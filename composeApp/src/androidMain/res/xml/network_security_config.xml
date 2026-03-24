@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    CORREÇÃO M5: Restringir tráfego HTTP sem criptografia.
+    Antes, usesCleartextTraffic=true permitia HTTP para QUALQUER domínio.
+    Agora, apenas os domínios da API que precisam de HTTP são permitidos.
+    O domínio principal (lfsystem.com.br) já usa HTTPS.
+    
+    Se algum cliente usa API em servidor local (IP sem SSL),
+    adicionar o IP/domínio aqui.
+-->
+<network-security-config>
+    <!-- Padrão: bloquear HTTP em todos os domínios -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Permitir HTTP apenas para domínios específicos que ainda não têm SSL -->
+    <!-- APIs de clientes podem rodar em servidores sem certificado -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Servidores locais de desenvolvimento -->
+        <domain includeSubdomains="true">10.0.0.0</domain>
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">localhost</domain>
+    </domain-config>
+</network-security-config>

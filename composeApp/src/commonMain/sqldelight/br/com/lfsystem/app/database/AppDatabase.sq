@@ -1,0 +1,747 @@
+-- ===============================
+-- TABELA DO MOTORISTA LOGADO
+-- ===============================
+CREATE TABLE Motorista (
+    id INTEGER PRIMARY KEY,
+    motorista_id TEXT NOT NULL,
+    nome TEXT NOT NULL,
+    cnpj TEXT NOT NULL,
+    usuario TEXT NOT NULL,
+    senha TEXT NOT NULL
+);
+
+-- ===============================
+-- TABELA DE DESTINOS (ROTAS)
+-- ===============================
+CREATE TABLE Destino (
+    id INTEGER PRIMARY KEY,
+    servidor_id INTEGER NOT NULL,
+    nome TEXT NOT NULL
+);
+
+-- ===============================
+-- TABELA DE EQUIPAMENTOS (PLACAS)
+-- ===============================
+CREATE TABLE Equipamento (
+    id INTEGER PRIMARY KEY,
+    servidor_id INTEGER NOT NULL,
+    placa TEXT NOT NULL
+);
+
+-- ===============================
+-- TABELA DE VIAGENS (para sincronizar)
+-- ===============================
+CREATE TABLE Viagem (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    numerobd TEXT NOT NULL,
+    cte TEXT NOT NULL,
+    numerobd2 TEXT,
+    cte2 TEXT,
+    destino_id INTEGER NOT NULL,
+    destino_nome TEXT NOT NULL,
+    placa TEXT NOT NULL,
+    data_viagem TEXT NOT NULL,
+    km_inicio TEXT NOT NULL,
+    pesocarga TEXT NOT NULL,
+    valorfrete TEXT,
+    foto_painel_saida TEXT,
+    data_criacao TEXT NOT NULL,
+    sincronizado INTEGER NOT NULL DEFAULT 0
+);
+
+-- ===============================
+-- QUERIES DO MOTORISTA
+-- ===============================
+getMotorista:
+SELECT * FROM Motorista LIMIT 1;
+
+insertMotorista:
+INSERT OR REPLACE INTO Motorista (id, motorista_id, nome, cnpj, usuario, senha)
+VALUES (1, ?, ?, ?, ?, ?);
+
+deleteMotorista:
+DELETE FROM Motorista;
+
+-- ===============================
+-- QUERIES DE DESTINOS
+-- ===============================
+getAllDestinos:
+SELECT * FROM Destino ORDER BY nome;
+
+insertDestino:
+INSERT OR REPLACE INTO Destino (servidor_id, nome)
+VALUES (?, ?);
+
+deleteAllDestinos:
+DELETE FROM Destino;
+
+getDestinoById:
+SELECT * FROM Destino WHERE servidor_id = ?;
+
+-- ===============================
+-- QUERIES DE EQUIPAMENTOS
+-- ===============================
+getAllEquipamentos:
+SELECT * FROM Equipamento ORDER BY placa;
+
+insertEquipamento:
+INSERT OR REPLACE INTO Equipamento (servidor_id, placa)
+VALUES (?, ?);
+
+deleteAllEquipamentos:
+DELETE FROM Equipamento;
+
+-- ===============================
+-- QUERIES DE VIAGENS
+-- ===============================
+getAllViagens:
+SELECT * FROM Viagem ORDER BY id DESC;
+
+getViagensNaoSincronizadas:
+SELECT * FROM Viagem WHERE sincronizado = 0;
+
+countViagensNaoSincronizadas:
+SELECT COUNT(*) FROM Viagem WHERE sincronizado = 0;
+
+insertViagem:
+INSERT INTO Viagem (numerobd, cte, numerobd2, cte2, destino_id, destino_nome, placa, data_viagem, km_inicio, pesocarga, valorfrete, foto_painel_saida, data_criacao, sincronizado)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
+
+marcarViagemSincronizada:
+UPDATE Viagem SET sincronizado = 1 WHERE id = ?;
+
+deleteViagensSincronizadas:
+DELETE FROM Viagem WHERE sincronizado = 1;
+deleteViagemById:
+DELETE FROM Viagem WHERE id = ?;
+-- ===============================
+-- CONTAGEM TOTAL DE PENDENTES
+-- ===============================
+countTotalPendentes:
+SELECT (SELECT COUNT(*) FROM Viagem WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Arla WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Abastecimento WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Manutencao WHERE sincronizado = 0) + (SELECT COUNT(*) FROM FinalizacaoViagem WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Descarga WHERE sincronizado = 0) + (SELECT COUNT(*) FROM OutraDespesa WHERE sincronizado = 0) + (SELECT COUNT(*) FROM ChecklistPreViagem WHERE sincronizado = 0) + (SELECT COUNT(*) FROM ChecklistPosViagem WHERE sincronizado = 0);
+
+-- ===============================
+-- TABELA DE ARLA (para sincronizar)
+-- ===============================
+CREATE TABLE Arla (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    motorista_id TEXT NOT NULL,
+    viagem_id INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    valor TEXT NOT NULL,
+    litros TEXT NOT NULL,
+    posto TEXT NOT NULL,
+    km_posto TEXT NOT NULL,
+    foto TEXT,
+    sincronizado INTEGER NOT NULL DEFAULT 0
+);
+-- ===============================
+-- QUERIES DE ARLA
+-- ===============================
+getAllArlas:
+SELECT * FROM Arla ORDER BY id DESC;
+
+getArlasNaoSincronizadas:
+SELECT * FROM Arla WHERE sincronizado = 0;
+
+countArlasNaoSincronizadas:
+SELECT COUNT(*) FROM Arla WHERE sincronizado = 0;
+
+insertArla:
+INSERT INTO Arla (
+    motorista_id,
+    viagem_id,
+    data,
+    valor,
+    litros,
+    posto,
+    km_posto,
+    foto,
+    sincronizado
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0);
+
+marcarArlaSincronizada:
+UPDATE Arla SET sincronizado = 1 WHERE id = ?;
+
+deleteArlasSincronizadas:
+DELETE FROM Arla WHERE sincronizado = 1;
+
+-- ===============================
+-- TABELA DE ABASTECIMENTO (para sincronizar)
+-- ===============================
+CREATE TABLE Abastecimento (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    motorista_id TEXT NOT NULL,
+    viagem_id INTEGER NOT NULL,
+    equipamento_id INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    valor TEXT NOT NULL,
+    litros TEXT NOT NULL,
+    posto TEXT NOT NULL,
+    km_posto TEXT NOT NULL,
+    foto TEXT,
+    foto_marcador TEXT,
+    tipo_pagamento TEXT NOT NULL DEFAULT 'dinheiro',
+    tipo_combustivel TEXT NOT NULL DEFAULT 'Diesel Caminhão',
+    horas TEXT,
+    sincronizado INTEGER DEFAULT 0,
+    data_criacao TEXT DEFAULT CURRENT_TIMESTAMP
+);
+-- ===============================
+-- QUERIES DE ABASTECIMENTO
+-- ===============================
+getAllAbastecimentos:
+SELECT * FROM Abastecimento ORDER BY id DESC;
+
+getAbastecimentosNaoSincronizados:
+SELECT * FROM Abastecimento WHERE sincronizado = 0;
+
+countAbastecimentosNaoSincronizados:
+SELECT COUNT(*) FROM Abastecimento WHERE sincronizado = 0;
+
+insertAbastecimento:
+INSERT INTO Abastecimento (
+    motorista_id,
+    viagem_id,
+    equipamento_id,
+    data,
+    valor,
+    litros,
+    posto,
+    km_posto,
+    foto,
+    foto_marcador,
+    tipo_pagamento,
+    tipo_combustivel,
+    horas,
+    sincronizado
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
+marcarAbastecimentoSincronizado:
+UPDATE Abastecimento SET sincronizado = 1 WHERE id = ?;
+
+deleteAbastecimentosSincronizados:
+DELETE FROM Abastecimento WHERE sincronizado = 1;
+
+
+-- ===============================
+-- TABELA DE VIAGEM ATUAL (offline)
+-- ===============================
+CREATE TABLE ViagemAtual (
+    id INTEGER PRIMARY KEY,
+    viagem_id INTEGER NOT NULL,
+    destino TEXT NOT NULL,
+    data_inicio TEXT NOT NULL,
+    km_inicio TEXT NOT NULL DEFAULT '',
+    km_rota TEXT NOT NULL DEFAULT '0'
+);
+
+-- ===============================
+-- QUERIES DE VIAGEM ATUAL
+-- ===============================
+getViagemAtual:
+SELECT * FROM ViagemAtual LIMIT 1;
+
+insertViagemAtual:
+INSERT OR REPLACE INTO ViagemAtual (id, viagem_id, destino, data_inicio, km_inicio, km_rota)
+VALUES (1, ?, ?, ?, ?, ?);
+
+deleteViagemAtual:
+DELETE FROM ViagemAtual;
+
+-- ===============================
+-- TABELA DE MANUTENÇÃO (para sincronizar)
+-- ===============================
+CREATE TABLE Manutencao (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    motorista_id TEXT NOT NULL,
+    viagem_id INTEGER NOT NULL,
+    data_manutencao TEXT NOT NULL,
+    placa TEXT NOT NULL,
+    servico TEXT NOT NULL,
+    descricao_servico TEXT,
+    local_manutencao TEXT,
+    valor TEXT NOT NULL,
+    km_troca_oleo TEXT,
+    km_troca_pneu TEXT,
+    pneus TEXT,
+    tipos_pneu TEXT,
+    foto_comprovante1 TEXT,
+    foto_comprovante2 TEXT,
+    sincronizado INTEGER NOT NULL DEFAULT 0
+);
+
+-- ===============================
+-- QUERIES DE MANUTENÇÃO
+-- ===============================
+getAllManutencoes:
+SELECT * FROM Manutencao ORDER BY id DESC;
+
+getManutencoesNaoSincronizadas:
+SELECT * FROM Manutencao WHERE sincronizado = 0;
+
+countManutencoesNaoSincronizadas:
+SELECT COUNT(*) FROM Manutencao WHERE sincronizado = 0;
+
+insertManutencao:
+INSERT INTO Manutencao (
+    motorista_id,
+    viagem_id,
+    data_manutencao,
+    placa,
+    servico,
+    descricao_servico,
+    local_manutencao,
+    valor,
+    km_troca_oleo,
+    km_troca_pneu,
+    pneus,
+    tipos_pneu,
+    foto_comprovante1,
+    foto_comprovante2,
+    sincronizado
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
+
+marcarManutencaoSincronizada:
+UPDATE Manutencao SET sincronizado = 1 WHERE id = ?;
+
+deleteManutencoesSincronizadas:
+DELETE FROM Manutencao WHERE sincronizado = 1;
+
+getLastInsertedManutencaoId:
+SELECT last_insert_rowid();
+
+-- ===============================
+-- TABELA DE FINALIZAÇÃO DE VIAGEM (para sincronizar)
+-- ===============================
+CREATE TABLE FinalizacaoViagem (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    motorista_id TEXT NOT NULL,
+    viagem_id INTEGER NOT NULL,
+    data_chegada TEXT NOT NULL,
+    km_chegada TEXT NOT NULL,
+    pesocarga_retorno TEXT,
+    valorfrete_retorno TEXT,
+    observacao TEXT,
+    foto_painel_chegada TEXT,
+    teve_retorno INTEGER NOT NULL DEFAULT 0,
+    local_carregou TEXT,
+    ordem_retorno TEXT,
+    cte_retorno TEXT,
+    sincronizado INTEGER NOT NULL DEFAULT 0
+);
+
+-- ===============================
+-- QUERIES DE FINALIZAÇÃO DE VIAGEM
+-- ===============================
+getAllFinalizacoes:
+SELECT * FROM FinalizacaoViagem ORDER BY id DESC;
+
+getFinalizacoesNaoSincronizadas:
+SELECT * FROM FinalizacaoViagem WHERE sincronizado = 0;
+
+countFinalizacoesNaoSincronizadas:
+SELECT COUNT(*) FROM FinalizacaoViagem WHERE sincronizado = 0;
+
+insertFinalizacaoViagem:
+INSERT INTO FinalizacaoViagem (
+    motorista_id,
+    viagem_id,
+    data_chegada,
+    km_chegada,
+    pesocarga_retorno,
+    valorfrete_retorno,
+    observacao,
+    foto_painel_chegada,
+    teve_retorno,
+    local_carregou,
+    ordem_retorno,
+    cte_retorno,
+    sincronizado
+) VALUES (:motorista_id, :viagem_id, :data_chegada, :km_chegada, :pesocarga_retorno, :valorfrete_retorno, :observacao, :foto_painel_chegada, :teve_retorno, :local_carregou, :ordem_retorno, :cte_retorno, 0);
+
+marcarFinalizacaoSincronizada:
+UPDATE FinalizacaoViagem SET sincronizado = 1 WHERE id = ?;
+
+deleteFinalizacoesSincronizadas:
+DELETE FROM FinalizacaoViagem WHERE sincronizado = 1;
+
+-- ===============================
+-- TABELA DE DESCARGA (para sincronizar)
+-- ===============================
+CREATE TABLE Descarga (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    motorista_id TEXT NOT NULL,
+    viagem_id INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    placa TEXT NOT NULL,
+    ordem_descarga INTEGER NOT NULL,
+    valor TEXT NOT NULL,
+    foto TEXT,
+    sincronizado INTEGER NOT NULL DEFAULT 0
+);
+
+-- ===============================
+-- TABELA PARA GUARDAR ÚLTIMO viagem_id DO SERVIDOR
+-- Usado como fallback quando ARLA/Abastecimento tem viagem_id = -1
+-- ===============================
+CREATE TABLE UltimaViagemServidor (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    viagem_id_servidor INTEGER NOT NULL
+);
+
+-- ===============================
+-- QUERIES DE UltimaViagemServidor
+-- ===============================
+salvarUltimaViagemServidor:
+INSERT OR REPLACE INTO UltimaViagemServidor (id, viagem_id_servidor) VALUES (1, :viagem_id_servidor);
+
+getUltimaViagemServidor:
+SELECT viagem_id_servidor FROM UltimaViagemServidor WHERE id = 1;
+
+-- ===============================
+-- TABELA PARA PERSISTIR MAPEAMENTO id_local -> id_servidor
+-- Garante que após fechar o app o mapeamento não seja perdido
+-- ===============================
+CREATE TABLE IF NOT EXISTS ViagemIdMapeamento (
+    id_local INTEGER PRIMARY KEY,
+    id_servidor INTEGER NOT NULL,
+    criado_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- QUERIES DE ViagemIdMapeamento
+inserirMapeamentoViagem:
+INSERT OR REPLACE INTO ViagemIdMapeamento (id_local, id_servidor) VALUES (:id_local, :id_servidor);
+
+getMapeamentoViagem:
+SELECT id_servidor FROM ViagemIdMapeamento WHERE id_local = :id_local;
+
+getMapeamentoViagemPorServidor:
+SELECT id_local FROM ViagemIdMapeamento WHERE id_servidor = :id_servidor;
+
+deletarMapeamentoViagem:
+DELETE FROM ViagemIdMapeamento WHERE id_local = :id_local;
+
+deletarMapeamentosAntigos:
+DELETE FROM ViagemIdMapeamento WHERE criado_em < :data_limite;
+
+-- ===============================
+-- QUERIES DE DESCARGA
+-- ===============================
+getAllDescargas:
+SELECT * FROM Descarga ORDER BY id DESC;
+
+getDescargasNaoSincronizadas:
+SELECT * FROM Descarga WHERE sincronizado = 0;
+
+countDescargasNaoSincronizadas:
+SELECT COUNT(*) FROM Descarga WHERE sincronizado = 0;
+
+insertDescarga:
+INSERT INTO Descarga (
+    motorista_id,
+    viagem_id,
+    data,
+    placa,
+    ordem_descarga,
+    valor,
+    foto,
+    sincronizado
+) VALUES (:motorista_id, :viagem_id, :data_, :placa, :ordem_descarga, :valor, :foto, 0);
+
+marcarDescargaSincronizada:
+UPDATE Descarga SET sincronizado = 1 WHERE id = ?;
+
+deleteDescargasSincronizadas:
+DELETE FROM Descarga WHERE sincronizado = 1;
+
+-- ===============================
+-- QUERIES DE ATUALIZAÇÃO DE IDs DE VIAGENS
+-- ===============================
+-- Estas queries atualizam o viagem_id em itens dependentes
+-- quando uma viagem offline é sincronizada e recebe um novo ID do servidor
+
+atualizarViagemIdAbastecimentos:
+UPDATE Abastecimento
+SET viagem_id = :viagem_id_novo
+WHERE viagem_id = :viagem_id_antigo AND sincronizado = 0;
+
+atualizarViagemIdArlas:
+UPDATE Arla
+SET viagem_id = :viagem_id_novo
+WHERE viagem_id = :viagem_id_antigo AND sincronizado = 0;
+
+atualizarViagemIdDescargas:
+UPDATE Descarga
+SET viagem_id = :viagem_id_novo
+WHERE viagem_id = :viagem_id_antigo AND sincronizado = 0;
+
+atualizarViagemIdManutencoes:
+UPDATE Manutencao
+SET viagem_id = :viagem_id_novo
+WHERE viagem_id = :viagem_id_antigo AND sincronizado = 0;
+
+atualizarViagemIdFinalizacoes:
+UPDATE FinalizacaoViagem
+SET viagem_id = :viagem_id_novo
+WHERE viagem_id = :viagem_id_antigo AND sincronizado = 0;
+
+-- ===============================
+-- QUERIES DE LIMPEZA DE DADOS PROBLEMÁTICOS
+-- ===============================
+deletarArlasComViagemIdInvalido:
+DELETE FROM Arla WHERE viagem_id <= 0 OR viagem_id IS NULL;
+
+deletarAbastecimentosComViagemIdInvalido:
+DELETE FROM Abastecimento WHERE viagem_id <= 0 OR viagem_id IS NULL;
+
+deletarDescargasComViagemIdInvalido:
+DELETE FROM Descarga WHERE viagem_id <= 0 OR viagem_id IS NULL;
+
+-- ===============================
+-- TABELA DE OUTRAS DESPESAS (Prioridade 2 - #6)
+-- Pedágio, Refeição, Hospedagem, Lavagem, Outros
+-- ===============================
+CREATE TABLE OutraDespesa (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    motorista_id TEXT NOT NULL,
+    viagem_id INTEGER NOT NULL,
+    tipo TEXT NOT NULL,
+    descricao TEXT,
+    valor TEXT NOT NULL,
+    data TEXT NOT NULL,
+    local_ TEXT,
+    foto_comprovante TEXT,
+    sincronizado INTEGER NOT NULL DEFAULT 0
+);
+
+-- ===============================
+-- QUERIES DE OUTRAS DESPESAS
+-- ===============================
+getAllOutrasDespesas:
+SELECT * FROM OutraDespesa ORDER BY id DESC;
+
+getOutrasDespesasNaoSincronizadas:
+SELECT * FROM OutraDespesa WHERE sincronizado = 0;
+
+countOutrasDespesasNaoSincronizadas:
+SELECT COUNT(*) FROM OutraDespesa WHERE sincronizado = 0;
+
+insertOutraDespesa:
+INSERT INTO OutraDespesa (
+    motorista_id,
+    viagem_id,
+    tipo,
+    descricao,
+    valor,
+    data,
+    local_,
+    foto_comprovante,
+    sincronizado
+) VALUES (:motorista_id, :viagem_id, :tipo, :descricao, :valor, :data_, :local_, :foto_comprovante, 0);
+
+marcarOutraDespesaSincronizada:
+UPDATE OutraDespesa SET sincronizado = 1 WHERE id = ?;
+
+deleteOutrasDespesasSincronizadas:
+DELETE FROM OutraDespesa WHERE sincronizado = 1;
+
+atualizarViagemIdOutrasDespesas:
+UPDATE OutraDespesa
+SET viagem_id = :viagem_id_novo
+WHERE viagem_id = :viagem_id_antigo AND sincronizado = 0;
+
+-- ===============================
+-- TABELA DE CHECKLIST PRÉ-VIAGEM
+-- ===============================
+CREATE TABLE ChecklistPreViagem (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    motorista_id TEXT NOT NULL,
+    viagem_id INTEGER NOT NULL,
+    data_checklist TEXT NOT NULL,
+    placa TEXT NOT NULL,
+    -- Documentação
+    doc_cnh_valida INTEGER NOT NULL DEFAULT 0,
+    doc_crlv_veiculo INTEGER NOT NULL DEFAULT 0,
+    doc_antt_valida INTEGER NOT NULL DEFAULT 0,
+    doc_seguro_carga INTEGER NOT NULL DEFAULT 0,
+    doc_ordem_coleta INTEGER NOT NULL DEFAULT 0,
+    -- Parte Elétrica
+    elet_farol_dianteiro INTEGER NOT NULL DEFAULT 0,
+    elet_farol_traseiro INTEGER NOT NULL DEFAULT 0,
+    elet_luz_freio INTEGER NOT NULL DEFAULT 0,
+    elet_seta_direita INTEGER NOT NULL DEFAULT 0,
+    elet_seta_esquerda INTEGER NOT NULL DEFAULT 0,
+    elet_luz_re INTEGER NOT NULL DEFAULT 0,
+    elet_painel_funcionando INTEGER NOT NULL DEFAULT 0,
+    -- Pneus e Rodas
+    pneu_calibragem_ok INTEGER NOT NULL DEFAULT 0,
+    pneu_estado_conservacao INTEGER NOT NULL DEFAULT 0,
+    pneu_estepe_ok INTEGER NOT NULL DEFAULT 0,
+    pneu_ferramentas_troca INTEGER NOT NULL DEFAULT 0,
+    -- Fluidos e Níveis
+    fluido_oleo_motor INTEGER NOT NULL DEFAULT 0,
+    fluido_agua_radiador INTEGER NOT NULL DEFAULT 0,
+    fluido_fluido_freio INTEGER NOT NULL DEFAULT 0,
+    fluido_arla32 INTEGER NOT NULL DEFAULT 0,
+    fluido_combustivel INTEGER NOT NULL DEFAULT 0,
+    -- Equipamentos de Segurança
+    seg_extintor_validade INTEGER NOT NULL DEFAULT 0,
+    seg_triangulo INTEGER NOT NULL DEFAULT 0,
+    seg_macaco_chave_roda INTEGER NOT NULL DEFAULT 0,
+    seg_cones_faixa INTEGER NOT NULL DEFAULT 0,
+    seg_epi_completo INTEGER NOT NULL DEFAULT 0,
+    -- Carroceria / Baú
+    carr_lonas_cordas INTEGER NOT NULL DEFAULT 0,
+    carr_portas_bau INTEGER NOT NULL DEFAULT 0,
+    carr_assoalho_estado INTEGER NOT NULL DEFAULT 0,
+    carr_travas_lacres INTEGER NOT NULL DEFAULT 0,
+    -- Cabine
+    cab_bancos_cintos INTEGER NOT NULL DEFAULT 0,
+    cab_espelhos_retrovisores INTEGER NOT NULL DEFAULT 0,
+    cab_limpador_parabrisa INTEGER NOT NULL DEFAULT 0,
+    cab_ar_condicionado INTEGER NOT NULL DEFAULT 0,
+    cab_freio_estacionamento INTEGER NOT NULL DEFAULT 0,
+    -- Observações
+    observacoes TEXT,
+    -- Controle
+    sincronizado INTEGER NOT NULL DEFAULT 0,
+    data_criacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ===============================
+-- TABELA DE CHECKLIST PÓS-VIAGEM
+-- ===============================
+CREATE TABLE ChecklistPosViagem (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    motorista_id TEXT NOT NULL,
+    viagem_id INTEGER NOT NULL,
+    data_checklist TEXT NOT NULL,
+    placa TEXT NOT NULL,
+    -- Avarias e Danos
+    avaria_carroceria INTEGER NOT NULL DEFAULT 0,
+    avaria_cabine INTEGER NOT NULL DEFAULT 0,
+    avaria_pneus INTEGER NOT NULL DEFAULT 0,
+    avaria_espelhos INTEGER NOT NULL DEFAULT 0,
+    avaria_farois INTEGER NOT NULL DEFAULT 0,
+    avaria_descricao TEXT,
+    -- Níveis e Fluidos
+    pos_nivel_oleo INTEGER NOT NULL DEFAULT 0,
+    pos_nivel_agua INTEGER NOT NULL DEFAULT 0,
+    pos_nivel_combustivel INTEGER NOT NULL DEFAULT 0,
+    pos_nivel_arla INTEGER NOT NULL DEFAULT 0,
+    -- Limpeza
+    limp_cabine_limpa INTEGER NOT NULL DEFAULT 0,
+    limp_carroceria_limpa INTEGER NOT NULL DEFAULT 0,
+    limp_bau_vazio INTEGER NOT NULL DEFAULT 0,
+    -- Funcionamento
+    func_freios_ok INTEGER NOT NULL DEFAULT 0,
+    func_direcao_ok INTEGER NOT NULL DEFAULT 0,
+    func_suspensao_ok INTEGER NOT NULL DEFAULT 0,
+    func_motor_ruido INTEGER NOT NULL DEFAULT 0,
+    func_cambio_ok INTEGER NOT NULL DEFAULT 0,
+    -- Pendências
+    pend_manutencao_urgente INTEGER NOT NULL DEFAULT 0,
+    pend_descricao_manutencao TEXT,
+    pend_abastecimento_necessario INTEGER NOT NULL DEFAULT 0,
+    pend_troca_oleo_proxima INTEGER NOT NULL DEFAULT 0,
+    pend_km_atual TEXT,
+    -- Observações
+    observacoes TEXT,
+    -- Controle
+    sincronizado INTEGER NOT NULL DEFAULT 0,
+    data_criacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ===============================
+-- QUERIES DE CHECKLIST PRÉ-VIAGEM
+-- ===============================
+getAllChecklistsPre:
+SELECT * FROM ChecklistPreViagem ORDER BY id DESC;
+
+getChecklistsPreNaoSincronizados:
+SELECT * FROM ChecklistPreViagem WHERE sincronizado = 0;
+
+countChecklistsPreNaoSincronizados:
+SELECT COUNT(*) FROM ChecklistPreViagem WHERE sincronizado = 0;
+
+insertChecklistPre:
+INSERT INTO ChecklistPreViagem (
+    motorista_id, viagem_id, data_checklist, placa,
+    doc_cnh_valida, doc_crlv_veiculo, doc_antt_valida, doc_seguro_carga, doc_ordem_coleta,
+    elet_farol_dianteiro, elet_farol_traseiro, elet_luz_freio, elet_seta_direita, elet_seta_esquerda, elet_luz_re, elet_painel_funcionando,
+    pneu_calibragem_ok, pneu_estado_conservacao, pneu_estepe_ok, pneu_ferramentas_troca,
+    fluido_oleo_motor, fluido_agua_radiador, fluido_fluido_freio, fluido_arla32, fluido_combustivel,
+    seg_extintor_validade, seg_triangulo, seg_macaco_chave_roda, seg_cones_faixa, seg_epi_completo,
+    carr_lonas_cordas, carr_portas_bau, carr_assoalho_estado, carr_travas_lacres,
+    cab_bancos_cintos, cab_espelhos_retrovisores, cab_limpador_parabrisa, cab_ar_condicionado, cab_freio_estacionamento,
+    observacoes, sincronizado
+) VALUES (
+    :motorista_id, :viagem_id, :data_checklist, :placa,
+    :doc_cnh_valida, :doc_crlv_veiculo, :doc_antt_valida, :doc_seguro_carga, :doc_ordem_coleta,
+    :elet_farol_dianteiro, :elet_farol_traseiro, :elet_luz_freio, :elet_seta_direita, :elet_seta_esquerda, :elet_luz_re, :elet_painel_funcionando,
+    :pneu_calibragem_ok, :pneu_estado_conservacao, :pneu_estepe_ok, :pneu_ferramentas_troca,
+    :fluido_oleo_motor, :fluido_agua_radiador, :fluido_fluido_freio, :fluido_arla32, :fluido_combustivel,
+    :seg_extintor_validade, :seg_triangulo, :seg_macaco_chave_roda, :seg_cones_faixa, :seg_epi_completo,
+    :carr_lonas_cordas, :carr_portas_bau, :carr_assoalho_estado, :carr_travas_lacres,
+    :cab_bancos_cintos, :cab_espelhos_retrovisores, :cab_limpador_parabrisa, :cab_ar_condicionado, :cab_freio_estacionamento,
+    :observacoes, 0
+);
+
+marcarChecklistPreSincronizado:
+UPDATE ChecklistPreViagem SET sincronizado = 1 WHERE id = ?;
+
+deleteChecklistsPreSincronizados:
+DELETE FROM ChecklistPreViagem WHERE sincronizado = 1;
+
+getChecklistPrePorViagem:
+SELECT * FROM ChecklistPreViagem WHERE viagem_id = :viagem_id ORDER BY id DESC LIMIT 1;
+
+-- ===============================
+-- QUERIES DE CHECKLIST PÓS-VIAGEM
+-- ===============================
+getAllChecklistsPos:
+SELECT * FROM ChecklistPosViagem ORDER BY id DESC;
+
+getChecklistsPosNaoSincronizados:
+SELECT * FROM ChecklistPosViagem WHERE sincronizado = 0;
+
+countChecklistsPosNaoSincronizados:
+SELECT COUNT(*) FROM ChecklistPosViagem WHERE sincronizado = 0;
+
+insertChecklistPos:
+INSERT INTO ChecklistPosViagem (
+    motorista_id, viagem_id, data_checklist, placa,
+    avaria_carroceria, avaria_cabine, avaria_pneus, avaria_espelhos, avaria_farois, avaria_descricao,
+    pos_nivel_oleo, pos_nivel_agua, pos_nivel_combustivel, pos_nivel_arla,
+    limp_cabine_limpa, limp_carroceria_limpa, limp_bau_vazio,
+    func_freios_ok, func_direcao_ok, func_suspensao_ok, func_motor_ruido, func_cambio_ok,
+    pend_manutencao_urgente, pend_descricao_manutencao, pend_abastecimento_necessario, pend_troca_oleo_proxima, pend_km_atual,
+    observacoes, sincronizado
+) VALUES (
+    :motorista_id, :viagem_id, :data_checklist, :placa,
+    :avaria_carroceria, :avaria_cabine, :avaria_pneus, :avaria_espelhos, :avaria_farois, :avaria_descricao,
+    :pos_nivel_oleo, :pos_nivel_agua, :pos_nivel_combustivel, :pos_nivel_arla,
+    :limp_cabine_limpa, :limp_carroceria_limpa, :limp_bau_vazio,
+    :func_freios_ok, :func_direcao_ok, :func_suspensao_ok, :func_motor_ruido, :func_cambio_ok,
+    :pend_manutencao_urgente, :pend_descricao_manutencao, :pend_abastecimento_necessario, :pend_troca_oleo_proxima, :pend_km_atual,
+    :observacoes, 0
+);
+
+marcarChecklistPosSincronizado:
+UPDATE ChecklistPosViagem SET sincronizado = 1 WHERE id = ?;
+
+deleteChecklistsPosSincronizados:
+DELETE FROM ChecklistPosViagem WHERE sincronizado = 1;
+
+getChecklistPosPorViagem:
+SELECT * FROM ChecklistPosViagem WHERE viagem_id = :viagem_id ORDER BY id DESC LIMIT 1;
+
+atualizarViagemIdChecklistsPre:
+UPDATE ChecklistPreViagem
+SET viagem_id = :viagem_id_novo
+WHERE viagem_id = :viagem_id_antigo AND sincronizado = 0;
+
+atualizarViagemIdChecklistsPos:
+UPDATE ChecklistPosViagem
+SET viagem_id = :viagem_id_novo
+WHERE viagem_id = :viagem_id_antigo AND sincronizado = 0;

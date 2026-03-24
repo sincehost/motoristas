@@ -1,0 +1,98 @@
+-- Offline.sq - Operações e fotos offline
+
+-- Tabela de operações pendentes
+CREATE TABLE IF NOT EXISTS operacoes_pendentes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo TEXT NOT NULL,
+    dados TEXT NOT NULL,
+    status TEXT DEFAULT 'pendente',
+    tentativas INTEGER DEFAULT 0,
+    data_criacao INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+    data_atualizacao INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+    foto_ids TEXT DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_operacoes_status ON operacoes_pendentes(status);
+CREATE INDEX IF NOT EXISTS idx_operacoes_tipo ON operacoes_pendentes(tipo);
+
+-- Tabela de fotos offline
+CREATE TABLE IF NOT EXISTS fotos_offline (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    viagem_id INTEGER NOT NULL,
+    tipo TEXT NOT NULL,
+    imagem_base64 TEXT NOT NULL,
+    latitude REAL,
+    longitude REAL,
+    sincronizada INTEGER DEFAULT 0,
+    data_criacao INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_fotos_viagem ON fotos_offline(viagem_id);
+CREATE INDEX IF NOT EXISTS idx_fotos_sincronizada ON fotos_offline(sincronizada);
+
+-- QUERIES
+
+insertOperacaoPendente:
+INSERT INTO operacoes_pendentes (tipo, dados, status, tentativas, foto_ids)
+VALUES (?, ?, 'pendente', 0, ?);
+
+getOperacoesPendentes:
+SELECT id, tipo, dados, status, tentativas, data_criacao, foto_ids
+FROM operacoes_pendentes
+WHERE status IN ('pendente', 'falha_permanente')
+ORDER BY data_criacao ASC;
+
+updateOperacaoStatus:
+UPDATE operacoes_pendentes
+SET status = ?, data_atualizacao = (strftime('%s', 'now') * 1000)
+WHERE id = ?;
+
+incrementOperacaoTentativas:
+UPDATE operacoes_pendentes
+SET tentativas = tentativas + 1, data_atualizacao = (strftime('%s', 'now') * 1000)
+WHERE id = ?;
+
+deleteOperacao:
+DELETE FROM operacoes_pendentes WHERE id = ?;
+
+countOperacoesPendentes:
+SELECT COUNT(*) FROM operacoes_pendentes WHERE status = 'pendente';
+
+insertFotoOffline:
+INSERT INTO fotos_offline (viagem_id, tipo, imagem_base64, latitude, longitude, sincronizada)
+VALUES (?, ?, ?, ?, ?, 0);
+
+getFotoById:
+SELECT id, viagem_id, tipo, imagem_base64, latitude, longitude, sincronizada, data_criacao
+FROM fotos_offline WHERE id = ?;
+
+getFotosOffline:
+SELECT id, viagem_id, tipo, imagem_base64, latitude, longitude, sincronizada, data_criacao
+FROM fotos_offline ORDER BY data_criacao DESC;
+
+getFotosNaoSincronizadas:
+SELECT id, viagem_id, tipo, imagem_base64, latitude, longitude, sincronizada, data_criacao
+FROM fotos_offline
+WHERE viagem_id = ? AND sincronizada = 0
+ORDER BY data_criacao ASC;
+
+getAllFotosNaoSincronizadas:
+SELECT id, viagem_id, tipo, imagem_base64, latitude, longitude, sincronizada, data_criacao
+FROM fotos_offline
+WHERE sincronizada = 0
+ORDER BY data_criacao ASC;
+
+marcarFotoSincronizada:
+UPDATE fotos_offline SET sincronizada = 1 WHERE id = ?;
+
+deletarFoto:
+DELETE FROM fotos_offline WHERE id = ?;
+
+deletarFotosPorViagem:
+DELETE FROM fotos_offline WHERE viagem_id = ?;
+
+countFotosNaoSincronizadas:
+SELECT COUNT(*) FROM fotos_offline WHERE sincronizada = 0;
+
+countFotosPorViagemNaoSincronizadas:
+SELECT COUNT(*) FROM fotos_offline WHERE viagem_id = ? AND sincronizada = 0;

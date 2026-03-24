@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema base usando Android Theme ao invés de AppCompat -->
+    <style name="Theme.Trakvia" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#08285A</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#08285A</item>
+    </style>
+</resources>

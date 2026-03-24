@@ -1,0 +1,84 @@
+workflows:
+  ios-workflow:
+    name: iOS Workflow
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Set up environment
+        script: |
+          chmod +x gradlew
+
+      - name: Create Podfile
+        script: |
+          cd iosApp
+          cat > Podfile << 'PODFILE_END'
+          platform :ios, '14.0'
+          
+          use_frameworks!
+          
+          target 'iosApp' do
+          end
+          
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              target.build_configurations.each do |config|
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+                config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
+                config.build_settings['OTHER_LDFLAGS'] << '-lsqlite3'
+              end
+            end
+          end
+          PODFILE_END
+          pod install
+
+      - name: Build iOS with SQLite3
+        script: |
+          cd iosApp
+          
+          xcodebuild -workspace iosApp.xcworkspace \
+            -scheme iosApp \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath $(PWD)/build \
+            OTHER_LDFLAGS="-lsqlite3" \
+            LIBRARY_SEARCH_PATHS='$(inherited) /usr/lib' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Create IPA
+        script: |
+          cd iosApp
+          mkdir -p $HOME/builds/output
+          
+          # O app se chama Motorista.app, não iosApp.app
+          APP_PATH="build/Build/Products/Debug-iphoneos/Motorista.app"
+          
+          if [ -d "$APP_PATH" ]; then
+            echo "✅ App encontrado: $APP_PATH"
+            cp -r "$APP_PATH" $HOME/builds/output/
+            cd $HOME/builds/output
+            mkdir Payload
+            mv Motorista.app Payload/
+            zip -r Motorista.ipa Payload
+            rm -rf Payload
+            echo "🎉 IPA CRIADO COM SUCESSO!"
+            ls -lh *.ipa
+          else
+            echo "❌ App não encontrado em: $APP_PATH"
+            echo "Procurando apps..."
+            find build -name "*.app" -type d
+            exit 1
+          fi
+
+    artifacts:
+      - $HOME/builds/output/*.ipa
+    publishing:
+      email:
+        recipients:
+          - lucas.felipe68@gmail.com

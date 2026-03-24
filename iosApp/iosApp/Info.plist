@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	
+	<key>NSCameraUsageDescription</key>
+<string>Precisamos da câmera para fotografar o painel do veículo</string>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>Precisamos acessar suas fotos para selecionar imagens</string>
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>Precisamos da sua localização para registrar o local da viagem</string>
+</dict>
+</plist>
