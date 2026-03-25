@@ -659,7 +659,7 @@ actual fun IniciarViagemScreen(
                                     onClick = {
                                         fotoImageBitmap = null
                                         fotoBase64 = null
-                                        mostrarMensagem("Foto removida")
+                                        // Foto removida silenciosamente
                                     },
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
@@ -804,7 +804,6 @@ actual fun IniciarViagemScreen(
                                                 dataInicio = dataViagemAPI,
                                                 kmInicio = kmInicio
                                             )
-                                            mostrarMensagem("✓ Viagem registrada com sucesso!")
                                             sucessoMsg = "Viagem registrada com sucesso!"
                                         } else {
                                             repository.salvarViagem(
@@ -831,7 +830,6 @@ actual fun IniciarViagemScreen(
                                                 dataInicio = dataViagemAPI,
                                                 kmInicio = kmInicio
                                             )
-                                            mostrarMensagem("✓ Viagem salva. Sincronize depois.")
                                             sucessoMsg = "Viagem salva. Sincronize depois."
                                         }
                                     } catch (e: Exception) {
@@ -859,7 +857,6 @@ actual fun IniciarViagemScreen(
                                             dataInicio = dataViagemAPI,
                                             kmInicio = kmInicio
                                         )
-                                        mostrarMensagem("✓ Viagem salva. Sincronize quando tiver internet.")
                                         sucessoMsg = "Viagem salva. Sincronize quando tiver internet."
                                     }
 

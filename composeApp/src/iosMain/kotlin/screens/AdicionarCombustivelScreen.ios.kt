@@ -567,7 +567,7 @@ actual fun AdicionarCombustivelScreen(
                                 onRemover = {
                                     fotoMarcador = null
                                     fotoMarcadorBase64 = null
-                                    mostrarMensagem("Foto removida")
+                                    // Foto removida silenciosamente
                                 }
                             )
 
@@ -817,7 +817,7 @@ actual fun AdicionarCombustivelScreen(
                                 onRemover = {
                                     fotoCupom = null
                                     fotoCupomBase64 = null
-                                    mostrarMensagem("Foto removida")
+                                    // Foto removida silenciosamente
                                 }
                             )
 

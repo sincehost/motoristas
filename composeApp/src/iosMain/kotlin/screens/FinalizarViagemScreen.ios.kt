@@ -765,7 +765,7 @@ actual fun FinalizarViagemScreen(
                             onRemover = {
                                 fotoPainel = null
                                 fotoPainelBase64 = null
-                                mostrarMensagem("Foto removida")
+                                // Foto removida silenciosamente
                             }
                         )
 

@@ -556,7 +556,7 @@ actual fun AdicionarArlaScreen(
                                         onClick = {
                                             fotoComprovante = null
                                             fotoBase64 = null
-                                            mostrarMensagem("Foto removida")
+                                            // Foto removida silenciosamente
                                         },
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
