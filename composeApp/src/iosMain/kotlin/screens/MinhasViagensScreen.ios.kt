@@ -1,6 +1,7 @@
 package screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,7 +21,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import api.*
 import database.AppRepository
 import kotlinx.coroutines.launch
@@ -90,17 +90,16 @@ private fun ListaViagensContent(
     var viagemSelecionada by remember { mutableStateOf<ViagemItem?>(null) }
     var mostrarConfirmacaoExcluir by remember { mutableStateOf(false) }
     var excluindo by remember { mutableStateOf(false) }
+    var erroMsg by remember { mutableStateOf<String?>(null) }
+    var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
-        scope.launch {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(
-                message = mensagem,
-                duration = if (isErro) SnackbarDuration.Long else SnackbarDuration.Short
-            )
+        if (isErro) {
+            erroMsg = mensagem
+        } else {
+            sucessoMsg = mensagem
         }
     }
 
@@ -177,18 +176,17 @@ private fun ListaViagensContent(
     }
 
     if (mostrarModalAcoes && viagemSelecionada != null) {
-        Dialog(onDismissRequest = { mostrarModalAcoes = false }) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground)
-            ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-                    Text("Ações da Viagem", fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(20.dp))
-
+        val viagemId = viagemSelecionada!!.id
+        AlertDialog(
+            onDismissRequest = { mostrarModalAcoes = false; viagemSelecionada = null },
+            containerColor = AppColors.CardBackground,
+            title = {
+                Text("Ações da Viagem", fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Button(
-                        onClick = { mostrarModalAcoes = false; onResumo(viagemSelecionada!!.id) },
+                        onClick = { mostrarModalAcoes = false; viagemSelecionada = null; onResumo(viagemId) },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
@@ -201,7 +199,7 @@ private fun ListaViagensContent(
                     Spacer(Modifier.height(12.dp))
 
                     Button(
-                        onClick = { mostrarModalAcoes = false; onDespesas(viagemSelecionada!!.id) },
+                        onClick = { mostrarModalAcoes = false; viagemSelecionada = null; onDespesas(viagemId) },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.Orange)
@@ -210,21 +208,20 @@ private fun ListaViagensContent(
                         Spacer(Modifier.width(8.dp))
                         Text("Visualizar Despesas")
                     }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    OutlinedButton(
-                        onClick = { mostrarModalAcoes = false },
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.ArrowBack, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Voltar")
-                    }
+                }
+            },
+            confirmButton = {
+                OutlinedButton(
+                    onClick = { mostrarModalAcoes = false; viagemSelecionada = null },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.ArrowBack, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Voltar")
                 }
             }
-        }
+        )
     }
 
     if (mostrarConfirmacaoExcluir && viagemSelecionada != null) {
@@ -242,28 +239,16 @@ private fun ListaViagensContent(
         )
     }
 
+    // Diálogos modais de erro e sucesso
+    if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
+    if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null }
+
     Scaffold(
         topBar = {
             GradientTopBar(
                 title = "Minhas Viagens",
                 onBackClick = onVoltar
             )
-        },
-        snackbarHost = {
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.padding(16.dp)
-            ) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = if (data.visuals.message.contains("sucesso", ignoreCase = true) ||
-                        data.visuals.message.contains("excluída", ignoreCase = true))
-                        AppColors.Secondary else AppColors.Error,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    actionColor = Color.White
-                )
-            }
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).background(AppColors.Background)) {
@@ -462,15 +447,15 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val focusManager = LocalFocusManager.current
+    var erroMsgEditar by remember { mutableStateOf<String?>(null) }
+    var sucessoMsgEditar by remember { mutableStateOf<String?>(null) }
 
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
-        scope.launch {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(
-                message = mensagem,
-                duration = if (isErro) SnackbarDuration.Long else SnackbarDuration.Short
-            )
+        if (isErro) {
+            erroMsgEditar = mensagem
+        } else {
+            sucessoMsgEditar = mensagem
         }
     }
 
@@ -524,9 +509,7 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                     ordem_retorno = ordemRetorno, cte_retorno = cteRetorno, descricao = descricao
                 ))
                 if (response.status == "ok") {
-                    mostrarMensagem("Viagem atualizada com sucesso!")
-                    kotlinx.coroutines.delay(1500)
-                    onVoltar()
+                    sucessoMsgEditar = "Viagem atualizada com sucesso!"
                 } else {
                     mostrarMensagem(response.mensagem ?: "Erro ao salvar", isErro = true)
                 }
@@ -540,28 +523,16 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
     var destinoExpandido by remember { mutableStateOf(false) }
     var placaExpandida by remember { mutableStateOf(false) }
 
+    // Diálogos modais de erro e sucesso
+    if (erroMsgEditar != null) ui.ErroDialog(erroMsgEditar!!) { erroMsgEditar = null }
+    if (sucessoMsgEditar != null) ui.SucessoDialog(sucessoMsgEditar!!) { sucessoMsgEditar = null; onVoltar() }
+
     Scaffold(
         topBar = {
             GradientTopBar(
                 title = "Editar Viagem",
                 onBackClick = onVoltar
             )
-        },
-        snackbarHost = {
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.padding(16.dp)
-            ) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = if (data.visuals.message.contains("sucesso", ignoreCase = true) ||
-                        data.visuals.message.contains("atualizada", ignoreCase = true))
-                        AppColors.Secondary else AppColors.Error,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    actionColor = Color.White
-                )
-            }
         }
     ) { padding ->
         when {
@@ -573,7 +544,9 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                     Text(erro!!, color = AppColors.Error)
                 }
             }
-            else -> Column(modifier = Modifier.fillMaxSize().padding(padding).background(AppColors.Background).verticalScroll(scrollState).padding(16.dp)) {
+            else -> Column(modifier = Modifier.fillMaxSize().padding(padding).background(AppColors.Background)
+                .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
+                .verticalScroll(scrollState).padding(16.dp)) {
                 Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground)) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                         Text("Placa", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)

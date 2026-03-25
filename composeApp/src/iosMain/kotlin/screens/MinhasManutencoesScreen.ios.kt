@@ -1,6 +1,7 @@
 package screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +13,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -61,7 +64,8 @@ private fun ListaManutencoesContent(
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
+    var erroMsg by remember { mutableStateOf<String?>(null) }
+    var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     var carregando by remember { mutableStateOf(true) }
     var erro by remember { mutableStateOf<String?>(null) }
@@ -73,12 +77,10 @@ private fun ListaManutencoesContent(
 
     // Função para mostrar mensagens
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
-        scope.launch {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(
-                message = mensagem,
-                duration = if (isErro) SnackbarDuration.Long else SnackbarDuration.Short
-            )
+        if (isErro) {
+            erroMsg = mensagem
+        } else {
+            sucessoMsg = mensagem
         }
     }
 
@@ -176,28 +178,16 @@ private fun ListaManutencoesContent(
         )
     }
 
+    // Diálogos modais
+    if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
+    if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null }
+
     Scaffold(
         topBar = {
             GradientTopBar(
                 title = "Minhas Manutenções",
                 onBackClick = onVoltar
             )
-        },
-        snackbarHost = {
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.padding(16.dp)
-            ) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = if (data.visuals.message.contains("sucesso", ignoreCase = true) ||
-                        data.visuals.message.contains("excluída", ignoreCase = true))
-                        Color(0xFF10B981) else AppColors.Error,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    actionColor = Color.White
-                )
-            }
         }
     ) { padding ->
         Box(

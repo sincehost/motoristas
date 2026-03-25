@@ -2,6 +2,7 @@ package screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +15,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -97,7 +100,9 @@ actual fun AdicionarDescargaScreen(
 ) {
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val focusManager = LocalFocusManager.current
+    var erroMsg by remember { mutableStateOf<String?>(null) }
+    var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     // Cores
     val primaryColor = Color(0xFF1E88E5)
@@ -130,12 +135,10 @@ actual fun AdicionarDescargaScreen(
 
     // Função para mostrar mensagens
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
-        scope.launch {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(
-                message = mensagem,
-                duration = if (isErro) SnackbarDuration.Long else SnackbarDuration.Short
-            )
+        if (isErro) {
+            erroMsg = mensagem
+        } else {
+            sucessoMsg = mensagem
         }
     }
 
@@ -254,9 +257,9 @@ actual fun AdicionarDescargaScreen(
                         )
                     )
                     if (response.status == "ok") {
-                        // API salvou com sucesso - NÃO salvar localmente
+                        // API salvou com sucesso
                         sucesso = true
-                        mostrarMensagem("✓ Descarga registrada com sucesso!")
+                        sucessoMsg = "Descarga registrada com sucesso!"
                     } else {
                         mostrarMensagem(response.mensagem ?: "Erro ao salvar", isErro = true)
                     }
@@ -272,7 +275,7 @@ actual fun AdicionarDescargaScreen(
                         foto = fotoBase64
                     )
                     sucesso = true
-                    mostrarMensagem("✓ Descarga salva! Sincronize quando tiver internet.")
+                    sucessoMsg = "Descarga salva! Sincronize quando tiver internet."
                 }
             } catch (e: Exception) {
                 mostrarMensagem("Erro ao salvar: ${e.message}", isErro = true)
@@ -409,6 +412,10 @@ actual fun AdicionarDescargaScreen(
         return
     }
 
+    // Diálogos modais de erro e sucesso
+    if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
+    if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onSucesso() }
+
     // ========== FORMULÁRIO ==========
     Scaffold(
         topBar = {
@@ -416,22 +423,6 @@ actual fun AdicionarDescargaScreen(
                 title = "Adicionar Descarga",
                 onBackClick = onVoltar
             )
-        },
-        snackbarHost = {
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.padding(16.dp)
-            ) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = if (data.visuals.message.contains("sucesso", ignoreCase = true) ||
-                        data.visuals.message.contains("salva", ignoreCase = true))
-                        successColor else errorColor,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    actionColor = Color.White
-                )
-            }
         }
     ) { padding ->
         Column(
@@ -439,6 +430,7 @@ actual fun AdicionarDescargaScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .background(backgroundColor)
+                .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
                 .verticalScroll(scrollState)
         ) {
             // Info da viagem

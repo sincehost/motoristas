@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,7 +18,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -107,12 +110,14 @@ actual fun AdicionarArlaScreen(
     val motorista = remember { repository.getMotoristaLogado() }
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val focusManager = LocalFocusManager.current
 
     // Estados
     var salvando by remember { mutableStateOf(false) }
     var carregando by remember { mutableStateOf(true) }
     var modoOffline by remember { mutableStateOf(false) }
+    var erroMsg by remember { mutableStateOf<String?>(null) }
+    var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     // Viagem em andamento (pega automaticamente)
     var viagemEmAndamento by remember { mutableStateOf<api.ViagemAberta?>(null) }
@@ -171,14 +176,12 @@ actual fun AdicionarArlaScreen(
     var fotoComprovante by remember { mutableStateOf<ImageBitmap?>(null) }
     var fotoBase64 by remember { mutableStateOf<String?>(null) }
 
-    // Função para mostrar mensagens
+    // Função para mostrar mensagens via modal
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
-        scope.launch {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(
-                message = mensagem,
-                duration = if (isErro) SnackbarDuration.Long else SnackbarDuration.Short
-            )
+        if (isErro) {
+            erroMsg = mensagem
+        } else {
+            sucessoMsg = mensagem
         }
     }
 
@@ -269,10 +272,8 @@ actual fun AdicionarArlaScreen(
                         )
                     )
                     if (response.status == "ok") {
-                        // API salvou com sucesso - NÃO salvar localmente
-                        mostrarMensagem("✓ ARLA registrado com sucesso!")
-                        kotlinx.coroutines.delay(1500)
-                        onSucesso()
+                        // API salvou com sucesso
+                        sucessoMsg = "ARLA registrado com sucesso!"
                     } else {
                         mostrarMensagem(response.mensagem ?: "Erro ao salvar", isErro = true)
                     }
@@ -288,9 +289,7 @@ actual fun AdicionarArlaScreen(
                         kmPosto = kmPosto,
                         foto = fotoBase64
                     )
-                    mostrarMensagem("✓ ARLA salvo! Sincronize quando tiver internet.")
-                    kotlinx.coroutines.delay(1500)
-                    onSucesso()
+                    sucessoMsg = "ARLA salvo! Sincronize quando tiver internet."
                 }
             } catch (e: Exception) {
                 mostrarMensagem("Erro ao salvar: ${e.message}", isErro = true)
@@ -299,28 +298,16 @@ actual fun AdicionarArlaScreen(
         }
     }
 
+    // Diálogos modais de erro e sucesso
+    if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
+    if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onSucesso() }
+
     Scaffold(
         topBar = {
             GradientTopBar(
                 title = "Adicionar Arla",
                 onBackClick = onVoltar
             )
-        },
-        snackbarHost = {
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.padding(16.dp)
-            ) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = if (data.visuals.message.contains("sucesso", ignoreCase = true) ||
-                        data.visuals.message.contains("salv", ignoreCase = true))
-                        AppColors.Secondary else AppColors.Error,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    actionColor = Color.White
-                )
-            }
         }
     ) { padding ->
         if (carregando) {
@@ -340,6 +327,7 @@ actual fun AdicionarArlaScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .background(AppColors.Background)
+                    .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
                     .verticalScroll(scrollState)
                     .padding(16.dp)
             ) {

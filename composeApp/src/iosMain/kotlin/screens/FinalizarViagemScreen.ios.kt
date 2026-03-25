@@ -113,7 +113,9 @@ actual fun FinalizarViagemScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
-    val snackbarHostState = remember { SnackbarHostState() }
+
+    var erroMsg by remember { mutableStateOf<String?>(null) }
+    var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     // Estados
     var salvando by remember { mutableStateOf(false) }
@@ -206,12 +208,10 @@ actual fun FinalizarViagemScreen(
 
     // Função para mostrar mensagens
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
-        scope.launch {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(
-                message = mensagem,
-                duration = if (isErro) SnackbarDuration.Long else SnackbarDuration.Short
-            )
+        if (isErro) {
+            erroMsg = mensagem
+        } else {
+            sucessoMsg = mensagem
         }
     }
 
@@ -364,12 +364,10 @@ actual fun FinalizarViagemScreen(
                 repository.limparViagemAtual()
 
                 if (salvouOnline) {
-                    mostrarMensagem("✓ Viagem finalizada com sucesso!")
+                    sucessoMsg = "Viagem finalizada com sucesso!"
                 } else {
-                    mostrarMensagem("✓ Viagem salva! Será sincronizada quando houver conexão.")
+                    sucessoMsg = "Viagem salva! Será sincronizada quando houver conexão."
                 }
-                kotlinx.coroutines.delay(1500)
-                onSucesso()
             } catch (e: Exception) {
                 mostrarMensagem("Erro ao salvar: ${e.message}", isErro = true)
             }
@@ -377,28 +375,16 @@ actual fun FinalizarViagemScreen(
         }
     }
 
+    // Diálogos modais de erro e sucesso
+    if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
+    if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onSucesso() }
+
     Scaffold(
         topBar = {
             GradientTopBar(
                 title = "Finalizar Viagem",
                 onBackClick = onVoltar
             )
-        },
-        snackbarHost = {
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.padding(16.dp)
-            ) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = if (data.visuals.message.contains("sucesso", ignoreCase = true) ||
-                        data.visuals.message.contains("salva", ignoreCase = true))
-                        Color(0xFF10B981) else AppColors.Error,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    actionColor = Color.White
-                )
-            }
         }
     ) { padding ->
         if (carregando) {

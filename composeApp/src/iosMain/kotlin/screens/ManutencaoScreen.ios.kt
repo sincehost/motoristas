@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,7 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -39,6 +42,7 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
 
 private val SERVICOS = listOf("Troca de Óleo", "Troca de Pneu", "Freios", "Suspensão", "Elétrica", "Funilaria", "Outros")
+private val TIPOS_PNEU_OPCOES = listOf("Novo", "Recapado", "Usado")
 
 // ===============================
 // CAMERA DELEGATE PARA MANUTENÇÃO
@@ -96,6 +100,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
     val motorista = remember { repository.getMotoristaLogado() }
     val equipamentos = remember { repository.getEquipamentosParaDropdown() }
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
 
     var dataManutencao by remember { mutableStateOf(dataAtualFormatada()) }
     var placaSelecionada by remember { mutableStateOf("") }
@@ -110,6 +115,10 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
     var placaExpanded by remember { mutableStateOf(false) }
     var servicoExpanded by remember { mutableStateOf(false) }
+
+    // === ESTADOS DE PNEUS ===
+    var pneusSelecionados by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    var tiposPneu by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
 
     // === ESTADOS DE FOTO ===
     var foto1Base64 by remember { mutableStateOf<String?>(null) }
@@ -129,6 +138,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
     }
 
     fun abrirCamera(fotoIndex: Int) {
+        focusManager.clearFocus()
         val vc = UIApplication.sharedApplication.keyWindow?.rootViewController ?: return
         if (!UIImagePickerController.isSourceTypeAvailable(UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)) {
             fotoMsg = "Câmera não disponível"; fotoMsgIsError = true; return
@@ -141,9 +151,17 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
     }
 
     fun salvar() {
+        focusManager.clearFocus()
         if (placaSelecionada.isBlank()) { erroMsg = "Selecione uma placa"; return }
         if (valor.isBlank()) { erroMsg = "Informe o valor"; return }
         if (servicoSelecionado == "Troca de Óleo" && kmTrocaOleo.isBlank()) { erroMsg = "Informe o KM da troca de óleo"; return }
+        if (servicoSelecionado == "Troca de Pneu") {
+            if (kmTrocaPneu.isBlank()) { erroMsg = "Informe o KM da troca de pneu"; return }
+            if (pneusSelecionados.isEmpty()) { erroMsg = "Selecione pelo menos um pneu"; return }
+            for (pneu in pneusSelecionados) {
+                if (tiposPneu[pneu].isNullOrBlank()) { erroMsg = "Selecione o tipo para o pneu $pneu"; return }
+            }
+        }
 
         scope.launch {
             salvando = true
@@ -165,9 +183,10 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                         descricao_servico = descricaoServico, local_manutencao = localManutencao, valor = valor,
                         km_troca_oleo = if (servicoSelecionado == "Troca de Óleo") kmTrocaOleo else null,
                         km_troca_pneu = if (servicoSelecionado == "Troca de Pneu") kmTrocaPneu else null,
-                        pneus = emptyList(), tipos_pneu = emptyMap(),
+                        pneus = pneusSelecionados.toList(),
+                        tipos_pneu = tiposPneu.mapKeys { it.key },
                         foto_comprovante1 = foto1Base64, foto_comprovante2 = foto2Base64))
-                    if (resp.status == "ok") { repository.marcarManutencaoSincronizada(manutencaoId); sucessoMsg = "Manutenção registrada!" }
+                    if (resp.status == "ok") { repository.marcarManutencaoSincronizada(manutencaoId); sucessoMsg = "Manutenção registrada com sucesso!" }
                     else { sucessoMsg = "Manutenção salva. Será sincronizada automaticamente." }
                 } catch (_: Exception) { sucessoMsg = "Manutenção salva offline! Sincronize quando tiver internet." }
             } catch (e: Exception) { erroMsg = "Erro: ${e.message}" }
@@ -175,11 +194,20 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
         }
     }
 
+    // Diálogos modais de erro e sucesso
     if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
     if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onVoltar() }
 
     Scaffold(topBar = { GradientTopBar(title = "Adicionar Manutenção", onBackClick = onVoltar) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).background(AppColors.Background).verticalScroll(rememberScrollState()).padding(16.dp)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(AppColors.Background)
+                .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground), shape = RoundedCornerShape(16.dp)) {
                 Column(Modifier.padding(20.dp)) {
                     OutlinedTextField(dataManutencao, { dataManutencao = it }, label = { Text("Data") },
@@ -230,6 +258,40 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                         OutlinedTextField(kmTrocaPneu, { kmTrocaPneu = it.filter { c -> c.isDigit() } },
                             label = { Text("KM da troca") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+
+                        Spacer(Modifier.height(24.dp))
+                        HorizontalDivider(color = AppColors.Background)
+                        Spacer(Modifier.height(16.dp))
+
+                        Text("Selecione os Pneus", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppColors.TextPrimary)
+                        Spacer(Modifier.height(16.dp))
+
+                        ChassiPneusIos(
+                            pneusSelecionados = pneusSelecionados,
+                            onPneuToggle = { pneu ->
+                                pneusSelecionados = if (pneu in pneusSelecionados) pneusSelecionados - pneu else pneusSelecionados + pneu
+                            }
+                        )
+
+                        if (pneusSelecionados.isNotEmpty()) {
+                            Spacer(Modifier.height(20.dp))
+                            HorizontalDivider(color = AppColors.Background)
+                            Spacer(Modifier.height(16.dp))
+                            Text("Tipo de cada Pneu", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                            Spacer(Modifier.height(12.dp))
+
+                            pneusSelecionados.sorted().forEach { pneu ->
+                                TipoPneuSelectorIos(
+                                    pneuNumero = pneu,
+                                    tipoSelecionado = tiposPneu[pneu] ?: "",
+                                    opcoes = TIPOS_PNEU_OPCOES,
+                                    onTipoChange = { tipo ->
+                                        tiposPneu = tiposPneu.toMutableMap().apply { put(pneu, tipo) }
+                                    }
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
+                        }
                     }
                 }
             }
@@ -257,9 +319,13 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
 
             Spacer(Modifier.height(24.dp))
             Button(onClick = { salvar() }, enabled = !salvando, modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)) {
+                shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6))) {
                 if (salvando) CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
-                else Text("Salvar Manutenção", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                else {
+                    Icon(Icons.Default.Save, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("SALVAR MANUTENÇÃO", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
             }
             Spacer(Modifier.height(32.dp))
         }
@@ -282,10 +348,118 @@ private fun FotoSlotManutencao(label: String, bitmap: ImageBitmap?, onClick: () 
                 .border(2.dp, Color(0xFFE0E0E0), RoundedCornerShape(12.dp)).background(Color(0xFFF5F5F5)).clickable { onClick() },
                 contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.CameraAlt, null, tint = AppColors.Primary, modifier = Modifier.size(32.dp))
+                    Icon(Icons.Default.CameraAlt, null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(32.dp))
                     Spacer(Modifier.height(4.dp))
                     Text(label, fontSize = 12.sp, color = AppColors.TextSecondary)
                 }
+            }
+        }
+    }
+}
+
+// ===============================
+// CHASSI DE PNEUS (igual Android)
+// ===============================
+@Composable
+private fun ChassiPneusIos(pneusSelecionados: Set<Int>, onPneuToggle: (Int) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(modifier = Modifier.width(8.dp).height(4.dp).background(Color(0xFF374151), RoundedCornerShape(4.dp)))
+
+        Text("Eixo Dianteiro", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusIos(listOf(1, 2), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+        Text("Eixo 2", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusIos(listOf(3, 4), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+        Text("Eixo 3 (Tração)", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusDuploIos(listOf(5, 6, 7, 8), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+        Text("Eixo 4 (Tração)", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusDuploIos(listOf(9, 10, 11, 12), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(4.dp).height(30.dp).background(Color(0xFF9CA3AF)))
+        Text("── Carreta ──", fontSize = 10.sp, color = AppColors.TextSecondary)
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+
+        Text("Eixo 5", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusDuploIos(listOf(13, 14, 15, 16), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+        Text("Eixo 6", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusDuploIos(listOf(17, 18, 19, 20), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+        Text("Eixo 7", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusDuploIos(listOf(21, 22, 23, 24), pneusSelecionados, onPneuToggle)
+    }
+}
+
+@Composable
+private fun EixoPneusIos(pneus: List<Int>, pneusSelecionados: Set<Int>, onPneuToggle: (Int) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Box(modifier = Modifier.width(100.dp).padding(start = 16.dp), contentAlignment = Alignment.CenterStart) {
+            PneuCheckboxIos(pneus[0], pneus[0] in pneusSelecionados) { onPneuToggle(pneus[0]) }
+        }
+        Box(modifier = Modifier.weight(1f).height(12.dp).background(Color(0xFF4B5563), RoundedCornerShape(6.dp)))
+        Box(modifier = Modifier.width(100.dp).padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
+            PneuCheckboxIos(pneus[1], pneus[1] in pneusSelecionados) { onPneuToggle(pneus[1]) }
+        }
+    }
+}
+
+@Composable
+private fun EixoPneusDuploIos(pneus: List<Int>, pneusSelecionados: Set<Int>, onPneuToggle: (Int) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(start = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            PneuCheckboxIos(pneus[0], pneus[0] in pneusSelecionados) { onPneuToggle(pneus[0]) }
+            PneuCheckboxIos(pneus[1], pneus[1] in pneusSelecionados) { onPneuToggle(pneus[1]) }
+        }
+        Box(modifier = Modifier.weight(1f).height(12.dp).background(Color(0xFF4B5563), RoundedCornerShape(6.dp)))
+        Row(modifier = Modifier.padding(end = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            PneuCheckboxIos(pneus[2], pneus[2] in pneusSelecionados) { onPneuToggle(pneus[2]) }
+            PneuCheckboxIos(pneus[3], pneus[3] in pneusSelecionados) { onPneuToggle(pneus[3]) }
+        }
+    }
+}
+
+@Composable
+private fun PneuCheckboxIos(numero: Int, selecionado: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.width(32.dp).height(52.dp).clip(RoundedCornerShape(8.dp))
+            .background(if (selecionado) Color(0xFF3B82F6) else Color(0xFF1F2937))
+            .border(2.dp, if (selecionado) Color(0xFF1D4ED8) else Color(0xFF374151), RoundedCornerShape(8.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(numero.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TipoPneuSelectorIos(pneuNumero: Int, tipoSelecionado: String, opcoes: List<String>, onTipoChange: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("Pneu $pneuNumero:", modifier = Modifier.width(70.dp), fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = Modifier.weight(1f)) {
+            OutlinedTextField(
+                value = if (tipoSelecionado.isBlank()) "Selecione..." else tipoSelecionado,
+                onValueChange = {}, readOnly = true,
+                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(8.dp),
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) })
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                opcoes.forEach { opcao -> DropdownMenuItem(text = { Text(opcao) }, onClick = { onTipoChange(opcao); expanded = false }) }
             }
         }
     }

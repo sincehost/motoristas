@@ -1,5 +1,6 @@
 package screens
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +13,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -54,15 +57,14 @@ actual fun EditarManutencaoScreen(
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    var erroMsg by remember { mutableStateOf<String?>(null) }
+    var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
-        scope.launch {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(
-                message = mensagem,
-                duration = if (isErro) SnackbarDuration.Long else SnackbarDuration.Short
-            )
+        if (isErro) {
+            erroMsg = mensagem
+        } else {
+            sucessoMsg = mensagem
         }
     }
 
@@ -98,23 +100,16 @@ actual fun EditarManutencaoScreen(
         carregando = false
     }
 
+    // Diálogos modais
+    if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
+    if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onVoltar() }
+
     Scaffold(
         topBar = {
             GradientTopBar(
                 title = "Editar Manutenção",
                 onBackClick = onVoltar
             )
-        },
-        snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState, modifier = Modifier.padding(16.dp)) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = if (data.visuals.message.contains("sucesso", ignoreCase = true))
-                        AppColors.Secondary else AppColors.Error,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
         }
     ) { padding ->
         if (carregando) {
@@ -267,9 +262,7 @@ actual fun EditarManutencaoScreen(
                                             )
                                         )
                                         if (response.status == "ok") {
-                                            mostrarMensagem("✓ Manutenção atualizada com sucesso!")
-                                            kotlinx.coroutines.delay(1500)
-                                            onVoltar()
+                                            sucessoMsg = "Manutenção atualizada com sucesso!"
                                         } else {
                                             mostrarMensagem(response.mensagem ?: "Erro ao salvar", isErro = true)
                                         }

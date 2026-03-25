@@ -121,7 +121,9 @@ actual fun IniciarViagemScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
-    val snackbarHostState = remember { SnackbarHostState() }
+
+    var erroMsg by remember { mutableStateOf<String?>(null) }
+    var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     // Estados de verificação de viagem em andamento
     var carregando by remember { mutableStateOf(true) }
@@ -189,12 +191,10 @@ actual fun IniciarViagemScreen(
 
     // Função para mostrar mensagens
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
-        scope.launch {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(
-                message = mensagem,
-                duration = if (isErro) SnackbarDuration.Long else SnackbarDuration.Short
-            )
+        if (isErro) {
+            erroMsg = mensagem
+        } else {
+            sucessoMsg = mensagem
         }
     }
 
@@ -234,29 +234,16 @@ actual fun IniciarViagemScreen(
         viewController.presentViewController(picker, true, null)
     }
 
+    // Diálogos modais de erro e sucesso
+    if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
+    if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onSucesso() }
+
     Scaffold(
         topBar = {
             GradientTopBar(
                 title = "Iniciar Viagem",
                 onBackClick = onVoltar
             )
-        },
-        snackbarHost = {
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.padding(16.dp)
-            ) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = if (data.visuals.message.contains("sucesso", ignoreCase = true) ||
-                        data.visuals.message.contains("salva", ignoreCase = true) ||
-                        data.visuals.message.contains("capturada", ignoreCase = true))
-                        AppColors.Secondary else AppColors.Error,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    actionColor = Color.White
-                )
-            }
         }
     ) { padding ->
         // Carregando
@@ -818,8 +805,7 @@ actual fun IniciarViagemScreen(
                                                 kmInicio = kmInicio
                                             )
                                             mostrarMensagem("✓ Viagem registrada com sucesso!")
-                                            kotlinx.coroutines.delay(1500)
-                                            onSucesso()
+                                            sucessoMsg = "Viagem registrada com sucesso!"
                                         } else {
                                             repository.salvarViagem(
                                                 numerobd = numerobd,
@@ -846,8 +832,7 @@ actual fun IniciarViagemScreen(
                                                 kmInicio = kmInicio
                                             )
                                             mostrarMensagem("✓ Viagem salva. Sincronize depois.")
-                                            kotlinx.coroutines.delay(1500)
-                                            onSucesso()
+                                            sucessoMsg = "Viagem salva. Sincronize depois."
                                         }
                                     } catch (e: Exception) {
                                         repository.salvarViagem(
@@ -875,8 +860,7 @@ actual fun IniciarViagemScreen(
                                             kmInicio = kmInicio
                                         )
                                         mostrarMensagem("✓ Viagem salva. Sincronize quando tiver internet.")
-                                        kotlinx.coroutines.delay(1500)
-                                        onSucesso()
+                                        sucessoMsg = "Viagem salva. Sincronize quando tiver internet."
                                     }
 
                                     loading = false
