@@ -125,22 +125,32 @@ actual fun FinalizarViagemScreen(
     var viagemAtual by remember { mutableStateOf<br.com.lfsystem.app.database.ViagemAtual?>(null) }
     var semViagemAberta by remember { mutableStateOf(false) }
     var kmInicioViagem by remember { mutableStateOf("") }
+    var kmRotaDestino by remember { mutableStateOf(0.0) } // KM esperado do destino
 
-    // Carrega viagem atual e busca km_inicio
+    // Carrega viagem atual e busca km_inicio + km_rota
     LaunchedEffect(Unit) {
         carregando = true
         viagemAtual = repository.getViagemAtual()
         if (viagemAtual == null) {
             semViagemAberta = true
         } else {
-            // Se km_inicio já está salvo na ViagemAtual local, usar
+            val viagemId = viagemAtual!!.viagem_id
+
+            // 1. Carregar dados locais salvos na ViagemAtual
             val kmLocal = viagemAtual?.km_inicio ?: ""
-            if (kmLocal.isNotEmpty()) {
-                kmInicioViagem = kmLocal
-            } else {
-                val viagemId = viagemAtual!!.viagem_id
+            val kmRotaLocal = viagemAtual?.km_rota ?: "0"
+            if (kmLocal.isNotEmpty()) kmInicioViagem = kmLocal
+            if (kmRotaLocal != "0" && kmRotaLocal.isNotEmpty()) {
+                kmRotaDestino = kmRotaLocal.toDoubleOrNull() ?: 0.0
+            }
+
+            // 2. Se falta km_inicio OU km_rota, buscar de fontes externas
+            val precisaKmInicio = kmInicioViagem.isEmpty()
+            val precisaKmRota = kmRotaDestino <= 0.0
+
+            if (precisaKmInicio || precisaKmRota) {
                 if (viagemId < 0) {
-                    // Viagem offline — buscar da tabela Viagem local
+                    // OFFLINE: viagem criada offline (viagem_id negativo)
                     val idLocal = -viagemId
                     val viagemOffline = repository.getViagensParaSincronizar()
                         .firstOrNull { it.id == idLocal }
@@ -150,21 +160,28 @@ actual fun FinalizarViagemScreen(
                             viagemId = viagemId,
                             destino = viagemAtual!!.destino,
                             dataInicio = viagemAtual!!.data_inicio,
-                            kmInicio = viagemOffline.km_inicio
+                            kmInicio = viagemOffline.km_inicio,
+                            kmRota = kmRotaLocal
                         )
                     }
                 } else if (viagemId > 0) {
+                    // ONLINE: tentar API para buscar km_inicio + km_rota do destino
                     try {
                         val resp = api.ApiClient.detalheViagem(
                             api.ViagemDetalheRequest(viagem_id = viagemId.toInt())
                         )
                         if (resp.status == "ok" && resp.viagem != null) {
-                            kmInicioViagem = resp.viagem.km_inicio
+                            if (precisaKmInicio) kmInicioViagem = resp.viagem.km_inicio
+                            val kmRotaApi = resp.viagem.km_rota.toDoubleOrNull() ?: 0.0
+                            if (kmRotaApi > 0.0) kmRotaDestino = kmRotaApi
+
+                            // Salvar TUDO localmente para funcionar offline depois
                             repository.salvarViagemAtual(
                                 viagemId = viagemId,
                                 destino = viagemAtual!!.destino,
                                 dataInicio = viagemAtual!!.data_inicio,
-                                kmInicio = resp.viagem.km_inicio
+                                kmInicio = if (kmInicioViagem.isNotEmpty()) kmInicioViagem else (viagemAtual?.km_inicio ?: ""),
+                                kmRota = if (kmRotaDestino > 0.0) kmRotaDestino.toLong().toString() else "0"
                             )
                         }
                     } catch (e: Exception) {
@@ -179,7 +196,8 @@ actual fun FinalizarViagemScreen(
                                 viagemId = viagemId,
                                 destino = viagemAtual!!.destino,
                                 dataInicio = viagemAtual!!.data_inicio,
-                                kmInicio = viagemLocal.km_inicio
+                                kmInicio = viagemLocal.km_inicio,
+                                kmRota = kmRotaLocal
                             )
                         }
                     }
@@ -205,6 +223,11 @@ actual fun FinalizarViagemScreen(
     // Foto
     var fotoPainel by remember { mutableStateOf<ImageBitmap?>(null) }
     var fotoPainelBase64 by remember { mutableStateOf<String?>(null) }
+
+    // Diálogo de confirmação e aviso de KM suspeito
+    var mostrarDialogoConfirmacao by remember { mutableStateOf(false) }
+    var mostrarAvisoKm by remember { mutableStateOf(false) }
+    var mensagemAvisoKm by remember { mutableStateOf("") }
 
     // Função para mostrar mensagens
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
@@ -251,8 +274,8 @@ actual fun FinalizarViagemScreen(
         viewController.presentViewController(picker, true, null)
     }
 
-    // Função finalizar viagem
-    fun finalizarViagem() {
+    // Função de validação antes de mostrar diálogo de confirmação
+    fun validarEConfirmar() {
         focusManager.clearFocus()
 
         if (viagemAtual == null) {
@@ -272,19 +295,78 @@ actual fun FinalizarViagemScreen(
             return
         }
 
-        // Validação de KM (chegada deve ser maior que início)
+        // ═══════════════════════════════════════════════════
+        // VALIDAÇÃO PROFISSIONAL DE KM
+        // ═══════════════════════════════════════════════════
         val kmChegadaNum = kmChegada.filter { it.isDigit() }.toLongOrNull() ?: 0L
         val kmInicioStr = kmInicioViagem.ifEmpty { viagemAtual?.km_inicio ?: "" }
-        val kmInicioNum = kmInicioStr.filter { it.isDigit() }.toLongOrNull() ?: 0L
+        val kmInicioNum = kmInicioStr.toDoubleOrNull()?.toLong()
+            ?: kmInicioStr.filter { it.isDigit() }.toLongOrNull()
+            ?: 0L
+        val kmRotaEsperado = kmRotaDestino.toLong()
 
+        // 1. KM de chegada deve ser > 0
         if (kmChegadaNum <= 0) {
             mostrarMensagem("KM de chegada deve ser maior que zero", isErro = true)
             return
         }
 
+        // 2. KM de chegada DEVE ser maior que KM de início (BLOQUEIO)
         if (kmInicioNum > 0 && kmChegadaNum <= kmInicioNum) {
-            mostrarMensagem("KM de chegada ($kmChegada) deve ser maior que KM de início ($kmInicioStr)", isErro = true)
+            mostrarMensagem(
+                "KM de chegada ($kmChegada) deve ser maior que KM de início (${kmInicioStr.toDoubleOrNull()?.toLong() ?: kmInicioStr})\n\nVerifique se digitou corretamente.",
+                isErro = true
+            )
             return
+        }
+
+        // 3. Calcular km percorrido e validar contra a rota do destino
+        if (kmInicioNum > 0) {
+            val kmPercorrido = kmChegadaNum - kmInicioNum
+
+            // 3a. KM percorrido absurdamente alto (mais de 5x a rota) = provavelmente erro de digitação (BLOQUEIO)
+            if (kmRotaEsperado > 0 && kmPercorrido > kmRotaEsperado * 5) {
+                val kmEsperadoFinal = kmInicioNum + kmRotaEsperado
+                mostrarMensagem(
+                    "KM de chegada parece incorreto!\n\n" +
+                        "• KM Início: $kmInicioNum\n" +
+                        "• KM Chegada digitado: $kmChegadaNum\n" +
+                        "• KM Percorrido: $kmPercorrido km\n" +
+                        "• KM da Rota: $kmRotaEsperado km\n\n" +
+                        "O km percorrido é ${kmPercorrido / kmRotaEsperado}x maior que a rota. " +
+                        "O KM esperado seria próximo de $kmEsperadoFinal.\n\n" +
+                        "Verifique se digitou corretamente.",
+                    isErro = true
+                )
+                return
+            }
+
+            // 3b. KM percorrido muito alto sem rota definida (>50.000 km em uma viagem) = provavelmente erro (BLOQUEIO)
+            if (kmRotaEsperado <= 0 && kmPercorrido > 50000) {
+                mostrarMensagem(
+                    "KM de chegada parece incorreto!\n\n" +
+                        "• KM Início: $kmInicioNum\n" +
+                        "• KM Chegada digitado: $kmChegadaNum\n" +
+                        "• KM Percorrido: $kmPercorrido km\n\n" +
+                        "Mais de 50.000 km em uma viagem é improvável. Verifique se digitou corretamente.",
+                    isErro = true
+                )
+                return
+            }
+
+            // 3c. KM percorrido ultrapassa a rota em mais de 5 km = AVISO (não bloqueia, mas confirma)
+            if (kmRotaEsperado > 0 && kmPercorrido > kmRotaEsperado + 5) {
+                val excedente = kmPercorrido - kmRotaEsperado
+                mensagemAvisoKm = "Atenção: KM ultrapassado!\n\n" +
+                        "• KM Início: $kmInicioNum\n" +
+                        "• KM Chegada: $kmChegadaNum\n" +
+                        "• KM Percorrido: $kmPercorrido km\n" +
+                        "• KM da Rota: $kmRotaEsperado km\n" +
+                        "• Excedente: +$excedente km\n\n" +
+                        "Deseja continuar mesmo assim?"
+                mostrarAvisoKm = true
+                return
+            }
         }
 
         if (teveRetorno) {
@@ -310,6 +392,39 @@ actual fun FinalizarViagemScreen(
             }
         }
 
+        mostrarDialogoConfirmacao = true
+    }
+
+    // Função chamada quando o motorista confirma o aviso de KM e quer prosseguir
+    fun prosseguirAposAvisoKm() {
+        mostrarAvisoKm = false
+        if (teveRetorno) {
+            if (pesoCargaRetorno.text.isEmpty()) {
+                mostrarMensagem("Informe o peso da carga de retorno", isErro = true)
+                return
+            }
+            if (valorFreteRetorno.text.isEmpty()) {
+                mostrarMensagem("Informe o valor do frete de retorno", isErro = true)
+                return
+            }
+            if (localCarregou.isEmpty()) {
+                mostrarMensagem("Informe o local onde carregou", isErro = true)
+                return
+            }
+            if (ordemRetorno.isEmpty()) {
+                mostrarMensagem("Informe a ordem de retorno", isErro = true)
+                return
+            }
+            if (cteRetorno.isEmpty()) {
+                mostrarMensagem("Informe o CTE de retorno", isErro = true)
+                return
+            }
+        }
+        mostrarDialogoConfirmacao = true
+    }
+
+    // Função finalizar viagem (chamada após confirmação)
+    fun finalizarViagem() {
         val dataChegadaAPI = converterDataParaAPI(dataChegada)
         val viagemId = viagemAtual!!.viagem_id
 
@@ -356,7 +471,11 @@ actual fun FinalizarViagemScreen(
                         pesocargaRetorno = if (teveRetorno) pesoCargaRetorno.text else null,
                         valorfreteRetorno = if (teveRetorno) valorFreteRetorno.text else null,
                         observacao = observacao.ifEmpty { null },
-                        fotoPainelChegada = fotoPainelBase64
+                        fotoPainelChegada = fotoPainelBase64,
+                        teveRetorno = teveRetorno,
+                        localCarregou = if (teveRetorno) localCarregou else null,
+                        ordemRetorno = if (teveRetorno) ordemRetorno else null,
+                        cteRetorno = if (teveRetorno) cteRetorno else null
                     )
                 }
 
@@ -373,6 +492,113 @@ actual fun FinalizarViagemScreen(
             }
             salvando = false
         }
+    }
+
+    // Diálogo de aviso de KM suspeito (permite prosseguir)
+    if (mostrarAvisoKm) {
+        ui.AppAlertDialog(
+            onDismissRequest = { mostrarAvisoKm = false },
+            icon = { Icon(Icons.Default.Warning, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(36.dp)) },
+            title = { Text("KM Suspeito", fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B)) },
+            text = {
+                Column {
+                    Text(
+                        mensagemAvisoKm,
+                        fontSize = 14.sp,
+                        color = AppColors.TextPrimary,
+                        lineHeight = 20.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { prosseguirAposAvisoKm() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Continuar Mesmo Assim", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { mostrarAvisoKm = false },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Corrigir KM")
+                }
+            }
+        )
+    }
+
+    // Diálogo de confirmação antes de finalizar viagem
+    if (mostrarDialogoConfirmacao) {
+        val kmChNum = kmChegada.filter { it.isDigit() }.toLongOrNull() ?: 0L
+        val kmInStr = kmInicioViagem.ifEmpty { viagemAtual?.km_inicio ?: "" }
+        val kmInNum = kmInStr.toDoubleOrNull()?.toLong() ?: kmInStr.filter { it.isDigit() }.toLongOrNull() ?: 0L
+        val kmPerc = if (kmInNum > 0) kmChNum - kmInNum else 0L
+        val kmRotaLong = kmRotaDestino.toLong()
+
+        ui.AppAlertDialog(
+            onDismissRequest = { mostrarDialogoConfirmacao = false },
+            icon = { Icon(Icons.Default.Flag, null, tint = Color(0xFF10B981), modifier = Modifier.size(32.dp)) },
+            title = { Text("Confirmar Finalização", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text(
+                        "Deseja finalizar a viagem para ${viagemAtual?.destino ?: ""}?",
+                        fontSize = 15.sp,
+                        color = AppColors.TextPrimary
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            if (kmInNum > 0) {
+                                Text("KM Início: $kmInNum", fontSize = 13.sp, color = AppColors.TextSecondary)
+                            }
+                            Text("KM Chegada: $kmChNum", fontSize = 13.sp, color = AppColors.TextPrimary, fontWeight = FontWeight.Medium)
+                            if (kmPerc > 0) {
+                                Text("KM Percorrido: $kmPerc km", fontSize = 13.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                            }
+                            if (kmRotaLong > 0) {
+                                Text("KM da Rota: $kmRotaLong km", fontSize = 13.sp, color = AppColors.TextSecondary)
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Esta ação não pode ser desfeita.",
+                        fontSize = 13.sp,
+                        color = AppColors.Error,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        mostrarDialogoConfirmacao = false
+                        finalizarViagem()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Confirmar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { mostrarDialogoConfirmacao = false },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     // Diálogos modais de erro e sucesso
@@ -773,7 +999,7 @@ actual fun FinalizarViagemScreen(
 
                         // Botão Finalizar
                         Button(
-                            onClick = { finalizarViagem() },
+                            onClick = { validarEConfirmar() },
                             enabled = !salvando,
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp),

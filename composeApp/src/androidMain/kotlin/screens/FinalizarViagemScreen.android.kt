@@ -39,6 +39,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import database.AppRepository
 import kotlinx.coroutines.launch
+import ui.AppAlertDialog
 import ui.AppColors
 import ui.GradientTopBar
 import util.rememberCameraState
@@ -414,7 +415,7 @@ actual fun FinalizarViagemScreen(
 
     // Diálogo de aviso de KM suspeito (permite prosseguir)
     if (mostrarAvisoKm) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { mostrarAvisoKm = false },
             icon = { Icon(Icons.Default.Warning, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(36.dp)) },
             title = { Text("KM Suspeito", fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B)) },
@@ -456,7 +457,7 @@ actual fun FinalizarViagemScreen(
         val kmPerc = if (kmInNum > 0) kmChNum - kmInNum else 0L
         val kmRotaLong = kmRotaDestino.toLong()
 
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { mostrarDialogoConfirmacao = false },
             icon = { Icon(Icons.Default.Flag, null, tint = Color(0xFF10B981), modifier = Modifier.size(32.dp)) },
             title = { Text("Confirmar Finalização", fontWeight = FontWeight.Bold) },

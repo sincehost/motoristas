@@ -25,6 +25,8 @@ import database.AppRepository
 import kotlinx.coroutines.launch
 import ui.AppColors
 import ui.GradientTopBar
+import util.converterDataParaAPI
+import util.converterDataParaExibicao
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,14 +42,16 @@ actual fun EditarOutraDespesaScreen(
     var tipo by remember { mutableStateOf(item.tipo) }
     var descricao by remember { mutableStateOf(item.descricao) }
     var valor by remember { mutableStateOf(item.valor.toString()) }
-    var data by remember { mutableStateOf(item.data) }
+    var data by remember { mutableStateOf(converterDataParaExibicao(item.data)) }
     var local by remember { mutableStateOf(item.local) }
     var salvando by remember { mutableStateOf(false) }
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     fun salvar() {
+        if (tipo.isEmpty()) { erroMsg = "Selecione o tipo de despesa"; return }
         if (valor.isBlank()) { erroMsg = "Informe o valor"; return }
+        if (data.isEmpty()) { erroMsg = "Informe a data"; return }
         scope.launch {
             salvando = true
             try {
@@ -58,8 +62,8 @@ actual fun EditarOutraDespesaScreen(
                         viagem_id = viagemId,
                         tipo = tipo,
                         descricao = descricao.ifEmpty { tipo },
-                        valor = valor,
-                        data = data,
+                        valor = valor.replace(",", "."),
+                        data = converterDataParaAPI(data),
                         local = local.ifEmpty { null },
                         foto_comprovante = null
                     )

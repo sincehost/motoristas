@@ -29,6 +29,8 @@ import ui.GradientTopBar
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.converterDataParaExibicao
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,10 +74,10 @@ actual fun EditarDescargaScreen(
             )
             if (response.status == "ok" && response.descarga != null) {
                 val descarga = response.descarga
-                data = descarga.data
+                data = converterDataParaExibicao(descarga.data)
                 placa = descarga.placa
                 ordemDescarga = descarga.ordem_descarga.toString()
-                valor = descarga.valor.toString()
+                valor = formatarValor((descarga.valor * 100).roundToLong().toString())
                 fotoBase64 = descarga.foto
             } else {
                 mostrarMensagem("Erro ao carregar dados", isErro = true)
@@ -186,8 +188,8 @@ actual fun EditarDescargaScreen(
                                                 viagem_id = viagemId,
                                                 data = converterDataParaAPI(data),
                                                 placa = placa,
-                                                ordem_descarga = ordemDescarga.toInt(),
-                                                valor = valor,
+                                                ordem_descarga = ordemDescarga.toIntOrNull() ?: 0,
+                                                valor = valor.replace(",", "."),
                                                 foto = fotoBase64
                                             )
                                         )

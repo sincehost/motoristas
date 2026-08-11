@@ -26,6 +26,7 @@ import ui.AppColors
 import ui.GradientTopBar
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.converterDataParaExibicao
 
 private val TIPOS_COMBUSTIVEL = listOf("Diesel Caminhão", "Diesel S10", "Diesel Aparelho", "Gasolina", "Etanol")
 private val TIPOS_PAGAMENTO = listOf("dinheiro", "cartao", "pix", "vale")
@@ -61,6 +62,8 @@ actual fun EditarCombustivelScreen(
     var valorLitro by remember { mutableStateOf("") }
     var valorTotal by remember { mutableStateOf("") }
     var tipoPagamento by remember { mutableStateOf("dinheiro") }
+    var fotoMarcadorBase64 by remember { mutableStateOf<String?>(null) }
+    var fotoCupomBase64 by remember { mutableStateOf<String?>(null) }
 
     var combustivelExpanded by remember { mutableStateOf(false) }
 
@@ -74,10 +77,11 @@ actual fun EditarCombustivelScreen(
             if (response.status == "ok" && response.abastecimento != null) {
                 val a = response.abastecimento
                 destino = a.destino; dataViagem = a.data_viagem; placa = a.placa
-                data = a.data_abastecimento; nomePosto = a.nome_posto; kmPosto = a.km_posto
+                data = converterDataParaExibicao(a.data_abastecimento); nomePosto = a.nome_posto; kmPosto = a.km_posto
                 tipoCombustivel = a.tipo_combustivel; horas = a.horas
                 litros = a.litros_abastecidos; valorLitro = a.valor_litro
                 valorTotal = a.valor_total; tipoPagamento = a.forma_pagamento.lowercase()
+                fotoMarcadorBase64 = a.foto_marcador; fotoCupomBase64 = a.foto_cupom
             } else {
                 erroMsg = "Abastecimento não encontrado"
             }
@@ -90,7 +94,9 @@ actual fun EditarCombustivelScreen(
     fun salvar() {
         if (nomePosto.isBlank()) { erroMsg = "Informe o posto"; return }
         if (kmPosto.isBlank()) { erroMsg = "Informe o KM"; return }
+        if (tipoCombustivel == "Diesel Aparelho" && horas.isBlank()) { erroMsg = "Informe as horas"; return }
         if (litros.isBlank()) { erroMsg = "Informe os litros"; return }
+        if (valorLitro.isBlank()) { erroMsg = "Informe o valor do litro"; return }
         if (valorTotal.isBlank()) { erroMsg = "Informe o valor total"; return }
 
         scope.launch {
@@ -99,11 +105,11 @@ actual fun EditarCombustivelScreen(
                 val resp = api.ApiClient.atualizarAbastecimento(
                     api.AtualizarAbastecimentoRequest(
                         abastecimento_id = abastecimentoId, motorista_id = motorista?.motorista_id ?: "",
-                        viagem_id = viagemId, placa = placa, data_abastecimento = data,
+                        viagem_id = viagemId, placa = placa, data_abastecimento = converterDataParaAPI(data),
                         nome_posto = nomePosto, km_posto = kmPosto, tipo_combustivel = tipoCombustivel,
                         horas = horas, litros_abastecidos = litros.replace(",", "."),
                         valor_litro = valorLitro.replace(",", "."), valor_total = valorTotal.replace(",", "."),
-                        forma_pagamento = tipoPagamento, foto_cupom = null, foto_marcador = null
+                        forma_pagamento = tipoPagamento, foto_cupom = fotoCupomBase64, foto_marcador = fotoMarcadorBase64
                     )
                 )
                 if (resp.status == "ok") sucessoMsg = "Abastecimento atualizado!" else erroMsg = resp.mensagem ?: "Erro"

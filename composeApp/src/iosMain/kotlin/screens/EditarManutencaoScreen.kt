@@ -29,6 +29,8 @@ import ui.GradientTopBar
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.converterDataParaExibicao
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,12 +81,12 @@ actual fun EditarManutencaoScreen(
             )
             if (response.status == "ok" && response.manutencao != null) {
                 val manutencao = response.manutencao
-                dataManutencao = manutencao.data_manutencao
+                dataManutencao = converterDataParaExibicao(manutencao.data_manutencao)
                 placa = manutencao.placa
                 servico = manutencao.servico
                 descricaoServico = manutencao.descricao_servico ?: ""
                 localManutencao = manutencao.local_manutencao ?: ""
-                valor = manutencao.valor.toString()
+                valor = formatarValor((manutencao.valor * 100).roundToLong().toString())
                 kmTrocaOleo = manutencao.km_troca_oleo ?: ""
                 kmTrocaPneu = manutencao.km_troca_pneu ?: ""
                 pneus = manutencao.pneus ?: ""
@@ -236,6 +238,8 @@ actual fun EditarManutencaoScreen(
                                     if (dataManutencao.isBlank()) { mostrarMensagem("Informe a data", isErro = true); return@launch }
                                     if (servico.isBlank()) { mostrarMensagem("Informe o serviço", isErro = true); return@launch }
                                     if (valor.isBlank()) { mostrarMensagem("Informe o valor", isErro = true); return@launch }
+                                    if (servico == "Troca de Óleo" && kmTrocaOleo.isBlank()) { mostrarMensagem("Informe o KM da troca de óleo", isErro = true); return@launch }
+                                    if (servico == "Troca de Pneu" && kmTrocaPneu.isBlank()) { mostrarMensagem("Informe o KM da troca de pneu", isErro = true); return@launch }
 
                                     salvando = true
                                     try {

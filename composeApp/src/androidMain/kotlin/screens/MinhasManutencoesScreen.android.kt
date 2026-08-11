@@ -22,6 +22,7 @@ import database.AppRepository
 import kotlinx.coroutines.launch
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import ui.AppAlertDialog
 import ui.AppColors
 import ui.GradientTopBar
 import java.text.SimpleDateFormat
@@ -165,7 +166,7 @@ private fun ListaManutencoesContent(
     }
 
     if (mostrarDialogoExcluir && manutencaoParaExcluir != null) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { if (!excluindo) mostrarDialogoExcluir = false },
             icon = { Icon(Icons.Default.Warning, null, tint = AppColors.Error) },
             title = { Text("Confirmar Exclusão", fontWeight = FontWeight.Bold) },

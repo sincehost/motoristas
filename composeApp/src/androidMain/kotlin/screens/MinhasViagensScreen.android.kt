@@ -36,6 +36,7 @@ import api.*
 import database.AppRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import ui.AppAlertDialog
 import ui.AppColors
 import ui.GradientTopBar
 import java.io.File
@@ -305,7 +306,7 @@ private fun ListaViagensContent(
 
     // Confirmação de exclusão
     if (mostrarConfirmacaoExcluir && viagemSelecionada != null) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { if (!excluindo) mostrarConfirmacaoExcluir = false },
             icon = { Icon(Icons.Default.Warning, null, tint = AppColors.Error) },
             title = { Text("Excluir Viagem?", fontWeight = FontWeight.Bold) },
@@ -1223,7 +1224,7 @@ private fun DespesasViagemContent(
 
     // Diálogo de confirmação de exclusão
     if (mostrarDialogoExcluir) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { if (!excluindo) mostrarDialogoExcluir = false },
             icon = { Icon(Icons.Default.Warning, null, tint = AppColors.Error) },
             title = { Text("Confirmar Exclusão", fontWeight = FontWeight.Bold) },

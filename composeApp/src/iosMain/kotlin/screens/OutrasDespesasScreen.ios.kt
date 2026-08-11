@@ -116,13 +116,15 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
     fun salvar() {
         if (tipoDespesa.isBlank()) { erroMsg = "Selecione o tipo de despesa"; return }
         if (valor.isBlank()) { erroMsg = "Informe o valor"; return }
+        if (dataDespesa.isBlank()) { erroMsg = "Informe a data"; return }
+        if (viagemAtual == null) { erroMsg = "Nenhuma viagem em andamento"; return }
+        val viagemId = viagemAtual.viagem_id
         scope.launch {
             salvando = true
             val dataApi = converterDataParaAPI(dataDespesa)
-            val viagemId = viagemAtual?.viagem_id ?: 0L
             try {
                 repository.salvarOutraDespesa(motorista?.motorista_id ?: "", viagemId, tipoDespesa,
-                    descricao.ifEmpty { null }, valor, dataApi, localDespesa.ifEmpty { null }, fotoBase64)
+                    descricao.ifEmpty { tipoDespesa }, valor, dataApi, localDespesa.ifEmpty { null }, fotoBase64)
                 try {
                     val resp = api.ApiClient.salvarOutraDespesa(api.SalvarOutraDespesaRequest(
                         motorista?.motorista_id ?: "", viagemId.toInt(), tipoDespesa,

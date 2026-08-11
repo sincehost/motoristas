@@ -34,6 +34,8 @@ import ui.GradientTopBar
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.converterDataParaExibicao
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,8 +81,8 @@ actual fun EditarArlaScreen(
             )
             if (response.status == "ok" && response.arla != null) {
                 val arla = response.arla
-                data = arla.data
-                valor = arla.valor.toString()
+                data = converterDataParaExibicao(arla.data)
+                valor = formatarValor((arla.valor * 100).roundToLong().toString())
                 litros = arla.litros.toString()
                 posto = arla.posto
                 kmPosto = arla.km_posto

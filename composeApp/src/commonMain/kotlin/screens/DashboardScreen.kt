@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.collect
 import sync.OfflineManager
 import sync.SyncState
 import sync.SyncStatus
+import ui.AppAlertDialog
 import ui.AppColors
 import util.LogWriter
 
@@ -363,7 +364,7 @@ private fun DashboardContent(
     }
 
     if (mostrarDialogoLogout) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { mostrarDialogoLogout = false },
             containerColor = AppColors.Surface,
             icon = {

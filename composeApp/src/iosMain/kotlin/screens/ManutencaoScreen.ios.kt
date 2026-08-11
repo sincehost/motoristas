@@ -166,16 +166,10 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
         scope.launch {
             salvando = true
             val dataApi = converterDataParaAPI(dataManutencao)
-            val viagemAtual = repository.getViagemAtual()
-            val viagemId = viagemAtual?.viagem_id ?: 0L
             try {
-                val manutencaoId = repository.salvarManutencao(
-                    motorista?.motorista_id ?: "", viagemId, dataApi, placaSelecionada,
-                    servicoSelecionado, descricaoServico, localManutencao, valor,
-                    if (servicoSelecionado == "Troca de Óleo") kmTrocaOleo else null,
-                    if (servicoSelecionado == "Troca de Pneu") kmTrocaPneu else null,
-                    null, null, foto1Base64, foto2Base64
-                )
+                val viagemAtual = repository.getViagemAtual()
+                val viagemId = viagemAtual?.viagem_id ?: 0L
+
                 try {
                     val resp = ApiClient.salvarManutencao(SalvarManutencaoRequest(
                         motorista_id = motorista?.motorista_id ?: "", viagem_id = viagemId.toInt(),
@@ -186,10 +180,24 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                         pneus = pneusSelecionados.toList(),
                         tipos_pneu = tiposPneu.mapKeys { it.key },
                         foto_comprovante1 = foto1Base64, foto_comprovante2 = foto2Base64))
-                    if (resp.status == "ok") { repository.marcarManutencaoSincronizada(manutencaoId); sucessoMsg = "Manutenção registrada com sucesso!" }
-                    else { sucessoMsg = "Manutenção salva. Será sincronizada automaticamente." }
-                } catch (_: Exception) { sucessoMsg = "Manutenção salva offline! Sincronize quando tiver internet." }
-            } catch (e: Exception) { erroMsg = "Erro: ${e.message}" }
+                    if (resp.status == "ok") {
+                        sucessoMsg = "Manutenção registrada com sucesso!"
+                    } else {
+                        erroMsg = resp.mensagem ?: "Erro ao salvar"
+                    }
+                } catch (e: Exception) {
+                    repository.salvarManutencao(
+                        motorista?.motorista_id ?: "", viagemId, dataApi, placaSelecionada,
+                        servicoSelecionado, descricaoServico, localManutencao, valor,
+                        if (servicoSelecionado == "Troca de Óleo") kmTrocaOleo else null,
+                        if (servicoSelecionado == "Troca de Pneu") kmTrocaPneu else null,
+                        pneusSelecionados.sorted().joinToString(","),
+                        tiposPneu.entries.joinToString(";") { "${it.key}:${it.value}" },
+                        foto1Base64, foto2Base64
+                    )
+                    sucessoMsg = "Manutenção salva! Sincronize quando tiver internet."
+                }
+            } catch (e: Exception) { erroMsg = "Erro ao salvar: ${e.message}" }
             salvando = false
         }
     }

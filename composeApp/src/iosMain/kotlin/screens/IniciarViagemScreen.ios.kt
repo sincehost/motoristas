@@ -806,33 +806,30 @@ actual fun IniciarViagemScreen(
                                             )
                                             sucessoMsg = "Viagem registrada com sucesso!"
                                         } else {
-                                            repository.salvarViagem(
-                                                numerobd = numerobd,
-                                                cte = cte,
-                                                numerobd2 = numerobd2.ifBlank { null },
-                                                cte2 = cte2.ifBlank { null },
-                                                destinoId = destinoSelecionado!!.first,
-                                                destinoNome = destinoSelecionado!!.second,
-                                                placa = placaSelecionada ?: "",
-                                                dataViagem = dataViagemAPI,
-                                                kmInicio = kmInicio,
-                                                pesoCarga = pesoCarga.text,
-                                                valorFrete = valorFreteParaAPI,
-                                                fotoPainelSaida = fotoBase64,
-                                                dataCriacao = dataCriacao
-                                            )
-                                            val viagens = repository.getViagensParaSincronizar()
-                                            val currentEpochMillis = (NSDate().timeIntervalSince1970 * 1000).toLong()
-                                            val idLocal = viagens.lastOrNull()?.id ?: currentEpochMillis
-                                            repository.salvarViagemAtual(
-                                                viagemId = -idLocal,
-                                                destino = destinoSelecionado!!.second,
-                                                dataInicio = dataViagemAPI,
-                                                kmInicio = kmInicio
-                                            )
-                                            sucessoMsg = "Viagem salva. Sincronize depois."
+                                            // API retornou erro de VALIDAÇÃO (dados inválidos, motorista não encontrado, etc.)
+                                            // NÃO salvar localmente — registros com erro de validação nunca serão aceitos pelo servidor
+                                            loading = false
+
+                                            val mensagemOriginal = response.mensagem ?: ""
+                                            val mensagemAmigavel = when {
+                                                mensagemOriginal.contains("valorfrete", ignoreCase = true) && mensagemOriginal.contains("null", ignoreCase = true) ->
+                                                    "O valor do frete não pode ser vazio. Informe um valor válido."
+                                                mensagemOriginal.contains("pesocarga", ignoreCase = true) && mensagemOriginal.contains("null", ignoreCase = true) ->
+                                                    "O peso da carga não pode ser vazio. Informe um valor válido."
+                                                mensagemOriginal.contains("cannot be null", ignoreCase = true) || mensagemOriginal.contains("SQLSTATE", ignoreCase = true) ->
+                                                    "Alguns campos obrigatórios estão vazios. Verifique todos os campos e tente novamente."
+                                                mensagemOriginal.contains("motorista", ignoreCase = true) ->
+                                                    "Motorista não encontrado. Faça login novamente."
+                                                mensagemOriginal.isNotEmpty() -> mensagemOriginal
+                                                else -> "Dados inválidos. Verifique as informações e tente novamente."
+                                            }
+
+                                            mostrarMensagem(mensagemAmigavel, isErro = true)
+                                            return@launch
                                         }
                                     } catch (e: Exception) {
+                                        // Exceção de REDE (sem internet, timeout, servidor indisponível)
+                                        // Salvar localmente para sincronização posterior
                                         repository.salvarViagem(
                                             numerobd = numerobd,
                                             cte = cte,
@@ -857,7 +854,7 @@ actual fun IniciarViagemScreen(
                                             dataInicio = dataViagemAPI,
                                             kmInicio = kmInicio
                                         )
-                                        sucessoMsg = "Viagem salva. Sincronize quando tiver internet."
+                                        sucessoMsg = "Sem internet. Viagem salva e será sincronizada automaticamente quando conectar."
                                     }
 
                                     loading = false

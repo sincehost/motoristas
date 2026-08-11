@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import database.AppRepository
 import kotlinx.coroutines.launch
+import ui.AppAlertDialog
 import ui.AppColors
 import ui.isDark
 
@@ -38,7 +39,7 @@ fun BottomNavigationBar(
 
     // ★ Popup: Inicie uma viagem primeiro
     if (mostrarAvisoIniciarViagem) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { mostrarAvisoIniciarViagem = false },
             containerColor = AppColors.Surface,
             icon = {
@@ -91,7 +92,7 @@ fun BottomNavigationBar(
 
     // ★ Popup: Nenhuma viagem em andamento
     if (mostrarAvisoSemViagem) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { mostrarAvisoSemViagem = false },
             containerColor = AppColors.Surface,
             icon = {

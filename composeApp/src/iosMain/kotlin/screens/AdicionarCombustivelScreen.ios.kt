@@ -335,8 +335,8 @@ actual fun AdicionarCombustivelScreen(
                     posto = nomePosto,
                     kmPosto = kmPosto,
                     foto = fotoCupomBase64,
-                    fotoMarcador = null,
-                    tipoPagamento = "dinheiro",
+                    fotoMarcador = fotoMarcadorBase64,
+                    tipoPagamento = tipoPagamento,
                     tipoCombustivel = tipoCombustivel,
                     horas = horas.ifEmpty { null }
                 )

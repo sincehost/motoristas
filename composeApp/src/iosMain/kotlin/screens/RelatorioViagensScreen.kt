@@ -308,10 +308,13 @@ actual fun RelatorioViagensScreen(
                             "R$ ${formatMoney(rel.total_valor_frete_retorno)}"
                         )
                         RelatorioItem("Descargas:", "R$ ${formatMoney(rel.total_valor_descarga)}")
+                        if (rel.total_outras_despesas > 0) {
+                            RelatorioItem("Outras Despesas:", "R$ ${formatMoney(rel.total_outras_despesas)}")
+                        }
 
                         val totalFrete = rel.total_valor_frete + rel.total_valor_frete_retorno
                         val imposto = totalFrete * 0.10
-                        val saldo = totalFrete - rel.total_valor_arla - rel.total_valor_diesel - rel.total_valor_descarga - imposto
+                        val saldo = totalFrete - rel.total_valor_arla - rel.total_valor_diesel - rel.total_valor_descarga - rel.total_outras_despesas - imposto
 
                         Divider(modifier = Modifier.padding(vertical = 12.dp))
 

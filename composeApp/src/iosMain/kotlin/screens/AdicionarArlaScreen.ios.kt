@@ -140,7 +140,20 @@ actual fun AdicionarArlaScreen(
             return@LaunchedEffect
         }
 
-        // 2. Se não tem local, tenta API
+        // 2. Se não tem ViagemAtual, verifica viagem NÃO SINCRONIZADA (offline)
+        val viagemNaoSincronizada = repository.getUltimaViagemNaoSincronizada()
+        if (viagemNaoSincronizada != null) {
+            viagemEmAndamento = api.ViagemAberta(
+                id = viagemNaoSincronizada.id.toInt(),
+                destino = viagemNaoSincronizada.destino_nome,
+                data = viagemNaoSincronizada.data_viagem
+            )
+            modoOffline = true
+            carregando = false
+            return@LaunchedEffect
+        }
+
+        // 3. Se não tem local, tenta API
         try {
             val response = api.ApiClient.arlaDados(
                 api.ArlaDadosRequest(
@@ -231,11 +244,11 @@ actual fun AdicionarArlaScreen(
             mostrarMensagem("Informe a data", isErro = true)
             return
         }
-        if (valor.isEmpty()) {
+        if (valor.isEmpty() || valor.replace(",", ".").toDoubleOrNull() == 0.0) {
             mostrarMensagem("Informe o valor", isErro = true)
             return
         }
-        if (litros.isEmpty()) {
+        if (litros.isEmpty() || litros.replace(",", ".").toDoubleOrNull() == 0.0) {
             mostrarMensagem("Informe os litros", isErro = true)
             return
         }

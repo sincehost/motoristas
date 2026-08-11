@@ -23,6 +23,7 @@ import api.*
 import database.AppRepository
 import kotlinx.coroutines.launch
 import platform.Foundation.*
+import ui.AppAlertDialog
 import ui.AppColors
 import ui.GradientTopBar
 
@@ -135,7 +136,7 @@ private fun ListaManutencoesContent(
     }
 
     if (mostrarDialogoExcluir && manutencaoParaExcluir != null) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { if (!excluindo) mostrarDialogoExcluir = false },
             icon = { Icon(Icons.Default.Warning, null, tint = AppColors.Error) },
             title = { Text("Confirmar Exclusão", fontWeight = FontWeight.Bold) },

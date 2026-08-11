@@ -149,7 +149,7 @@ actual fun AdicionarDescargaScreen(
             viagemAtual = repository.getViagemAtual()
             placas = repository.getEquipamentosParaDropdown().map { it.second }
 
-            // Tentar carregar placas da API
+            // Tentar carregar placas (e viagem, se não houver localmente) da API
             motorista?.let { m ->
                 try {
                     val response = ApiClient.abastecimentoDados(
@@ -158,8 +158,17 @@ actual fun AdicionarDescargaScreen(
                             motorista_id = m.motorista_id
                         )
                     )
-                    if (response.status == "ok" && response.placas.isNotEmpty()) {
-                        placas = response.placas
+                    if (response.status == "ok") {
+                        if (response.placas.isNotEmpty()) {
+                            placas = response.placas
+                        }
+                        // Se não havia viagem em andamento localmente, tenta achar via API
+                        // (evita bloquear o usuário quando o cache local de ViagemAtual está vazio)
+                        if (viagemAtual == null && response.viagens.isNotEmpty()) {
+                            val viagem = response.viagens.first()
+                            repository.salvarViagemAtual(viagem.id.toLong(), viagem.destino, viagem.data)
+                            viagemAtual = repository.getViagemAtual()
+                        }
                     }
                 } catch (e: Exception) { }
             }
@@ -219,6 +228,10 @@ actual fun AdicionarDescargaScreen(
             return
         }
 
+        if (data.isEmpty()) {
+            mostrarMensagem("Informe a data", isErro = true)
+            return
+        }
         if (placaSelecionada.isNullOrBlank()) {
             mostrarMensagem("Selecione a placa", isErro = true)
             return

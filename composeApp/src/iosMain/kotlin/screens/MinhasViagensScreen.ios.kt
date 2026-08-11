@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import api.*
 import database.AppRepository
 import kotlinx.coroutines.launch
+import ui.AppAlertDialog
 import ui.AppColors
 import ui.GradientTopBar
 
@@ -35,6 +36,10 @@ private sealed class TelaViagem {
     data class Editar(val viagemId: Int) : TelaViagem()
     data class Resumo(val viagemId: Int) : TelaViagem()
     data class Despesas(val viagemId: Int) : TelaViagem()
+    data class EditarCombustivel(val abastecimentoId: Int, val viagemId: Int) : TelaViagem()
+    data class EditarArla(val arlaId: Int, val viagemId: Int) : TelaViagem()
+    data class EditarDescarga(val descargaId: Int, val viagemId: Int) : TelaViagem()
+    data class EditarOutraDespesa(val item: OutraDespesaItem, val viagemId: Int) : TelaViagem()
 }
 
 @Composable
@@ -65,7 +70,35 @@ actual fun MinhasViagensScreen(
         is TelaViagem.Despesas -> DespesasViagemContent(
             repository = repository,
             viagemId = tela.viagemId,
-            onVoltar = { telaAtual = TelaViagem.Lista }
+            onVoltar = { telaAtual = TelaViagem.Lista },
+            onEditarCombustivel = { abastId, viagId -> telaAtual = TelaViagem.EditarCombustivel(abastId, viagId) },
+            onEditarArla = { arlaId, viagId -> telaAtual = TelaViagem.EditarArla(arlaId, viagId) },
+            onEditarDescarga = { descId, viagId -> telaAtual = TelaViagem.EditarDescarga(descId, viagId) },
+            onEditarOutra = { item, viagId -> telaAtual = TelaViagem.EditarOutraDespesa(item, viagId) }
+        )
+        is TelaViagem.EditarCombustivel -> EditarCombustivelScreen(
+            repository = repository,
+            abastecimentoId = tela.abastecimentoId,
+            viagemId = tela.viagemId,
+            onVoltar = { telaAtual = TelaViagem.Despesas(tela.viagemId) }
+        )
+        is TelaViagem.EditarArla -> EditarArlaScreen(
+            repository = repository,
+            arlaId = tela.arlaId,
+            viagemId = tela.viagemId,
+            onVoltar = { telaAtual = TelaViagem.Despesas(tela.viagemId) }
+        )
+        is TelaViagem.EditarDescarga -> EditarDescargaScreen(
+            repository = repository,
+            descargaId = tela.descargaId,
+            viagemId = tela.viagemId,
+            onVoltar = { telaAtual = TelaViagem.Despesas(tela.viagemId) }
+        )
+        is TelaViagem.EditarOutraDespesa -> EditarOutraDespesaScreen(
+            repository = repository,
+            item = tela.item,
+            viagemId = tela.viagemId,
+            onVoltar = { telaAtual = TelaViagem.Despesas(tela.viagemId) }
         )
     }
 }
@@ -179,7 +212,7 @@ private fun ListaViagensContent(
 
     if (mostrarModalAcoes && viagemSelecionada != null) {
         val viagemId = viagemSelecionada!!.id
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { mostrarModalAcoes = false; viagemSelecionada = null },
             containerColor = AppColors.CardBackground,
             title = {
@@ -227,7 +260,7 @@ private fun ListaViagensContent(
     }
 
     if (mostrarConfirmacaoExcluir && viagemSelecionada != null) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { if (!excluindo) mostrarConfirmacaoExcluir = false },
             icon = { Icon(Icons.Default.Warning, null, tint = AppColors.Error) },
             title = { Text("Excluir Viagem?", fontWeight = FontWeight.Bold) },
@@ -622,12 +655,19 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
     var loading by remember { mutableStateOf(true) }
     var erro by remember { mutableStateOf<String?>(null) }
     var resumo by remember { mutableStateOf<ResumoViagem?>(null) }
+    var outrasDespesas by remember { mutableStateOf<List<OutraDespesaItem>>(emptyList()) }
     val scrollState = rememberScrollState()
 
     LaunchedEffect(viagemId) {
         try {
             val response = ApiClient.resumoViagem(ResumoRequest(viagem_id = viagemId))
             if (response.status == "ok") resumo = response.resumo else erro = response.mensagem
+            try {
+                val responseDespesas = ApiClient.despesasViagem(DespesasRequest(viagem_id = viagemId))
+                if (responseDespesas.status == "ok") {
+                    outrasDespesas = responseDespesas.outras_despesas
+                }
+            } catch (_: Exception) {}
         } catch (e: Exception) { erro = "Erro: ${e.message}" }
         loading = false
     }
@@ -699,7 +739,17 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         LinhaResumo("ARLA:", formatarMoeda(resumo!!.valor_arla))
                         LinhaResumo("Descarga:", formatarMoeda(resumo!!.valor_descarga))
                         LinhaResumo("Comissão:", formatarMoeda(resumo!!.comissao))
-                        LinhaResumo("Total Despesas:", formatarMoeda(resumo!!.total_despesas))
+
+                        if (outrasDespesas.isNotEmpty()) {
+                            val totalOutras = outrasDespesas.sumOf { it.valor }
+                            val porTipo = outrasDespesas.groupBy { it.tipo }
+                            porTipo.forEach { (tipo, itens) ->
+                                LinhaResumo("$tipo (${itens.size}x):", formatarMoeda(itens.sumOf { it.valor }))
+                            }
+                            LinhaResumoDestaque("Total Outras:", formatarMoeda(totalOutras), Color(0xFFFF6F00))
+                        }
+
+                        LinhaResumo("Total Despesas:", formatarMoeda(resumo!!.total_despesas + outrasDespesas.sumOf { it.valor }))
 
                         Spacer(Modifier.height(16.dp))
                         HorizontalDivider()
@@ -750,7 +800,11 @@ private fun LinhaResumoDestaque(label: String, valor: String, cor: Color) {
 private fun DespesasViagemContent(
     repository: AppRepository,
     viagemId: Int,
-    onVoltar: () -> Unit
+    onVoltar: () -> Unit,
+    onEditarCombustivel: (Int, Int) -> Unit,
+    onEditarArla: (Int, Int) -> Unit,
+    onEditarDescarga: (Int, Int) -> Unit,
+    onEditarOutra: (OutraDespesaItem, Int) -> Unit
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
     val scope = rememberCoroutineScope()
@@ -760,7 +814,20 @@ private fun DespesasViagemContent(
     var abastecimentos by remember { mutableStateOf<List<AbastecimentoItem>>(emptyList()) }
     var arla by remember { mutableStateOf<List<ArlaItem>>(emptyList()) }
     var descargas by remember { mutableStateOf<List<DescargaItem>>(emptyList()) }
+    var outrasDespesas by remember { mutableStateOf<List<OutraDespesaItem>>(emptyList()) }
     val scrollState = rememberScrollState()
+
+    var erroMsg by remember { mutableStateOf<String?>(null) }
+    var sucessoMsg by remember { mutableStateOf<String?>(null) }
+    fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
+        if (isErro) erroMsg = mensagem else sucessoMsg = mensagem
+    }
+
+    // Estados para diálogo de confirmação de exclusão
+    var mostrarDialogoExcluir by remember { mutableStateOf(false) }
+    var tipoExclusao by remember { mutableStateOf("") }
+    var idExclusao by remember { mutableStateOf(0) }
+    var excluindo by remember { mutableStateOf(false) }
 
     fun carregarDados() {
         scope.launch {
@@ -773,15 +840,69 @@ private fun DespesasViagemContent(
                     abastecimentos = response.abastecimentos
                     arla = response.arla
                     descargas = response.descargas
+                    outrasDespesas = response.outras_despesas
                 } else erro = response.mensagem
             } catch (e: Exception) { erro = "Erro: ${e.message}" }
             loading = false
         }
     }
 
+    fun executarExclusao() {
+        scope.launch {
+            excluindo = true
+            try {
+                val response = when (tipoExclusao) {
+                    "abastecimento" -> ApiClient.excluirAbastecimento(
+                        ExcluirDespesaRequest(motorista_id = motorista?.motorista_id ?: "", id = idExclusao)
+                    )
+                    "arla" -> ApiClient.excluirArla(
+                        ExcluirDespesaRequest(motorista_id = motorista?.motorista_id ?: "", id = idExclusao)
+                    )
+                    "descarga" -> ApiClient.excluirDescarga(
+                        ExcluirDescargaRequest(motorista_id = motorista?.motorista_id ?: "", descarga_id = idExclusao)
+                    )
+                    "outra_despesa" -> ApiClient.excluirOutraDespesa(
+                        ExcluirOutraDespesaRequest(despesa_id = idExclusao, motorista_id = motorista?.motorista_id ?: "")
+                    )
+                    else -> ExcluirDespesaResponse("erro", "Tipo inválido")
+                }
+                if (response.status == "ok") {
+                    mostrarMensagem(response.mensagem ?: "Registro excluído com sucesso!")
+                    carregarDados()
+                } else {
+                    mostrarMensagem(response.mensagem ?: "Erro ao excluir", isErro = true)
+                }
+            } catch (e: Exception) {
+                mostrarMensagem("Erro: ${e.message}", isErro = true)
+            }
+            excluindo = false
+            mostrarDialogoExcluir = false
+        }
+    }
+
     LaunchedEffect(viagemId) {
         carregarDados()
     }
+
+    // Diálogo de confirmação de exclusão
+    if (mostrarDialogoExcluir) {
+        AppAlertDialog(
+            onDismissRequest = { if (!excluindo) mostrarDialogoExcluir = false },
+            icon = { Icon(Icons.Default.Warning, null, tint = AppColors.Error) },
+            title = { Text("Confirmar Exclusão", fontWeight = FontWeight.Bold) },
+            text = { Text("Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.") },
+            confirmButton = {
+                Button(onClick = { executarExclusao() }, enabled = !excluindo, colors = ButtonDefaults.buttonColors(containerColor = AppColors.Error)) {
+                    if (excluindo) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp) else Text("Excluir")
+                }
+            },
+            dismissButton = { TextButton(onClick = { mostrarDialogoExcluir = false }, enabled = !excluindo) { Text("Cancelar") } }
+        )
+    }
+
+    // Diálogos modais de erro e sucesso
+    if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
+    if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null }
 
     Scaffold(
         topBar = {
@@ -811,7 +932,7 @@ private fun DespesasViagemContent(
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Info, null, tint = Color(0xFF10B981))
                             Spacer(Modifier.width(8.dp))
-                            Text("Viagem em andamento", color = Color(0xFF10B981), fontSize = 13.sp)
+                            Text("Viagem em andamento - você pode editar ou excluir registros", color = Color(0xFF10B981), fontSize = 13.sp)
                         }
                     }
                 }
@@ -827,7 +948,10 @@ private fun DespesasViagemContent(
                             tipo = item.tipo,
                             litros = formatarNumero(item.litros),
                             valor = formatarMoeda(item.valor),
-                            cor = AppColors.Primary
+                            cor = AppColors.Primary,
+                            viagemAberta = viagemAberta,
+                            onEditar = { onEditarCombustivel(item.id, viagemId) },
+                            onExcluir = { tipoExclusao = "abastecimento"; idExclusao = item.id; mostrarDialogoExcluir = true }
                         )
                     }
                 }
@@ -845,7 +969,10 @@ private fun DespesasViagemContent(
                             tipo = null,
                             litros = formatarNumero(item.litros),
                             valor = formatarMoeda(item.valor),
-                            cor = Color(0xFF06B6D4)
+                            cor = Color(0xFF06B6D4),
+                            viagemAberta = viagemAberta,
+                            onEditar = { onEditarArla(item.id, viagemId) },
+                            onExcluir = { tipoExclusao = "arla"; idExclusao = item.id; mostrarDialogoExcluir = true }
                         )
                     }
                 }
@@ -859,7 +986,26 @@ private fun DespesasViagemContent(
                     descargas.forEach { item ->
                         CardDespesaDescarga(
                             data = formatarData(item.data),
-                            valor = formatarMoeda(item.valor)
+                            valor = formatarMoeda(item.valor),
+                            viagemAberta = viagemAberta,
+                            onEditar = { onEditarDescarga(item.id, viagemId) },
+                            onExcluir = { tipoExclusao = "descarga"; idExclusao = item.id; mostrarDialogoExcluir = true }
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                SecaoHeader("Outras Despesas", Icons.Default.MoreHoriz, Color(0xFFFF6F00))
+                if (outrasDespesas.isEmpty()) {
+                    CardVazio("Nenhuma outra despesa")
+                } else {
+                    outrasDespesas.forEach { item ->
+                        CardDespesaOutra(
+                            item = item,
+                            viagemAberta = viagemAberta,
+                            onEditar = { onEditarOutra(item, viagemId) },
+                            onExcluir = { tipoExclusao = "outra_despesa"; idExclusao = item.id; mostrarDialogoExcluir = true }
                         )
                     }
                 }
@@ -877,7 +1023,10 @@ private fun CardDespesaSimples(
     tipo: String?,
     litros: String,
     valor: String,
-    cor: Color
+    cor: Color,
+    viagemAberta: Boolean = false,
+    onEditar: () -> Unit = {},
+    onExcluir: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -897,12 +1046,36 @@ private fun CardDespesaSimples(
                 Text("$litros L", color = AppColors.TextSecondary)
                 Text(valor, fontWeight = FontWeight.Bold, color = cor)
             }
+            if (viagemAberta) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = Color(0xFFE5E7EB))
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onEditar) {
+                        Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp), tint = cor)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Editar", color = cor)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = onExcluir) {
+                        Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp), tint = AppColors.Error)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Excluir", color = AppColors.Error)
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun CardDespesaDescarga(data: String, valor: String) {
+private fun CardDespesaDescarga(
+    data: String,
+    valor: String,
+    viagemAberta: Boolean = false,
+    onEditar: () -> Unit = {},
+    onExcluir: () -> Unit = {}
+) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground),
@@ -912,6 +1085,86 @@ private fun CardDespesaDescarga(data: String, valor: String) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(data, fontWeight = FontWeight.Bold)
                 Text(valor, fontWeight = FontWeight.Bold, color = AppColors.Orange)
+            }
+            if (viagemAberta) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = Color(0xFFE5E7EB))
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onEditar) {
+                        Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp), tint = AppColors.Orange)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Editar", color = AppColors.Orange)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = onExcluir) {
+                        Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp), tint = AppColors.Error)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Excluir", color = AppColors.Error)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CardDespesaOutra(
+    item: OutraDespesaItem,
+    viagemAberta: Boolean,
+    onEditar: () -> Unit,
+    onExcluir: () -> Unit
+) {
+    val corTipo = when (item.tipo.lowercase()) {
+        "pedágio", "pedagio" -> Color(0xFF6366F1)
+        "refeição", "refeicao" -> Color(0xFF10B981)
+        "hospedagem" -> Color(0xFF8B5CF6)
+        "lavagem" -> Color(0xFF06B6D4)
+        else -> Color(0xFFFF6F00)
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(color = corTipo.copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
+                        Text(item.tipo, color = corTipo, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                    }
+                    if (item.local.isNotEmpty()) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(item.local, fontSize = 12.sp, color = AppColors.TextSecondary)
+                    }
+                }
+                Text(formatarMoeda(item.valor), fontWeight = FontWeight.Bold, color = corTipo)
+            }
+            if (item.descricao.isNotEmpty() && item.descricao != item.tipo) {
+                Spacer(Modifier.height(4.dp))
+                Text(item.descricao, fontSize = 13.sp, color = AppColors.TextSecondary)
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(formatarData(item.data), fontSize = 12.sp, color = AppColors.TextSecondary)
+
+            if (viagemAberta) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = Color(0xFFE5E7EB))
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onEditar) {
+                        Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp), tint = corTipo)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Editar", color = corTipo)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = onExcluir) {
+                        Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp), tint = AppColors.Error)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Excluir", color = AppColors.Error)
+                    }
+                }
             }
         }
     }
