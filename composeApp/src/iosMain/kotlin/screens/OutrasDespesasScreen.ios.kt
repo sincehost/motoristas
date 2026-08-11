@@ -82,6 +82,7 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
     val motorista = remember { repository.getMotoristaLogado() }
     val scope = rememberCoroutineScope()
     val viagemAtual = remember { repository.getViagemAtual() }
+    val focusManager = LocalFocusManager.current
 
     var tipoDespesa by remember { mutableStateOf("") }
     var descricao by remember { mutableStateOf("") }
@@ -141,7 +142,11 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
     if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onSucesso() }
 
     Scaffold(topBar = { GradientTopBar(title = "Outras Despesas", onBackClick = onVoltar) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).background(AppColors.Background).verticalScroll(rememberScrollState()).padding(16.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).background(AppColors.Background).pointerInput(Unit) {
+            detectTapGestures(onTap = {
+                focusManager.clearFocus()
+            })
+        }.verticalScroll(rememberScrollState()).padding(16.dp)) {
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground), shape = RoundedCornerShape(16.dp)) {
                 Column(Modifier.padding(20.dp)) {
                     Text("Tipo de Despesa", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AppColors.TextSecondary)

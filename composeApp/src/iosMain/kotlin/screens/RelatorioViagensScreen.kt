@@ -34,6 +34,7 @@ actual fun RelatorioViagensScreen(
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
@@ -110,6 +111,11 @@ actual fun RelatorioViagensScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .background(AppColors.Background)
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = {
+                        focusManager.clearFocus()
+                    })
+                }
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {

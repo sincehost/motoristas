@@ -38,6 +38,7 @@ actual fun EditarOutraDespesaScreen(
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
 
     var tipo by remember { mutableStateOf(item.tipo) }
     var descricao by remember { mutableStateOf(item.descricao) }
@@ -79,7 +80,11 @@ actual fun EditarOutraDespesaScreen(
     if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onVoltar() }
 
     Scaffold(topBar = { GradientTopBar(title = "Editar Despesa", onBackClick = onVoltar) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).background(AppColors.Background).verticalScroll(rememberScrollState()).padding(16.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding).background(AppColors.Background).pointerInput(Unit) {
+            detectTapGestures(onTap = {
+                focusManager.clearFocus()
+            })
+        }.verticalScroll(rememberScrollState()).padding(16.dp)) {
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground), shape = RoundedCornerShape(16.dp)) {
                 Column(Modifier.padding(20.dp)) {
                     OutlinedTextField(tipo, { tipo = it }, label = { Text("Tipo") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))

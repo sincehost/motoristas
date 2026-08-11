@@ -510,7 +510,7 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                 placa = response.viagem.placa
                 dataViagem = response.viagem.data_viagem
                 dataChegada = response.viagem.data_chegada
-                kmInicio = response.viagem.km_inicio
+                kmInicio = response.viagem.km_inicio.toDoubleOrNull()?.toLong()?.toString() ?: response.viagem.km_inicio
                 kmChegada = response.viagem.km_chegada
                 kmPosto = response.viagem.km_posto
                 pesocarga = response.viagem.pesocarga
@@ -616,20 +616,19 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
 
                         Spacer(Modifier.height(16.dp))
 
-                        CampoTexto("KM de Início:", kmInicio, { kmInicio = it }, KeyboardType.Number)
-                        CampoTexto("KM de Chegada:", kmChegada, { kmChegada = it }, KeyboardType.Number)
+                        // KM/Data de chegada e dados de retorno não aparecem aqui: só é
+                        // possível editar a viagem enquanto ela está em andamento (antes de
+                        // finalizar), então esses campos ainda não existem nesse momento.
+                        // Continuam sendo carregados e reenviados sem alteração (ver LaunchedEffect
+                        // e salvar()) para não apagar nada caso já existam no servidor.
+                        CampoTexto("KM de Início:", kmInicio, { kmInicio = it.filter { c -> c.isDigit() } }, KeyboardType.Number)
                         CampoTexto("Data de Início:", dataViagem, { dataViagem = it })
-                        CampoTexto("Data de Chegada:", dataChegada, { dataChegada = it })
                         CampoTexto("Ordem de Frete:", numerobd, { numerobd = it })
                         CampoTexto("Ordem de Frete 2:", numerobd2, { numerobd2 = it })
                         CampoTexto("CTE:", cte, { cte = it })
                         CampoTexto("CTE 2:", cte2, { cte2 = it })
-                        CampoTexto("Ordem Retorno:", ordemRetorno, { ordemRetorno = it })
-                        CampoTexto("CTE Retorno:", cteRetorno, { cteRetorno = it })
                         CampoTexto("Peso da Carga:", pesocarga, { pesocarga = it }, KeyboardType.Number)
-                        CampoTexto("Peso Carga Retorno:", pesocargaretorno, { pesocargaretorno = it }, KeyboardType.Number)
                         CampoTexto("Valor do Frete:", valorfrete, { valorfrete = it }, KeyboardType.Decimal)
-                        CampoTexto("Valor Frete Retorno:", valorfreteretorno, { valorfreteretorno = it }, KeyboardType.Decimal)
 
                         Text("Descrição:", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))

@@ -4,7 +4,14 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	
+
+	<key>CFBundleDevelopmentRegion</key>
+	<string>pt-BR</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>pt-BR</string>
+	</array>
+
 	<key>NSCameraUsageDescription</key>
 <string>Precisamos da câmera para fotografar o painel do veículo</string>
 <key>NSPhotoLibraryUsageDescription</key>

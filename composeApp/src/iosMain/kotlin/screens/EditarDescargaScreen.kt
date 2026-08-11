@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import api.ApiClient
 import api.AtualizarDescargaRequest
-import api.DetalheDescargaRequest
 import database.AppRepository
 import kotlinx.coroutines.launch
 import ui.AppColors
@@ -52,6 +51,7 @@ actual fun EditarDescargaScreen(
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
@@ -66,24 +66,24 @@ actual fun EditarDescargaScreen(
     LaunchedEffect(descargaId) {
         carregando = true
         try {
-            val response = ApiClient.detalheDescarga(
-                DetalheDescargaRequest(
-
-                    descarga_id = descargaId
+            val response = ApiClient.buscarDescarga(
+                api.BuscarDescargaRequest(
+                    descarga_id = descargaId,
+                    motorista_id = motorista?.motorista_id ?: ""
                 )
             )
             if (response.status == "ok" && response.descarga != null) {
                 val descarga = response.descarga
-                data = converterDataParaExibicao(descarga.data)
+                data = converterDataParaExibicao(descarga.data_descarga)
                 placa = descarga.placa
                 ordemDescarga = descarga.ordem_descarga.toString()
-                valor = formatarValor((descarga.valor * 100).roundToLong().toString())
+                valor = formatarValor(((descarga.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
                 fotoBase64 = descarga.foto
             } else {
-                mostrarMensagem("Erro ao carregar dados", isErro = true)
+                mostrarMensagem(response.mensagem ?: "Descarga não encontrada", isErro = true)
             }
         } catch (e: Exception) {
-            mostrarMensagem("Erro: ${e.message}", isErro = true)
+            mostrarMensagem("Erro ao carregar dados: ${e.message}", isErro = true)
         }
         carregando = false
     }
@@ -106,7 +106,11 @@ actual fun EditarDescargaScreen(
             }
         } else {
             Column(
-                modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(scrollState).padding(16.dp)
+                modifier = Modifier.fillMaxSize().padding(padding).pointerInput(Unit) {
+                    detectTapGestures(onTap = {
+                        focusManager.clearFocus()
+                    })
+                }.verticalScroll(scrollState).padding(16.dp)
             ) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),

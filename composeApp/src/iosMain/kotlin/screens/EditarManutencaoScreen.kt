@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import api.ApiClient
 import api.AtualizarManutencaoRequest
-import api.DetalheManutencaoRequest
 import database.AppRepository
 import kotlinx.coroutines.launch
 import ui.AppColors
@@ -59,6 +58,7 @@ actual fun EditarManutencaoScreen(
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
@@ -73,10 +73,10 @@ actual fun EditarManutencaoScreen(
     LaunchedEffect(manutencaoId) {
         carregando = true
         try {
-            val response = ApiClient.detalheManutencao(
-                DetalheManutencaoRequest(
-
-                    manutencao_id = manutencaoId
+            val response = ApiClient.buscarManutencao(
+                api.BuscarManutencaoRequest(
+                    manutencao_id = manutencaoId,
+                    motorista_id = motorista?.motorista_id ?: ""
                 )
             )
             if (response.status == "ok" && response.manutencao != null) {
@@ -86,7 +86,7 @@ actual fun EditarManutencaoScreen(
                 servico = manutencao.servico
                 descricaoServico = manutencao.descricao_servico ?: ""
                 localManutencao = manutencao.local_manutencao ?: ""
-                valor = formatarValor((manutencao.valor * 100).roundToLong().toString())
+                valor = formatarValor(((manutencao.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
                 kmTrocaOleo = manutencao.km_troca_oleo ?: ""
                 kmTrocaPneu = manutencao.km_troca_pneu ?: ""
                 pneus = manutencao.pneus ?: ""
@@ -94,10 +94,10 @@ actual fun EditarManutencaoScreen(
                 fotoComprovante1Base64 = manutencao.foto_comprovante1
                 fotoComprovante2Base64 = manutencao.foto_comprovante2
             } else {
-                mostrarMensagem("Erro ao carregar dados", isErro = true)
+                mostrarMensagem(response.mensagem ?: "Manutenção não encontrada", isErro = true)
             }
         } catch (e: Exception) {
-            mostrarMensagem("Erro: ${e.message}", isErro = true)
+            mostrarMensagem("Erro ao carregar dados: ${e.message}", isErro = true)
         }
         carregando = false
     }
@@ -120,7 +120,11 @@ actual fun EditarManutencaoScreen(
             }
         } else {
             Column(
-                modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(scrollState).padding(16.dp)
+                modifier = Modifier.fillMaxSize().padding(padding).pointerInput(Unit) {
+                    detectTapGestures(onTap = {
+                        focusManager.clearFocus()
+                    })
+                }.verticalScroll(scrollState).padding(16.dp)
             ) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),

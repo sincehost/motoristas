@@ -60,6 +60,7 @@ actual fun EditarArlaScreen(
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
@@ -74,24 +75,25 @@ actual fun EditarArlaScreen(
     LaunchedEffect(arlaId) {
         carregando = true
         try {
-            val response = ApiClient.detalheArla(
-                api.DetalheArlaRequest(
-                    arla_id = arlaId
+            val response = ApiClient.buscarArla(
+                api.BuscarArlaRequest(
+                    arla_id = arlaId,
+                    motorista_id = motorista?.motorista_id ?: ""
                 )
             )
             if (response.status == "ok" && response.arla != null) {
                 val arla = response.arla
-                data = converterDataParaExibicao(arla.data)
-                valor = formatarValor((arla.valor * 100).roundToLong().toString())
-                litros = arla.litros.toString()
+                data = converterDataParaExibicao(arla.data_arla)
+                valor = formatarValor(((arla.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
+                litros = arla.litros
                 posto = arla.posto
                 kmPosto = arla.km_posto
                 fotoBase64 = arla.foto
             } else {
-                mostrarMensagem("Erro ao carregar dados", isErro = true)
+                mostrarMensagem(response.mensagem ?: "ARLA não encontrado", isErro = true)
             }
         } catch (e: Exception) {
-            mostrarMensagem("Erro: ${e.message}", isErro = true)
+            mostrarMensagem("Erro ao carregar dados: ${e.message}", isErro = true)
         }
         carregando = false
     }
@@ -117,6 +119,11 @@ actual fun EditarArlaScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .pointerInput(Unit) {
+                        detectTapGestures(onTap = {
+                            focusManager.clearFocus()
+                        })
+                    }
                     .verticalScroll(scrollState)
                     .padding(16.dp)
             ) {

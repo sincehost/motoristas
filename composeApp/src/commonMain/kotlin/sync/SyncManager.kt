@@ -663,7 +663,9 @@ class SyncManager(private val repository: AppRepository) {
                     viagem_id = viagemIdParaEnviar.toInt(),
                     data = abastecimento.data_,
                     placa = try {
-                        repository.getViagemAtual()?.let { "" } ?: ""
+                        repository.getAllEquipamentos()
+                            .firstOrNull { it.servidor_id == abastecimento.equipamento_id }
+                            ?.placa ?: ""
                     } catch (_: Exception) { "" },
                     nome_posto = abastecimento.posto,
                     tipo_combustivel = abastecimento.tipo_combustivel,
