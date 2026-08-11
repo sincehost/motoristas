@@ -516,39 +516,27 @@ actual fun AdicionarCombustivelScreen(
                                 color = AppColors.TextPrimary
                             )
                             Spacer(Modifier.height(8.dp))
-                            ExposedDropdownMenuBox(
+                            ui.AppDropdownField(
+                                label = "Placa",
+                                selectedText = placaSelecionada?.second ?: "",
                                 expanded = placaExpandida,
                                 onExpandedChange = {
                                     focusManager.clearFocus()
                                     placaExpandida = it
-                                }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Primary)
+                                },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                OutlinedTextField(
-                                    value = placaSelecionada?.second ?: "Selecione uma placa",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    trailingIcon = {
-                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = placaExpandida)
-                                    },
-                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                    colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                    leadingIcon = {
-                                        Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Primary)
-                                    })
-                                
-                                ExposedDropdownMenu(
-                                    expanded = placaExpandida,
-                                    onDismissRequest = { placaExpandida = false }
-                                ) {
-                                    equipamentos.forEach { (id, placa) ->
-                                        DropdownMenuItem(
-                                            text = { Text(placa) },
-                                            onClick = {
-                                                placaSelecionada = id to placa
-                                                placaExpandida = false
-                                            }
-                                        )
-                                    }
+                                equipamentos.forEach { (id, placa) ->
+                                    ui.AppDropdownMenuItem(
+                                        text = { Text(placa) },
+                                        onClick = {
+                                            placaSelecionada = id to placa
+                                            placaExpandida = false
+                                        }
+                                    )
                                 }
                             }
 
@@ -619,45 +607,33 @@ actual fun AdicionarCombustivelScreen(
                                 color = AppColors.TextPrimary
                             )
                             Spacer(Modifier.height(8.dp))
-                            ExposedDropdownMenuBox(
+                            ui.AppDropdownField(
+                                label = "Tipo de Combustível",
+                                selectedText = tipoCombustivel,
                                 expanded = combustivelExpandido,
                                 onExpandedChange = {
                                     focusManager.clearFocus()
                                     combustivelExpandido = it
-                                }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.LocalGasStation, null, tint = AppColors.Primary)
+                                },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                OutlinedTextField(
-                                    value = tipoCombustivel.ifEmpty { "Selecione" },
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    trailingIcon = {
-                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = combustivelExpandido)
-                                    },
-                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                    colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                    leadingIcon = {
-                                        Icon(Icons.Default.LocalGasStation, null, tint = AppColors.Primary)
+                                ui.AppDropdownMenuItem(
+                                    text = { Text("Diesel Caminhão") },
+                                    onClick = {
+                                        tipoCombustivel = "Diesel Caminhão"
+                                        combustivelExpandido = false
                                     }
                                 )
-                                ExposedDropdownMenu(
-                                    expanded = combustivelExpandido,
-                                    onDismissRequest = { combustivelExpandido = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Diesel Caminhão") },
-                                        onClick = {
-                                            tipoCombustivel = "Diesel Caminhão"
-                                            combustivelExpandido = false
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Diesel Aparelho") },
-                                        onClick = {
-                                            tipoCombustivel = "Diesel Aparelho"
-                                            combustivelExpandido = false
-                                        }
-                                    )
-                                }
+                                ui.AppDropdownMenuItem(
+                                    text = { Text("Diesel Aparelho") },
+                                    onClick = {
+                                        tipoCombustivel = "Diesel Aparelho"
+                                        combustivelExpandido = false
+                                    }
+                                )
                             }
 
                             // Campo Horas (só para Diesel Aparelho)

@@ -162,12 +162,18 @@ actual fun EditarCombustivelScreen(
                         Spacer(Modifier.height(12.dp))
 
                         // Tipo combustível
-                        ExposedDropdownMenuBox(expanded = combustivelExpanded, onExpandedChange = { combustivelExpanded = it }) {
-                            OutlinedTextField(tipoCombustivel, {}, readOnly = true, label = { Text("Tipo combustível") },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(combustivelExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(12.dp))
-                            ExposedDropdownMenu(combustivelExpanded, { combustivelExpanded = false }) {
-                                TIPOS_COMBUSTIVEL.forEach { t -> DropdownMenuItem(text = { Text(t) }, onClick = { tipoCombustivel = t; combustivelExpanded = false }) }
+                        ui.AppDropdownField(
+                            label = "Tipo combustível",
+                            selectedText = tipoCombustivel,
+                            expanded = combustivelExpanded,
+                            onExpandedChange = { combustivelExpanded = it },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            TIPOS_COMBUSTIVEL.forEach { t ->
+                                ui.AppDropdownMenuItem(
+                                    text = { Text(t) },
+                                    onClick = { tipoCombustivel = t; combustivelExpanded = false }
+                                )
                             }
                         }
                         Spacer(Modifier.height(12.dp))

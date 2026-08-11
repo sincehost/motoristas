@@ -586,10 +586,15 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                         Text("Placa", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
-                        ExposedDropdownMenuBox(expanded = placaExpandida, onExpandedChange = { placaExpandida = it }) {
-                            OutlinedTextField(value = placa, onValueChange = {}, readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = placaExpandida) }, modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(12.dp))
-                            ExposedDropdownMenu(expanded = placaExpandida, onDismissRequest = { placaExpandida = false }) {
-                                equipamentos.forEach { eq -> DropdownMenuItem(text = { Text(eq.placa) }, onClick = { placa = eq.placa; placaExpandida = false }) }
+                        ui.AppDropdownField(
+                            label = "",
+                            selectedText = placa,
+                            expanded = placaExpandida,
+                            onExpandedChange = { placaExpandida = it },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            equipamentos.forEach { eq ->
+                                ui.AppDropdownMenuItem(text = { Text(eq.placa) }, onClick = { placa = eq.placa; placaExpandida = false })
                             }
                         }
 
@@ -597,10 +602,15 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
 
                         Text("Rota", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
-                        ExposedDropdownMenuBox(expanded = destinoExpandido, onExpandedChange = { destinoExpandido = it }) {
-                            OutlinedTextField(value = destinos.find { it.id == destinoId }?.nome ?: "", onValueChange = {}, readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = destinoExpandido) }, modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(12.dp))
-                            ExposedDropdownMenu(expanded = destinoExpandido, onDismissRequest = { destinoExpandido = false }) {
-                                destinos.forEach { d -> DropdownMenuItem(text = { Text(d.nome) }, onClick = { destinoId = d.id; destinoExpandido = false }) }
+                        ui.AppDropdownField(
+                            label = "",
+                            selectedText = destinos.find { it.id == destinoId }?.nome ?: "",
+                            expanded = destinoExpandido,
+                            onExpandedChange = { destinoExpandido = it },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            destinos.forEach { d ->
+                                ui.AppDropdownMenuItem(text = { Text(d.nome) }, onClick = { destinoId = d.id; destinoExpandido = false })
                             }
                         }
 

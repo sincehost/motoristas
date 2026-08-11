@@ -134,66 +134,40 @@ actual fun RelatorioViagensScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // Seletor de Mês
-                        ExposedDropdownMenuBox(
+                        ui.AppDropdownField(
+                            label = "Mês",
+                            selectedText = meses[mesSelecionado],
                             expanded = expandedMes,
                             onExpandedChange = { expandedMes = it },
                             modifier = Modifier.weight(1f)
                         ) {
-                            OutlinedTextField(
-                                value = meses[mesSelecionado],
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Mês") },
-                                modifier = Modifier.menuAnchor(),
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedMes)
-                                }
-                            )
-                            ExposedDropdownMenu(
-                                expanded = expandedMes,
-                                onDismissRequest = { expandedMes = false }
-                            ) {
-                                meses.forEachIndexed { index, mes ->
-                                    DropdownMenuItem(
-                                        text = { Text(mes) },
-                                        onClick = {
-                                            mesSelecionado = index
-                                            expandedMes = false
-                                        }
-                                    )
-                                }
+                            meses.forEachIndexed { index, mes ->
+                                ui.AppDropdownMenuItem(
+                                    text = { Text(mes) },
+                                    onClick = {
+                                        mesSelecionado = index
+                                        expandedMes = false
+                                    }
+                                )
                             }
                         }
 
                         // Seletor de Ano
-                        ExposedDropdownMenuBox(
+                        ui.AppDropdownField(
+                            label = "Ano",
+                            selectedText = anoSelecionado.toString(),
                             expanded = expandedAno,
                             onExpandedChange = { expandedAno = it },
                             modifier = Modifier.weight(1f)
                         ) {
-                            OutlinedTextField(
-                                value = anoSelecionado.toString(),
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Ano") },
-                                modifier = Modifier.menuAnchor(),
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedAno)
-                                }
-                            )
-                            ExposedDropdownMenu(
-                                expanded = expandedAno,
-                                onDismissRequest = { expandedAno = false }
-                            ) {
-                                (2020..anoAtual).forEach { ano ->
-                                    DropdownMenuItem(
-                                        text = { Text(ano.toString()) },
-                                        onClick = {
-                                            anoSelecionado = ano
-                                            expandedAno = false
-                                        }
-                                    )
-                                }
+                            (2020..anoAtual).forEach { ano ->
+                                ui.AppDropdownMenuItem(
+                                    text = { Text(ano.toString()) },
+                                    onClick = {
+                                        anoSelecionado = ano
+                                        expandedAno = false
+                                    }
+                                )
                             }
                         }
                     }

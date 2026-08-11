@@ -514,36 +514,24 @@ actual fun AdicionarDescargaScreen(
                         color = labelColor
                     )
                     Spacer(Modifier.height(8.dp))
-                    ExposedDropdownMenuBox(
+                    ui.AppDropdownField(
+                        label = "Placa do Veículo",
+                        selectedText = placaSelecionada ?: "",
                         expanded = expandedPlaca,
-                        onExpandedChange = { expandedPlaca = it }
+                        onExpandedChange = { expandedPlaca = it },
+                        leadingIcon = {
+                            Icon(Icons.Default.DirectionsCar, null, tint = placeholderColor)
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        OutlinedTextField(
-                            value = placaSelecionada ?: "Selecione a placa",
-                            onValueChange = {},
-                            readOnly = true,
-                            modifier = Modifier.fillMaxWidth().menuAnchor(),
-                            colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            leadingIcon = {
-                                Icon(Icons.Default.DirectionsCar, null, tint = placeholderColor)
-                            },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPlaca)
-                            }
-                        )
-                        ExposedDropdownMenu(
-                            expanded = expandedPlaca,
-                            onDismissRequest = { expandedPlaca = false }
-                        ) {
-                            placas.forEach { placa ->
-                                DropdownMenuItem(
-                                    text = { Text(placa) },
-                                    onClick = {
-                                        placaSelecionada = placa
-                                        expandedPlaca = false
-                                    }
-                                )
-                            }
+                        placas.forEach { placa ->
+                            ui.AppDropdownMenuItem(
+                                text = { Text(placa) },
+                                onClick = {
+                                    placaSelecionada = placa
+                                    expandedPlaca = false
+                                }
+                            )
                         }
                     }
 

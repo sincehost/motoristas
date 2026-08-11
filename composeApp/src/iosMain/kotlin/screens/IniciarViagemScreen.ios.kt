@@ -464,79 +464,53 @@ actual fun IniciarViagemScreen(
 
                         Spacer(Modifier.height(12.dp))
 
-                        ExposedDropdownMenuBox(
+                        ui.AppDropdownField(
+                            label = "Rota *",
+                            selectedText = destinoSelecionado?.second ?: "",
                             expanded = destinoExpandido,
                             onExpandedChange = {
                                 focusManager.clearFocus()
                                 destinoExpandido = it
-                            }
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Route, null, tint = AppColors.Primary)
+                            },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            OutlinedTextField(
-                                value = destinoSelecionado?.second ?: "",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Rota *") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Route, null, tint = AppColors.Primary)
-                                },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = destinoExpandido)
-                                },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            ExposedDropdownMenu(
-                                expanded = destinoExpandido,
-                                onDismissRequest = { destinoExpandido = false }
-                            ) {
-                                destinos.forEach { destino ->
-                                    DropdownMenuItem(
-                                        text = { Text(destino.nome) },
-                                        onClick = {
-                                            destinoSelecionado = Pair(destino.servidor_id, destino.nome)
-                                            destinoExpandido = false
-                                        }
-                                    )
-                                }
+                            destinos.forEach { destino ->
+                                ui.AppDropdownMenuItem(
+                                    text = { Text(destino.nome) },
+                                    onClick = {
+                                        destinoSelecionado = Pair(destino.servidor_id, destino.nome)
+                                        destinoExpandido = false
+                                    }
+                                )
                             }
                         }
 
                         Spacer(Modifier.height(12.dp))
 
-                        ExposedDropdownMenuBox(
+                        ui.AppDropdownField(
+                            label = "Placa do Cavalo *",
+                            selectedText = placaSelecionada ?: "",
                             expanded = placaExpandida,
                             onExpandedChange = {
                                 focusManager.clearFocus()
                                 placaExpandida = it
-                            }
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.LocalShipping, null, tint = AppColors.Primary)
+                            },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            OutlinedTextField(
-                                value = placaSelecionada ?: "",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Placa do Cavalo *") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.LocalShipping, null, tint = AppColors.Primary)
-                                },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = placaExpandida)
-                                },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            ExposedDropdownMenu(
-                                expanded = placaExpandida,
-                                onDismissRequest = { placaExpandida = false }
-                            ) {
-                                equipamentos.forEach { equip ->
-                                    DropdownMenuItem(
-                                        text = { Text(equip.placa) },
-                                        onClick = {
-                                            placaSelecionada = equip.placa
-                                            placaExpandida = false
-                                        }
-                                    )
-                                }
+                            equipamentos.forEach { equip ->
+                                ui.AppDropdownMenuItem(
+                                    text = { Text(equip.placa) },
+                                    onClick = {
+                                        placaSelecionada = equip.placa
+                                        placaExpandida = false
+                                    }
+                                )
                             }
                         }
 

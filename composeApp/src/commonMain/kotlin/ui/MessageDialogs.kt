@@ -1,11 +1,15 @@
 package ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -13,14 +17,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 
 /**
- * Substituto de `androidx.compose.material3.AlertDialog` com a MESMA assinatura,
- * implementado sobre `Dialog` para evitar os bugs de renderização do `AlertDialog`
- * no destino iOS (ver comentário em [MensagemDialog]). Use no lugar de `AlertDialog`
- * em qualquer diálogo de confirmação/aviso do app.
+ * Substituto de `androidx.compose.material3.AlertDialog` com a MESMA assinatura.
+ *
+ * NÃO usa `Dialog`/`Popup` (nem o `AlertDialog` do Material3, que é implementado
+ * em cima de `Popup`). No destino iOS do Compose Multiplatform, dentro da estrutura
+ * de navegação deste app (telas trocadas dentro de um `AnimatedVisibility`), QUALQUER
+ * `Popup`/`Dialog` simplesmente não aparece — testado e confirmado, não é só um
+ * problema do `AlertDialog` especificamente. Por isso este componente é implementado
+ * como um `Box` comum, desenhado por cima do resto da tela usando `Modifier.zIndex`,
+ * sem passar pela ponte de janela nativa (`UIViewController`/`UIWindow`) que o
+ * Popup exige. Use no lugar de `AlertDialog` em qualquer diálogo do app.
  */
 @Composable
 fun AppAlertDialog(
@@ -33,14 +42,27 @@ fun AppAlertDialog(
     text: (@Composable () -> Unit)? = null,
     containerColor: Color = AppColors.Surface
 ) {
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(1000f)
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismissRequest
+            ),
+        contentAlignment = Alignment.Center
     ) {
         Card(
             modifier = modifier
                 .fillMaxWidth(0.86f)
-                .padding(16.dp),
+                .padding(16.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {} // consome o toque para não fechar ao tocar dentro do card
+                ),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = containerColor)
         ) {

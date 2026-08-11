@@ -225,6 +225,7 @@ private fun DashboardContent(
     val scope = rememberCoroutineScope()
 
     var mostrarDialogoLogout by remember { mutableStateOf(false) }
+    var mostrarMenuDespesas by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     val pullRefreshState = rememberPullToRefreshState()
 
@@ -391,6 +392,13 @@ private fun DashboardContent(
         )
     }
 
+    if (mostrarMenuDespesas) {
+        DespesasMenuOverlay(
+            onDismiss = { mostrarMenuDespesas = false },
+            onNavigate = { screen -> onNavigate(screen) }
+        )
+    }
+
     Scaffold(
         topBar = {
             DashboardTopBar(
@@ -415,7 +423,8 @@ private fun DashboardContent(
                 viagemAtualId = viagemAtualId,
                 telaAtual = telaAtual,
                 onNavigate = onNavigate,
-                onMessage = { mensagem = it; tipoMensagem = TipoMensagem.AVISO }
+                onMessage = { mensagem = it; tipoMensagem = TipoMensagem.AVISO },
+                onAbrirMenuDespesas = { mostrarMenuDespesas = true }
             )
         }
     ) { padding ->

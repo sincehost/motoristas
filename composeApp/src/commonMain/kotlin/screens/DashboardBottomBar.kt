@@ -1,5 +1,8 @@
 package screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -13,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import database.AppRepository
 import kotlinx.coroutines.launch
 import ui.AppAlertDialog
@@ -28,10 +32,10 @@ fun BottomNavigationBar(
     viagemAtualId: Long?,
     telaAtual: Screen? = null,
     onNavigate: (Screen) -> Unit,
-    onMessage: (String) -> Unit
+    onMessage: (String) -> Unit,
+    onAbrirMenuDespesas: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    var mostrarMenuDespesas by remember { mutableStateOf(false) }
 
     // ★ Estado dos popups de aviso
     var mostrarAvisoIniciarViagem by remember { mutableStateOf(false) }
@@ -181,7 +185,7 @@ fun BottomNavigationBar(
                 scope.launch {
                     onMessage("")
                     if (viagemAtualId != null) {
-                        mostrarMenuDespesas = !mostrarMenuDespesas
+                        onAbrirMenuDespesas()
                     } else {
                         // ★ Popup em vez de mensagem pequena
                         mostrarAvisoIniciarViagem = true
@@ -189,25 +193,14 @@ fun BottomNavigationBar(
                 }
             },
             icon = {
-                Box {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    ) {
-                        Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(26.dp))
-                        Spacer(Modifier.height(4.dp))
-                        Text("Despesas", fontSize = 11.sp, maxLines = 1, fontWeight = FontWeight.Medium)
-                    }
-
-                    DespesasDropdownMenu(
-                        expanded = mostrarMenuDespesas,
-                        onDismiss = { mostrarMenuDespesas = false },
-                        onNavigate = { screen ->
-                            mostrarMenuDespesas = false
-                            onNavigate(screen)
-                        }
-                    )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(26.dp))
+                    Spacer(Modifier.height(4.dp))
+                    Text("Despesas", fontSize = 11.sp, maxLines = 1, fontWeight = FontWeight.Medium)
                 }
             },
             colors = bottomNavColors()
@@ -267,36 +260,69 @@ fun BottomNavigationBar(
 }
 
 // ===============================
-// MENU DROPDOWN DE DESPESAS
+// MENU DE DESPESAS (overlay ancorado embaixo, SEM Popup — ver AppAlertDialog)
 // ===============================
 @Composable
-private fun DespesasDropdownMenu(
-    expanded: Boolean,
+fun DespesasMenuOverlay(
     onDismiss: () -> Unit,
     onNavigate: (Screen) -> Unit
 ) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(
-            text = { Text("Diesel", fontWeight = FontWeight.Medium) },
-            leadingIcon = { Icon(Icons.Default.LocalGasStation, null, tint = AppColors.Primary) },
-            onClick = { onNavigate(Screen.ADICIONAR_COMBUSTIVEL) }
-        )
-        DropdownMenuItem(
-            text = { Text("ARLA 32", fontWeight = FontWeight.Medium) },
-            leadingIcon = { Icon(Icons.Default.WaterDrop, null, tint = Color(0xFF06B6D4)) },
-            onClick = { onNavigate(Screen.ADICIONAR_ARLA) }
-        )
-        DropdownMenuItem(
-            text = { Text("Descarga", fontWeight = FontWeight.Medium) },
-            leadingIcon = { Icon(Icons.Default.Inventory, null, tint = Color(0xFF8B5CF6)) },
-            onClick = { onNavigate(Screen.ADICIONAR_DESCARGA) }
-        )
-        HorizontalDivider()
-        DropdownMenuItem(
-            text = { Text("Outras Despesas", fontWeight = FontWeight.Medium) },
-            leadingIcon = { Icon(Icons.Default.MoreHoriz, null, tint = Color(0xFFFF6F00)) },
-            onClick = { onNavigate(Screen.OUTRAS_DESPESAS) }
-        )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(1000f)
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss
+            ),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .padding(bottom = 96.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {}
+                ),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = AppColors.Surface)
+        ) {
+            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                DespesaMenuItem("Diesel", Icons.Default.LocalGasStation, AppColors.Primary) {
+                    onDismiss(); onNavigate(Screen.ADICIONAR_COMBUSTIVEL)
+                }
+                DespesaMenuItem("ARLA 32", Icons.Default.WaterDrop, Color(0xFF06B6D4)) {
+                    onDismiss(); onNavigate(Screen.ADICIONAR_ARLA)
+                }
+                DespesaMenuItem("Descarga", Icons.Default.Inventory, Color(0xFF8B5CF6)) {
+                    onDismiss(); onNavigate(Screen.ADICIONAR_DESCARGA)
+                }
+                HorizontalDivider()
+                DespesaMenuItem("Outras Despesas", Icons.Default.MoreHoriz, Color(0xFFFF6F00)) {
+                    onDismiss(); onNavigate(Screen.OUTRAS_DESPESAS)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DespesaMenuItem(texto: String, icone: androidx.compose.ui.graphics.vector.ImageVector, cor: Color, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icone, null, tint = cor)
+        Spacer(Modifier.width(16.dp))
+        Text(texto, fontWeight = FontWeight.Medium)
     }
 }
 

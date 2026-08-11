@@ -222,24 +222,30 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                         leadingIcon = { Icon(Icons.Default.CalendarToday, null) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                     Spacer(Modifier.height(12.dp))
 
-                    ExposedDropdownMenuBox(expanded = placaExpanded, onExpandedChange = { placaExpanded = it }) {
-                        OutlinedTextField(placaSelecionada, {}, readOnly = true, label = { Text("Placa do veículo") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = placaExpanded) },
-                            leadingIcon = { Icon(Icons.Default.DirectionsCar, null) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(12.dp))
-                        ExposedDropdownMenu(expanded = placaExpanded, onDismissRequest = { placaExpanded = false }) {
-                            equipamentos.forEach { (_, placa) -> DropdownMenuItem(text = { Text(placa) }, onClick = { placaSelecionada = placa; placaExpanded = false }) }
+                    ui.AppDropdownField(
+                        label = "Placa do veículo",
+                        selectedText = placaSelecionada,
+                        expanded = placaExpanded,
+                        onExpandedChange = { placaExpanded = it },
+                        leadingIcon = { Icon(Icons.Default.DirectionsCar, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        equipamentos.forEach { (_, placa) ->
+                            ui.AppDropdownMenuItem(text = { Text(placa) }, onClick = { placaSelecionada = placa; placaExpanded = false })
                         }
                     }
                     Spacer(Modifier.height(12.dp))
 
-                    ExposedDropdownMenuBox(expanded = servicoExpanded, onExpandedChange = { servicoExpanded = it }) {
-                        OutlinedTextField(servicoSelecionado, {}, readOnly = true, label = { Text("Tipo de serviço") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = servicoExpanded) },
-                            leadingIcon = { Icon(Icons.Default.Build, null) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor(), shape = RoundedCornerShape(12.dp))
-                        ExposedDropdownMenu(expanded = servicoExpanded, onDismissRequest = { servicoExpanded = false }) {
-                            SERVICOS.forEach { s -> DropdownMenuItem(text = { Text(s) }, onClick = { servicoSelecionado = s; servicoExpanded = false }) }
+                    ui.AppDropdownField(
+                        label = "Tipo de serviço",
+                        selectedText = servicoSelecionado,
+                        expanded = servicoExpanded,
+                        onExpandedChange = { servicoExpanded = it },
+                        leadingIcon = { Icon(Icons.Default.Build, null) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        SERVICOS.forEach { s ->
+                            ui.AppDropdownMenuItem(text = { Text(s) }, onClick = { servicoSelecionado = s; servicoExpanded = false })
                         }
                     }
                     Spacer(Modifier.height(12.dp))
@@ -459,15 +465,15 @@ private fun TipoPneuSelectorIos(pneuNumero: Int, tipoSelecionado: String, opcoes
     var expanded by remember { mutableStateOf(false) }
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text("Pneu $pneuNumero:", modifier = Modifier.width(70.dp), fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
-        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = Modifier.weight(1f)) {
-            OutlinedTextField(
-                value = if (tipoSelecionado.isBlank()) "Selecione..." else tipoSelecionado,
-                onValueChange = {}, readOnly = true,
-                modifier = Modifier.fillMaxWidth().menuAnchor(),
-                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(8.dp),
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) })
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                opcoes.forEach { opcao -> DropdownMenuItem(text = { Text(opcao) }, onClick = { onTipoChange(opcao); expanded = false }) }
+        ui.AppDropdownField(
+            label = "",
+            selectedText = if (tipoSelecionado.isBlank()) "Selecione..." else tipoSelecionado,
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+            modifier = Modifier.weight(1f)
+        ) {
+            opcoes.forEach { opcao ->
+                ui.AppDropdownMenuItem(text = { Text(opcao) }, onClick = { onTipoChange(opcao); expanded = false })
             }
         }
     }
