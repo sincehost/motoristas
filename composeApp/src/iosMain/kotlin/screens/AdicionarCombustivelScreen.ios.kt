@@ -80,7 +80,7 @@ private class CombustivelCameraDelegate(
                     if (skiaImage != null) {
                         val bitmap = skiaImage.toComposeImageBitmap()
                         onFotoCaptured(tipoFoto, base64, bitmap)
-                        onMessage("✓ Foto capturada com sucesso!", false)
+                        // Foto capturada silenciosamente - a prévia já confirma
                     } else {
                         onMessage("Erro ao processar imagem", true)
                     }

@@ -84,7 +84,7 @@ private class CameraDelegate(
                     if (skiaImage != null) {
                         val bitmap = skiaImage.toComposeImageBitmap()
                         onFotoCaptured(base64, bitmap)
-                        onMessage("✓ Foto capturada com sucesso!", false)
+                        // Foto capturada silenciosamente - a prévia já confirma
                     } else {
                         onMessage("Erro ao processar imagem", true)
                     }

@@ -74,7 +74,7 @@ private class AdicionarDescargaCameraDelegate(
                 }
 
                 onFotoCaptured(base64)
-                onMessage("✓ Foto capturada com sucesso!", false)
+                // Foto capturada silenciosamente - a prévia já confirma
             } catch (e: Exception) {
                 onMessage("Erro: ${e.message}", true)
             }
