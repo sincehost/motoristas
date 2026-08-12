@@ -683,7 +683,7 @@ class SyncManager(private val repository: AppRepository) {
             LogWriter.log("   viagem_id: $viagemIdParaEnviar")
             LogWriter.log("   equipamento_id: ${abastecimento.equipamento_id} -> placa: '$placaResolvida'")
             LogWriter.log("   tipo_combustivel: ${abastecimento.tipo_combustivel}")
-            LogWriter.log("   tipo_pagamento: ${abastecimento.tipo_pagamento.uppercase()}")
+            LogWriter.log("   tipo_pagamento: ${abastecimento.tipo_pagamento}")
             LogWriter.log("   litros: '${abastecimento.litros}' -> '$litrosConvertido'")
             LogWriter.log("   valor: '${abastecimento.valor}' -> '$valorConvertido'")
             LogWriter.log("   valor_litro calculado: $valorLitroConvertido")
@@ -696,7 +696,10 @@ class SyncManager(private val repository: AppRepository) {
                     placa = placaResolvida,
                     nome_posto = abastecimento.posto,
                     tipo_combustivel = abastecimento.tipo_combustivel,
-                    tipo_pagamento = abastecimento.tipo_pagamento.uppercase(),
+                    // A API valida tipo_pagamento contra formas_pagamento.codigo, que é
+                    // sempre minúsculo ("ctf", "dinheiro") — NÃO uppercase aqui, senão
+                    // o servidor rejeita com "forma de pagamento inválida".
+                    tipo_pagamento = abastecimento.tipo_pagamento,
                     litros_abastecidos = litrosConvertido,
                     valor_litro = valorLitroConvertido,
                     valor = valorConvertido,
