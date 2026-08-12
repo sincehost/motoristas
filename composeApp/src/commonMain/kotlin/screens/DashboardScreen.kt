@@ -296,7 +296,7 @@ private fun DashboardContent(
             delay(4000)
             syncStatus = syncStatus.copy(state = SyncState.IDLE, message = "")
         } else if (syncStatus.state == SyncState.ERROR || syncStatus.state == SyncState.NO_INTERNET) {
-            delay(6000)
+            delay(15000)
             syncStatus = syncStatus.copy(state = SyncState.IDLE, message = "")
         }
     }

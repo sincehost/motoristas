@@ -345,6 +345,9 @@ class SyncManager(private val repository: AppRepository) {
         LogWriter.log("❌ Erros: ${erros.size}")
         LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
+        // Mostra o motivo real do primeiro erro na tela (não só a contagem) —
+        // sem isso não tem como o motorista (ou quem estiver testando) saber
+        // POR QUE algo não sincronizou sem acesso aos logs/Xcode.
         val estadoFinal = when {
             erros.isEmpty() -> SyncStatus(
                 state = SyncState.SUCCESS,
@@ -353,12 +356,12 @@ class SyncManager(private val repository: AppRepository) {
             )
             sucessos > 0 -> SyncStatus(
                 state = SyncState.ERROR,
-                message = "$sucessos OK, ${erros.size} ${if (erros.size == 1) "erro" else "erros"}",
+                message = "$sucessos OK, ${erros.size} ${if (erros.size == 1) "erro" else "erros"}: ${erros.first()}",
                 lastSync = agora
             )
             else -> SyncStatus(
                 state = SyncState.ERROR,
-                message = "Falha ao sincronizar. Dados salvos para nova tentativa.",
+                message = erros.first(),
                 lastSync = agora
             )
         }
