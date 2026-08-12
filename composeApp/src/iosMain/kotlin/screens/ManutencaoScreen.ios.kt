@@ -259,11 +259,12 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                         leadingIcon = { Icon(Icons.Default.LocationOn, null) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(valor, { newValue ->
-                        val filtered = newValue.text.filter { c -> c.isDigit() || c == '.' || c == ',' }
-                        valor = TextFieldValue(filtered, selection = TextRange(filtered.length))
+                        val digits = newValue.text.filter { c -> c.isDigit() }.take(9)
+                        val formatted = formatarValorManutencao(digits)
+                        valor = TextFieldValue(formatted, selection = TextRange(formatted.length))
                     },
                         label = { Text("Valor (R$)") }, leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
 
                     if (servicoSelecionado == "Troca de Óleo") {
@@ -482,4 +483,14 @@ private fun TipoPneuSelectorIos(pneuNumero: Int, tipoSelecionado: String, opcoes
             }
         }
     }
+}
+
+private fun formatarValorManutencao(input: String): String {
+    val digits = input.filter { it.isDigit() }
+    if (digits.isEmpty()) return ""
+    val value = digits.toLongOrNull() ?: return ""
+    val reais = value / 100
+    val centavos = value % 100
+    val reaisFormatado = reais.toString().reversed().chunked(3).joinToString(".").reversed()
+    return "$reaisFormatado,${centavos.toString().padStart(2, '0')}"
 }

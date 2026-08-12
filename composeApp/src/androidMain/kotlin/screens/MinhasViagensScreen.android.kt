@@ -599,7 +599,13 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                 placa = response.viagem.placa
                 dataViagem = response.viagem.data_viagem
                 dataChegada = response.viagem.data_chegada
-                kmInicio = response.viagem.km_inicio.toDoubleOrNull()?.toLong()?.toString() ?: response.viagem.km_inicio
+                kmInicio = run {
+                    val s = response.viagem.km_inicio
+                    // Só remove decimal se for ".0" ou ".00" (nunca 3 dígitos, que
+                    // poderia ser separador de milhar em vez de casa decimal)
+                    val m = Regex("^(\\d+)\\.(\\d{1,2})$").find(s)
+                    if (m != null && m.groupValues[2].all { it == '0' }) m.groupValues[1] else s
+                }
                 kmChegada = response.viagem.km_chegada
                 kmPosto = response.viagem.km_posto
                 pesocarga = response.viagem.pesocarga

@@ -183,11 +183,11 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(valor, { newValue ->
-                        val formatted = newValue.text.filter { c -> c.isDigit() || c == '.' || c == ',' }
+                        val formatted = formatarValorDespesaOutras(newValue.text)
                         valor = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
                     },
                         label = { Text("Valor (R$)") }, leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(dataDespesa, { dataDespesa = it }, label = { Text("Data") },
@@ -236,4 +236,14 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
             Spacer(Modifier.height(32.dp))
         }
     }
+}
+
+private fun formatarValorDespesaOutras(input: String): String {
+    val digits = input.filter { it.isDigit() }
+    if (digits.isEmpty()) return ""
+    val value = digits.toLongOrNull() ?: return ""
+    val reais = value / 100
+    val centavos = value % 100
+    val reaisFormatado = reais.toString().reversed().chunked(3).joinToString(".").reversed()
+    return "$reaisFormatado,${centavos.toString().padStart(2, '0')}"
 }

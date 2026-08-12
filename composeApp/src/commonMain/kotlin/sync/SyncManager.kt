@@ -657,32 +657,52 @@ class SyncManager(private val repository: AppRepository) {
                 return SyncItemResult(sucesso = false, erro = "Abastecimento: aguardando viagem ser sincronizada primeiro")
             }
 
+            val placaResolvida = try {
+                repository.getAllEquipamentos()
+                    .firstOrNull { it.servidor_id == abastecimento.equipamento_id }
+                    ?.placa ?: ""
+            } catch (_: Exception) { "" }
+            val litrosConvertido = abastecimento.litros.replace(".", "").replace(",", ".")
+            val valorConvertido = abastecimento.valor.replace(".", "").replace(",", ".")
+            val valorLitroConvertido = try {
+                val v = valorConvertido.toDoubleOrNull() ?: 0.0
+                val l = litrosConvertido.toDoubleOrNull() ?: 0.0
+                if (l > 0) ((v / l * 100).toLong() / 100.0).toString() else "0.00"
+            } catch (_: Exception) { "0.00" }
+
+            LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            LogWriter.log("📤 SINCRONIZANDO ABASTECIMENTO - ID: ${abastecimento.id}")
+            LogWriter.log("   viagem_id: $viagemIdParaEnviar")
+            LogWriter.log("   equipamento_id: ${abastecimento.equipamento_id} -> placa: '$placaResolvida'")
+            LogWriter.log("   tipo_combustivel: ${abastecimento.tipo_combustivel}")
+            LogWriter.log("   tipo_pagamento: ${abastecimento.tipo_pagamento.uppercase()}")
+            LogWriter.log("   litros: '${abastecimento.litros}' -> '$litrosConvertido'")
+            LogWriter.log("   valor: '${abastecimento.valor}' -> '$valorConvertido'")
+            LogWriter.log("   valor_litro calculado: $valorLitroConvertido")
+
             val resp = comRetry("Abastecimento") { ApiClient.salvarAbastecimento(
                 SalvarAbastecimentoRequest(
                     motorista_id = motorista?.motorista_id ?: "",
                     viagem_id = viagemIdParaEnviar.toInt(),
                     data = abastecimento.data_,
-                    placa = try {
-                        repository.getAllEquipamentos()
-                            .firstOrNull { it.servidor_id == abastecimento.equipamento_id }
-                            ?.placa ?: ""
-                    } catch (_: Exception) { "" },
+                    placa = placaResolvida,
                     nome_posto = abastecimento.posto,
                     tipo_combustivel = abastecimento.tipo_combustivel,
                     tipo_pagamento = abastecimento.tipo_pagamento.uppercase(),
-                    litros_abastecidos = abastecimento.litros.replace(".", "").replace(",", "."),
-                    valor_litro = try {
-                        val v = abastecimento.valor.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0
-                        val l = abastecimento.litros.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0
-                        if (l > 0) ((v / l * 100).toLong() / 100.0).toString() else "0.00"
-                    } catch (_: Exception) { "0.00" },
-                    valor = abastecimento.valor.replace(".", "").replace(",", "."),
+                    litros_abastecidos = litrosConvertido,
+                    valor_litro = valorLitroConvertido,
+                    valor = valorConvertido,
                     km_posto = abastecimento.km_posto,
                     horas = abastecimento.horas,
                     cupom_fiscal_base64 = abastecimento.foto,
                     marcador_base64 = abastecimento.foto_marcador
                 )
             )}
+
+            LogWriter.log("📥 RESPOSTA SERVIDOR ABASTECIMENTO:")
+            LogWriter.log("   status: ${resp.status}")
+            LogWriter.log("   mensagem: ${resp.mensagem ?: "sem mensagem"}")
+            LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
             if (resp.status == "ok") {
                 repository.marcarAbastecimentoSincronizado(abastecimento.id)
@@ -691,6 +711,9 @@ class SyncManager(private val repository: AppRepository) {
                 SyncItemResult(sucesso = false, erro = "Abastecimento: ${resp.mensagem}")
             }
         } catch (e: Exception) {
+            LogWriter.log("❌ EXCEÇÃO SINCRONIZAR ABASTECIMENTO:")
+            LogWriter.log("   ${e::class.simpleName}: ${e.message}")
+            LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             SyncItemResult(sucesso = false, erro = "Abastecimento: ${e.message}")
         }
     }
