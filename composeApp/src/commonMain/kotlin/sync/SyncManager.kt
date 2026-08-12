@@ -2,6 +2,8 @@ package sync
 
 import api.*
 import database.AppRepository
+import database.TipoDespesaSync
+import database.TipoCombustivelSync
 import br.com.lfsystem.app.database.Motorista
 import util.LogWriter
 import kotlinx.datetime.Clock
@@ -371,7 +373,7 @@ class SyncManager(private val repository: AppRepository) {
     suspend fun verificarConectividade(): Boolean {
         return try {
             LogWriter.log("🌐 Verificando conectividade...")
-            ApiClient.syncDados()
+            ApiClient.syncDados(repository.getMotoristaLogado()?.motorista_id ?: "")
             LogWriter.log("✅ Internet OK")
             true
         } catch (e: Exception) {
@@ -445,12 +447,15 @@ class SyncManager(private val repository: AppRepository) {
                     onModoOffline(false)
                     onViagemEncontrada(viagem.id.toLong(), viagem.destino)
 
-                    // Tenta sincronizar destinos/equipamentos em background
+                    // Tenta sincronizar destinos/equipamentos/catálogos em background
                     try {
-                        val syncResp = ApiClient.syncDados()
+                        val syncResp = ApiClient.syncDados(repository.getMotoristaLogado()?.motorista_id ?: "")
                         if (syncResp.status == "ok") {
                             repository.salvarDestinos(syncResp.destinos.map { it.id to it.nome })
                             repository.salvarEquipamentos(syncResp.equipamentos.map { it.id to it.placa })
+                            repository.salvarFormasPagamento(syncResp.formas_pagamento.map { Triple(it.id, it.nome, it.codigo) })
+                            repository.salvarTiposDespesa(syncResp.tipos_despesa.map { TipoDespesaSync(it.id, it.nome, it.icone, it.cor) })
+                            repository.salvarTiposCombustivel(syncResp.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) })
                         }
                     } catch (_: Exception) { }
                     return

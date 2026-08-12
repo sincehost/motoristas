@@ -115,6 +115,10 @@ actual fun AdicionarCombustivelScreen(
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
 
+    // Formas de pagamento e tipos de combustível (catálogo da empresa, cadastrado no admin)
+    val formasPagamento = remember { repository.getAllFormasPagamento() }
+    val tiposCombustivel = remember { repository.getAllTiposCombustivel() }
+
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
@@ -166,7 +170,7 @@ actual fun AdicionarCombustivelScreen(
 
                 // Atualiza equipamentos da API
                 try {
-                    val syncResp = api.ApiClient.syncDados()
+                    val syncResp = api.ApiClient.syncDados(motorista?.motorista_id ?: "")
                     if (syncResp.status == "ok") {
                         repository.salvarEquipamentos(syncResp.equipamentos.map { it.id to it.placa })
                         equipamentos = repository.getEquipamentosParaDropdown()
@@ -292,7 +296,7 @@ actual fun AdicionarCombustivelScreen(
             mostrarMensagem("Selecione o tipo de combustível", isErro = true)
             return
         }
-        if (tipoCombustivel == "Diesel Aparelho" && horas.isEmpty()) {
+        if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L && horas.isEmpty()) {
             mostrarMensagem("Informe as horas", isErro = true)
             return
         }
@@ -620,24 +624,19 @@ actual fun AdicionarCombustivelScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                ui.AppDropdownMenuItem(
-                                    text = { Text("Diesel Caminhão") },
-                                    onClick = {
-                                        tipoCombustivel = "Diesel Caminhão"
-                                        combustivelExpandido = false
-                                    }
-                                )
-                                ui.AppDropdownMenuItem(
-                                    text = { Text("Diesel Aparelho") },
-                                    onClick = {
-                                        tipoCombustivel = "Diesel Aparelho"
-                                        combustivelExpandido = false
-                                    }
-                                )
+                                tiposCombustivel.forEach { tc ->
+                                    ui.AppDropdownMenuItem(
+                                        text = { Text(tc.nome) },
+                                        onClick = {
+                                            tipoCombustivel = tc.nome
+                                            combustivelExpandido = false
+                                        }
+                                    )
+                                }
                             }
 
-                            // Campo Horas (só para Diesel Aparelho)
-                            if (tipoCombustivel == "Diesel Aparelho") {
+                            // Campo Horas (só para tipos que exigem horas)
+                            if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L) {
                                 Spacer(Modifier.height(16.dp))
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
@@ -762,20 +761,15 @@ actual fun AdicionarCombustivelScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                BotaoOpcaoComb(
-                                    "CTF",
-                                    Icons.Default.CreditCard,
-                                    tipoPagamento == "ctf",
-                                    { tipoPagamento = "ctf" },
-                                    Modifier.weight(1f)
-                                )
-                                BotaoOpcaoComb(
-                                    "Dinheiro",
-                                    Icons.Default.Money,
-                                    tipoPagamento == "dinheiro",
-                                    { tipoPagamento = "dinheiro" },
-                                    Modifier.weight(1f)
-                                )
+                                formasPagamento.forEach { fp ->
+                                    BotaoOpcaoComb(
+                                        fp.nome,
+                                        Icons.Default.CreditCard,
+                                        tipoPagamento == fp.codigo,
+                                        { tipoPagamento = fp.codigo },
+                                        Modifier.weight(1f)
+                                    )
+                                }
                             }
 
                             Spacer(Modifier.height(16.dp))

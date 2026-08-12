@@ -76,6 +76,10 @@ actual fun EditarCombustivelScreen(
     // Equipamentos (placas)
     var equipamentos by remember { mutableStateOf<List<Pair<Long, String>>>(emptyList()) }
 
+    // Formas de pagamento e tipos de combustível (catálogo da empresa, cadastrado no admin)
+    val formasPagamento = remember { repository.getAllFormasPagamento() }
+    val tiposCombustivel = remember { repository.getAllTiposCombustivel() }
+
     // Campos do formulário
     var placaSelecionada by remember { mutableStateOf<Pair<Long, String>?>(null) }
     var data by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
@@ -200,7 +204,7 @@ actual fun EditarCombustivelScreen(
         if (nomePosto.isEmpty()) { erro = "Informe o nome do posto"; return }
         if (kmPosto.isEmpty()) { erro = "Informe o KM no posto"; return }
         if (tipoCombustivel.isEmpty()) { erro = "Selecione o tipo de combustível"; return }
-        if (tipoCombustivel == "Diesel Aparelho" && horas.isEmpty()) { erro = "Informe as horas"; return }
+        if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L && horas.isEmpty()) { erro = "Informe as horas"; return }
         if (litrosAbastecidos.text.isEmpty()) { erro = "Informe os litros abastecidos"; return }
         if (valorLitro.text.isEmpty()) { erro = "Informe o valor do litro"; return }
         if (valorTotal.text.isEmpty()) { erro = "Informe o valor total"; return }
@@ -398,13 +402,14 @@ actual fun EditarCombustivelScreen(
                                 leadingIcon = { Icon(Icons.Default.LocalGasStation, null, tint = AppColors.Primary) }
                             )
                             ExposedDropdownMenu(expanded = combustivelExpandido, onDismissRequest = { combustivelExpandido = false }) {
-                                DropdownMenuItem(text = { Text("Diesel Caminhão") }, onClick = { tipoCombustivel = "Diesel Caminhão"; combustivelExpandido = false })
-                                DropdownMenuItem(text = { Text("Diesel Aparelho") }, onClick = { tipoCombustivel = "Diesel Aparelho"; combustivelExpandido = false })
+                                tiposCombustivel.forEach { tc ->
+                                    DropdownMenuItem(text = { Text(tc.nome) }, onClick = { tipoCombustivel = tc.nome; combustivelExpandido = false })
+                                }
                             }
                         }
 
-                        // Campo Horas (só para Diesel Aparelho)
-                        if (tipoCombustivel == "Diesel Aparelho") {
+                        // Campo Horas (só para tipos que exigem horas)
+                        if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L) {
                             Spacer(Modifier.height(16.dp))
                             Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.Background)) {
                                 Column(modifier = Modifier.padding(12.dp)) {
@@ -493,8 +498,9 @@ actual fun EditarCombustivelScreen(
                         Text("Forma de Pagamento *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            BotaoOpcaoCombEdit("CTF", Icons.Default.CreditCard, tipoPagamento == "ctf", { tipoPagamento = "ctf" }, Modifier.weight(1f))
-                            BotaoOpcaoCombEdit("Dinheiro", Icons.Default.Money, tipoPagamento == "dinheiro", { tipoPagamento = "dinheiro" }, Modifier.weight(1f))
+                            formasPagamento.forEach { fp ->
+                                BotaoOpcaoCombEdit(fp.nome, Icons.Default.CreditCard, tipoPagamento == fp.codigo, { tipoPagamento = fp.codigo }, Modifier.weight(1f))
+                            }
                         }
 
                         Spacer(Modifier.height(16.dp))

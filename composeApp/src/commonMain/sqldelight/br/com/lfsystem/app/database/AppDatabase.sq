@@ -29,6 +29,37 @@ CREATE TABLE Equipamento (
 );
 
 -- ===============================
+-- TABELA DE FORMAS DE PAGAMENTO
+-- ===============================
+CREATE TABLE FormaPagamento (
+    id INTEGER PRIMARY KEY,
+    servidor_id INTEGER NOT NULL,
+    nome TEXT NOT NULL,
+    codigo TEXT NOT NULL
+);
+
+-- ===============================
+-- TABELA DE TIPOS DE DESPESA
+-- ===============================
+CREATE TABLE TipoDespesa (
+    id INTEGER PRIMARY KEY,
+    servidor_id INTEGER NOT NULL,
+    nome TEXT NOT NULL,
+    icone TEXT NOT NULL DEFAULT '',
+    cor TEXT NOT NULL DEFAULT ''
+);
+
+-- ===============================
+-- TABELA DE TIPOS DE COMBUSTÍVEL
+-- ===============================
+CREATE TABLE TipoCombustivel (
+    id INTEGER PRIMARY KEY,
+    servidor_id INTEGER NOT NULL,
+    nome TEXT NOT NULL,
+    requer_horas INTEGER NOT NULL DEFAULT 0
+);
+
+-- ===============================
 -- TABELA DE VIAGENS (para sincronizar)
 -- ===============================
 CREATE TABLE Viagem (
@@ -90,6 +121,51 @@ VALUES (?, ?);
 
 deleteAllEquipamentos:
 DELETE FROM Equipamento;
+
+-- ===============================
+-- QUERIES DE FORMAS DE PAGAMENTO
+-- ===============================
+getAllFormasPagamento:
+SELECT * FROM FormaPagamento ORDER BY nome;
+
+insertFormaPagamento:
+INSERT OR REPLACE INTO FormaPagamento (servidor_id, nome, codigo)
+VALUES (?, ?, ?);
+
+deleteAllFormasPagamento:
+DELETE FROM FormaPagamento;
+
+getFormaPagamentoById:
+SELECT * FROM FormaPagamento WHERE servidor_id = ?;
+
+-- ===============================
+-- QUERIES DE TIPOS DE DESPESA
+-- ===============================
+getAllTiposDespesa:
+SELECT * FROM TipoDespesa ORDER BY nome;
+
+insertTipoDespesa:
+INSERT OR REPLACE INTO TipoDespesa (servidor_id, nome, icone, cor)
+VALUES (?, ?, ?, ?);
+
+deleteAllTiposDespesa:
+DELETE FROM TipoDespesa;
+
+getTipoDespesaById:
+SELECT * FROM TipoDespesa WHERE servidor_id = ?;
+
+-- ===============================
+-- QUERIES DE TIPOS DE COMBUSTÍVEL
+-- ===============================
+getAllTiposCombustivel:
+SELECT * FROM TipoCombustivel ORDER BY nome;
+
+insertTipoCombustivel:
+INSERT OR REPLACE INTO TipoCombustivel(servidor_id, nome, requer_horas)
+VALUES (?, ?, ?);
+
+deleteAllTiposCombustivel:
+DELETE FROM TipoCombustivel;
 
 -- ===============================
 -- QUERIES DE VIAGENS

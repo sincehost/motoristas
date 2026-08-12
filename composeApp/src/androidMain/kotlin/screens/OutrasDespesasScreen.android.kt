@@ -42,16 +42,6 @@ import util.converterDataParaAPI
 import util.rememberCameraState
 import util.rememberSaveableTextField
 
-// Tipos de despesas disponíveis
-private val TIPOS_DESPESA = listOf(
-    "Pedágio" to Icons.Default.Toll,
-    "Refeição" to Icons.Default.Restaurant,
-    "Hospedagem" to Icons.Default.Hotel,
-    "Lavagem" to Icons.Default.LocalCarWash,
-    "Estacionamento" to Icons.Default.LocalParking,
-    "Outros" to Icons.Default.MoreHoriz
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 actual fun OutrasDespesasScreen(
@@ -71,6 +61,9 @@ actual fun OutrasDespesasScreen(
 
     // Viagem atual
     val viagemAtual = remember { repository.getViagemAtual() }
+
+    // Tipos de despesa (catálogo da empresa, cadastrado no admin)
+    val tiposDespesa = remember { repository.getAllTiposDespesa() }
 
     // ★ FIX: Campos do formulário com rememberSaveable — sobrevivem à morte do processo
     var tipoDespesa by rememberSaveable { mutableStateOf("") }
@@ -236,14 +229,14 @@ actual fun OutrasDespesasScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                TIPOS_DESPESA.take(3).forEach { (tipo, icone) ->
-                                    val selecionado = tipoDespesa == tipo
+                                tiposDespesa.take(3).forEach { t ->
+                                    val selecionado = tipoDespesa == t.nome
                                     Surface(
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(70.dp)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .clickable { tipoDespesa = tipo },
+                                            .clickable { tipoDespesa = t.nome },
                                         color = if (selecionado) Color(0xFFFF6F00) else Color(0xFFF5F5F5),
                                         shape = RoundedCornerShape(12.dp)
                                     ) {
@@ -252,9 +245,9 @@ actual fun OutrasDespesasScreen(
                                             horizontalAlignment = Alignment.CenterHorizontally,
                                             verticalArrangement = Arrangement.Center
                                         ) {
-                                            Icon(icone, null, tint = if (selecionado) Color.White else AppColors.TextSecondary, modifier = Modifier.size(24.dp))
+                                            Icon(Icons.Default.Receipt, null, tint = if (selecionado) Color.White else AppColors.TextSecondary, modifier = Modifier.size(24.dp))
                                             Spacer(Modifier.height(4.dp))
-                                            Text(tipo, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = if (selecionado) Color.White else AppColors.TextSecondary)
+                                            Text(t.nome, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = if (selecionado) Color.White else AppColors.TextSecondary)
                                         }
                                     }
                                 }
@@ -263,14 +256,14 @@ actual fun OutrasDespesasScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                TIPOS_DESPESA.drop(3).forEach { (tipo, icone) ->
-                                    val selecionado = tipoDespesa == tipo
+                                tiposDespesa.drop(3).forEach { t ->
+                                    val selecionado = tipoDespesa == t.nome
                                     Surface(
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(70.dp)
                                             .clip(RoundedCornerShape(12.dp))
-                                            .clickable { tipoDespesa = tipo },
+                                            .clickable { tipoDespesa = t.nome },
                                         color = if (selecionado) Color(0xFFFF6F00) else Color(0xFFF5F5F5),
                                         shape = RoundedCornerShape(12.dp)
                                     ) {
@@ -279,9 +272,9 @@ actual fun OutrasDespesasScreen(
                                             horizontalAlignment = Alignment.CenterHorizontally,
                                             verticalArrangement = Arrangement.Center
                                         ) {
-                                            Icon(icone, null, tint = if (selecionado) Color.White else AppColors.TextSecondary, modifier = Modifier.size(24.dp))
+                                            Icon(Icons.Default.Receipt, null, tint = if (selecionado) Color.White else AppColors.TextSecondary, modifier = Modifier.size(24.dp))
                                             Spacer(Modifier.height(4.dp))
-                                            Text(tipo, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = if (selecionado) Color.White else AppColors.TextSecondary)
+                                            Text(t.nome, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = if (selecionado) Color.White else AppColors.TextSecondary)
                                         }
                                     }
                                 }

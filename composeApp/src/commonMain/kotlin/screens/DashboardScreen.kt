@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import api.ApiClient
 import database.AppRepository
+import database.TipoDespesaSync
+import database.TipoCombustivelSync
 import kotlinx.coroutines.delay
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -488,6 +490,7 @@ private fun DashboardContent(
 
             DashboardMenuItems(
                 scope = scope,
+                repository = repository,
                 onNavigate = onNavigate,
                 onMensagem = { mensagem = it; tipoMensagem = TipoMensagem.ERRO }
             )
@@ -579,6 +582,7 @@ private fun DashboardTopBar(
 @Composable
 private fun DashboardMenuItems(
     scope: kotlinx.coroutines.CoroutineScope,
+    repository: AppRepository,
     onNavigate: (Screen) -> Unit,
     onMensagem: (String?) -> Unit
 ) {
@@ -586,10 +590,27 @@ private fun DashboardMenuItems(
     // Antes, se não tivesse internet, o motorista era bloqueado completamente.
     // Agora navega sempre e tenta sync em background. As telas internas
     // devem lidar com dados desatualizados mostrando aviso.
+    //
+    // Antes esse sync rodava e o resultado era simplesmente descartado (nem
+    // destino/equipamento eram salvos) — persiste os 5 catálogos agora,
+    // senão essa sincronização periódica nunca serve pra nada de verdade.
+    suspend fun sincronizarCatalogos() {
+        try {
+            val sync = ApiClient.syncDados(repository.getMotoristaLogado()?.motorista_id ?: "")
+            if (sync.status == "ok") {
+                repository.salvarDestinos(sync.destinos.map { it.id to it.nome })
+                repository.salvarEquipamentos(sync.equipamentos.map { it.id to it.placa })
+                repository.salvarFormasPagamento(sync.formas_pagamento.map { Triple(it.id, it.nome, it.codigo) })
+                repository.salvarTiposDespesa(sync.tipos_despesa.map { TipoDespesaSync(it.id, it.nome, it.icone, it.cor) })
+                repository.salvarTiposCombustivel(sync.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) })
+            }
+        } catch (_: Exception) { }
+    }
+
     MenuButton(Icons.Default.ListAlt, "Minhas Viagens", AppColors.Purple) {
         scope.launch {
             onMensagem(null)
-            try { ApiClient.syncDados() } catch (_: Exception) { }
+            sincronizarCatalogos()
             onNavigate(Screen.MINHAS_VIAGENS)
         }
     }
@@ -597,7 +618,7 @@ private fun DashboardMenuItems(
     MenuButton(Icons.Default.Handyman, "Minhas Manutenções", Color(0xFF8B5CF6)) {
         scope.launch {
             onMensagem(null)
-            try { ApiClient.syncDados() } catch (_: Exception) { }
+            sincronizarCatalogos()
             onNavigate(Screen.MINHAS_MANUTENCOES)
         }
     }
@@ -605,7 +626,7 @@ private fun DashboardMenuItems(
     MenuButton(Icons.Default.Assessment, "Relatório de Viagens", AppColors.Secondary) {
         scope.launch {
             onMensagem(null)
-            try { ApiClient.syncDados() } catch (_: Exception) { }
+            sincronizarCatalogos()
             onNavigate(Screen.RELATORIO_VIAGENS)
         }
     }

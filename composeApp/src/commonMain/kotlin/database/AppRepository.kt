@@ -4,6 +4,9 @@ import br.com.lfsystem.app.database.AppDatabase
 import br.com.lfsystem.app.database.Motorista
 import br.com.lfsystem.app.database.Destino
 import br.com.lfsystem.app.database.Equipamento
+import br.com.lfsystem.app.database.FormaPagamento
+import br.com.lfsystem.app.database.TipoDespesa
+import br.com.lfsystem.app.database.TipoCombustivel
 import br.com.lfsystem.app.database.Viagem
 
 import br.com.lfsystem.app.database.Arla
@@ -11,6 +14,14 @@ import br.com.lfsystem.app.database.Abastecimento
 import br.com.lfsystem.app.database.ViagemAtual
 import api.ApiClient
 import util.PasswordHasher
+
+/** Par (id, nome) não basta pra tipo de despesa — precisa também de
+ * ícone/cor pro badge. Usado só por salvarTiposDespesa(). */
+data class TipoDespesaSync(val id: String, val nome: String, val icone: String, val cor: String)
+
+/** Par (id, nome) não basta pra tipo de combustível — precisa também da
+ * flag de horas pra saber quando exibir o campo. Usado só por salvarTiposCombustivel(). */
+data class TipoCombustivelSync(val id: String, val nome: String, val requerHoras: Boolean)
 
 class AppRepository(driverFactory: DatabaseDriverFactory) {
 
@@ -111,6 +122,72 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
             queries.insertEquipamento(
                 servidor_id = id.toLong(),
                 placa = placa
+            )
+        }
+    }
+
+    // ===============================
+    // FORMAS DE PAGAMENTO (CACHE)
+    // ===============================
+
+    fun getAllFormasPagamento(): List<FormaPagamento> {
+        return queries.getAllFormasPagamento().executeAsList()
+    }
+
+    fun salvarFormasPagamento(formas: List<Triple<String, String, String>>) {
+        queries.deleteAllFormasPagamento()
+        formas.forEach { (id, nome, codigo) ->
+            queries.insertFormaPagamento(
+                servidor_id = id.toLong(),
+                nome = nome,
+                codigo = codigo
+            )
+        }
+    }
+
+    fun getFormaPagamentoById(id: Long): FormaPagamento? {
+        return queries.getFormaPagamentoById(id).executeAsOneOrNull()
+    }
+
+    // ===============================
+    // TIPOS DE DESPESA (CACHE)
+    // ===============================
+
+    fun getAllTiposDespesa(): List<TipoDespesa> {
+        return queries.getAllTiposDespesa().executeAsList()
+    }
+
+    fun salvarTiposDespesa(tipos: List<TipoDespesaSync>) {
+        queries.deleteAllTiposDespesa()
+        tipos.forEach { t ->
+            queries.insertTipoDespesa(
+                servidor_id = t.id.toLong(),
+                nome = t.nome,
+                icone = t.icone,
+                cor = t.cor
+            )
+        }
+    }
+
+    fun getTipoDespesaById(id: Long): TipoDespesa? {
+        return queries.getTipoDespesaById(id).executeAsOneOrNull()
+    }
+
+    // ===============================
+    // TIPOS DE COMBUSTÍVEL (CACHE)
+    // ===============================
+
+    fun getAllTiposCombustivel(): List<TipoCombustivel> {
+        return queries.getAllTiposCombustivel().executeAsList()
+    }
+
+    fun salvarTiposCombustivel(tipos: List<TipoCombustivelSync>) {
+        queries.deleteAllTiposCombustivel()
+        tipos.forEach { t ->
+            queries.insertTipoCombustivel(
+                servidor_id = t.id.toLong(),
+                nome = t.nome,
+                requer_horas = if (t.requerHoras) 1L else 0L
             )
         }
     }

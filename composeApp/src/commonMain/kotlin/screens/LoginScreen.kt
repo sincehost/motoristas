@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.sp
 import api.ApiClient
 import api.EmpresaDto
 import database.AppRepository
+import database.TipoDespesaSync
+import database.TipoCombustivelSync
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ui.AppColors
@@ -442,13 +444,22 @@ fun LoginScreen(
                                         statusMsg = "Sincronizando dados..."
 
                                         try {
-                                            val sync = ApiClient.syncDados()
+                                            val sync = ApiClient.syncDados(resp.motorista_id ?: "")
                                             if (sync.status == "ok") {
                                                 repository.salvarDestinos(
                                                     sync.destinos.map { it.id to it.nome }
                                                 )
                                                 repository.salvarEquipamentos(
                                                     sync.equipamentos.map { it.id to it.placa }
+                                                )
+                                                repository.salvarFormasPagamento(
+                                                    sync.formas_pagamento.map { Triple(it.id, it.nome, it.codigo) }
+                                                )
+                                                repository.salvarTiposDespesa(
+                                                    sync.tipos_despesa.map { TipoDespesaSync(it.id, it.nome, it.icone, it.cor) }
+                                                )
+                                                repository.salvarTiposCombustivel(
+                                                    sync.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) }
                                                 )
                                             }
                                         } catch (_: Exception) {}

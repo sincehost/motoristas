@@ -123,13 +123,17 @@ object ApiClient {
     }
 
     // ===============================
-    // SINCRONIZAR DADOS (Destinos e Equipamentos)
+    // SINCRONIZAR DADOS (Destinos, Equipamentos, Formas de Pagamento, Tipos de Despesa/Combustível)
     // ===============================
-    suspend fun syncDados(): SyncDadosResponse {
+    suspend fun syncDados(motoristaId: String): SyncDadosResponse {
+        // motorista_id precisa ir no corpo — é o que sync.php usa pra filtrar
+        // "placas_apenas_vinculadas" (só as placas ligadas a ESSE motorista).
+        // Sem isso, o servidor recebe motorista_id=0 e devolve só os veículos
+        // sem motorista nenhum vinculado, escondendo a placa certa.
         return client.post("${getBaseUrl()}/sync.php") {
             contentType(ContentType.Application.Json)
             withAuth()
-            setBody(emptyMap<String, String>())
+            setBody(mapOf("motorista_id" to motoristaId))
         }.body()
     }
 
@@ -554,6 +558,9 @@ data class SyncDadosResponse(
     val status: String,
     val destinos: List<DestinoDto> = emptyList(),
     val equipamentos: List<EquipamentoDto> = emptyList(),
+    val formas_pagamento: List<FormaPagamentoDto> = emptyList(),
+    val tipos_despesa: List<TipoDespesaDto> = emptyList(),
+    val tipos_combustivel: List<TipoCombustivelDto> = emptyList(),
     val mensagem: String? = null
 )
 
@@ -581,6 +588,29 @@ data class DestinoDto(
 data class EquipamentoDto(
     val id: String,
     val placa: String
+)
+
+@Serializable
+data class FormaPagamentoDto(
+    val id: String,
+    val nome: String,
+    val codigo: String
+)
+
+@Serializable
+data class TipoDespesaDto(
+    val id: String,
+    val nome: String,
+    val icone: String = "",
+    val cor: String = ""
+)
+
+@Serializable
+data class TipoCombustivelDto(
+    val id: String,
+    val nome: String,
+    val requer_horas: Boolean = false,
+    val protegido: Boolean = false
 )
 
 @Serializable

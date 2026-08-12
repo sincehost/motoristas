@@ -39,9 +39,6 @@ import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.converterDataParaExibicao
 
-private val TIPOS_COMBUSTIVEL = listOf("Diesel Caminhão", "Diesel S10", "Diesel Aparelho", "Gasolina", "Etanol")
-private val TIPOS_PAGAMENTO = listOf("dinheiro", "cartao", "pix", "vale")
-
 // Delegate da câmera nativa iOS - fora do @Composable - suporta as duas fotos (marcador/cupom)
 private class EditarCombustivelCameraDelegate(
     private val tipoFoto: String,
@@ -143,6 +140,10 @@ actual fun EditarCombustivelScreen(
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
+    // Formas de pagamento e tipos de combustível (catálogo da empresa, cadastrado no admin)
+    val formasPagamento = remember { repository.getAllFormasPagamento() }
+    val tiposCombustivel = remember { repository.getAllTiposCombustivel() }
+
     var carregando by remember { mutableStateOf(true) }
     var salvando by remember { mutableStateOf(false) }
     var erroMsg by remember { mutableStateOf<String?>(null) }
@@ -236,7 +237,7 @@ actual fun EditarCombustivelScreen(
     fun salvar() {
         if (nomePosto.isBlank()) { erroMsg = "Informe o posto"; return }
         if (kmPosto.isBlank()) { erroMsg = "Informe o KM"; return }
-        if (tipoCombustivel == "Diesel Aparelho" && horas.isBlank()) { erroMsg = "Informe as horas"; return }
+        if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L && horas.isBlank()) { erroMsg = "Informe as horas"; return }
         if (litros.text.isBlank()) { erroMsg = "Informe os litros"; return }
         if (valorLitro.text.isBlank()) { erroMsg = "Informe o valor do litro"; return }
         if (valorTotal.text.isBlank()) { erroMsg = "Informe o valor total"; return }
@@ -325,16 +326,16 @@ actual fun EditarCombustivelScreen(
                             onExpandedChange = { combustivelExpanded = it },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            TIPOS_COMBUSTIVEL.forEach { t ->
+                            tiposCombustivel.forEach { tc ->
                                 ui.AppDropdownMenuItem(
-                                    text = { Text(t) },
-                                    onClick = { tipoCombustivel = t; combustivelExpanded = false }
+                                    text = { Text(tc.nome) },
+                                    onClick = { tipoCombustivel = tc.nome; combustivelExpanded = false }
                                 )
                             }
                         }
                         Spacer(Modifier.height(12.dp))
 
-                        if (tipoCombustivel == "Diesel Aparelho") {
+                        if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L) {
                             OutlinedTextField(horas, { horas = it }, label = { Text("Horas") },
                                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                             Spacer(Modifier.height(12.dp))
@@ -375,9 +376,9 @@ actual fun EditarCombustivelScreen(
                         Text("Forma de pagamento", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AppColors.TextSecondary)
                         Spacer(Modifier.height(8.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TIPOS_PAGAMENTO.forEach { tp ->
-                                FilterChip(selected = tipoPagamento == tp, onClick = { tipoPagamento = tp },
-                                    label = { Text(tp.replaceFirstChar { it.uppercase() }, fontSize = 13.sp) },
+                            formasPagamento.forEach { fp ->
+                                FilterChip(selected = tipoPagamento == fp.codigo, onClick = { tipoPagamento = fp.codigo },
+                                    label = { Text(fp.nome, fontSize = 13.sp) },
                                     colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AppColors.Primary, selectedLabelColor = Color.White))
                             }
                         }

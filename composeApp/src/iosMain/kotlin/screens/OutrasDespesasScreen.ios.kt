@@ -42,15 +42,6 @@ import util.converterDataParaAPI
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
 
-private val TIPOS_DESPESA = listOf(
-    "Pedágio" to Icons.Default.Toll,
-    "Refeição" to Icons.Default.Restaurant,
-    "Hospedagem" to Icons.Default.Hotel,
-    "Lavagem" to Icons.Default.LocalCarWash,
-    "Estacionamento" to Icons.Default.LocalParking,
-    "Outros" to Icons.Default.MoreHoriz
-)
-
 // ===============================
 // CAMERA DELEGATE
 // ===============================
@@ -91,6 +82,7 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
     val motorista = remember { repository.getMotoristaLogado() }
     val scope = rememberCoroutineScope()
     val viagemAtual = remember { repository.getViagemAtual() }
+    val tiposDespesa = remember { repository.getAllTiposDespesa() }
     val focusManager = LocalFocusManager.current
 
     var tipoDespesa by remember { mutableStateOf("") }
@@ -161,19 +153,19 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
                     Text("Tipo de Despesa", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AppColors.TextSecondary)
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TIPOS_DESPESA.take(3).forEach { (tipo, icone) ->
-                            FilterChip(selected = tipoDespesa == tipo, onClick = { tipoDespesa = tipo },
-                                label = { Text(tipo, fontSize = 13.sp) },
-                                leadingIcon = { Icon(icone, null, modifier = Modifier.size(18.dp)) },
+                        tiposDespesa.take(3).forEach { t ->
+                            FilterChip(selected = tipoDespesa == t.nome, onClick = { tipoDespesa = t.nome },
+                                label = { Text(t.nome, fontSize = 13.sp) },
+                                leadingIcon = { Icon(Icons.Default.Receipt, null, modifier = Modifier.size(18.dp)) },
                                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AppColors.Primary, selectedLabelColor = Color.White))
                         }
                     }
                     Spacer(Modifier.height(6.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TIPOS_DESPESA.drop(3).forEach { (tipo, icone) ->
-                            FilterChip(selected = tipoDespesa == tipo, onClick = { tipoDespesa = tipo },
-                                label = { Text(tipo, fontSize = 13.sp) },
-                                leadingIcon = { Icon(icone, null, modifier = Modifier.size(18.dp)) },
+                        tiposDespesa.drop(3).forEach { t ->
+                            FilterChip(selected = tipoDespesa == t.nome, onClick = { tipoDespesa = t.nome },
+                                label = { Text(t.nome, fontSize = 13.sp) },
+                                leadingIcon = { Icon(Icons.Default.Receipt, null, modifier = Modifier.size(18.dp)) },
                                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AppColors.Primary, selectedLabelColor = Color.White))
                         }
                     }
