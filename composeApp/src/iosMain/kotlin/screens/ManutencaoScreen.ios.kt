@@ -24,6 +24,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import api.*
@@ -107,7 +109,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
     var servicoSelecionado by remember { mutableStateOf("Troca de Óleo") }
     var descricaoServico by remember { mutableStateOf("") }
     var localManutencao by remember { mutableStateOf("") }
-    var valor by remember { mutableStateOf("") }
+    var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var kmTrocaOleo by remember { mutableStateOf("") }
     var kmTrocaPneu by remember { mutableStateOf("") }
     var salvando by remember { mutableStateOf(false) }
@@ -153,7 +155,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
     fun salvar() {
         focusManager.clearFocus()
         if (placaSelecionada.isBlank()) { erroMsg = "Selecione uma placa"; return }
-        if (valor.isBlank()) { erroMsg = "Informe o valor"; return }
+        if (valor.text.isBlank()) { erroMsg = "Informe o valor"; return }
         if (servicoSelecionado == "Troca de Óleo" && kmTrocaOleo.isBlank()) { erroMsg = "Informe o KM da troca de óleo"; return }
         if (servicoSelecionado == "Troca de Pneu") {
             if (kmTrocaPneu.isBlank()) { erroMsg = "Informe o KM da troca de pneu"; return }
@@ -174,7 +176,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                     val resp = ApiClient.salvarManutencao(SalvarManutencaoRequest(
                         motorista_id = motorista?.motorista_id ?: "", viagem_id = viagemId.toInt(),
                         data_manutencao = dataApi, placa = placaSelecionada, servico = servicoSelecionado,
-                        descricao_servico = descricaoServico, local_manutencao = localManutencao, valor = valor,
+                        descricao_servico = descricaoServico, local_manutencao = localManutencao, valor = valor.text,
                         km_troca_oleo = if (servicoSelecionado == "Troca de Óleo") kmTrocaOleo else null,
                         km_troca_pneu = if (servicoSelecionado == "Troca de Pneu") kmTrocaPneu else null,
                         pneus = pneusSelecionados.toList(),
@@ -188,7 +190,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                 } catch (e: Exception) {
                     repository.salvarManutencao(
                         motorista?.motorista_id ?: "", viagemId, dataApi, placaSelecionada,
-                        servicoSelecionado, descricaoServico, localManutencao, valor,
+                        servicoSelecionado, descricaoServico, localManutencao, valor.text,
                         if (servicoSelecionado == "Troca de Óleo") kmTrocaOleo else null,
                         if (servicoSelecionado == "Troca de Pneu") kmTrocaPneu else null,
                         pneusSelecionados.sorted().joinToString(","),
@@ -256,7 +258,10 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                     OutlinedTextField(localManutencao, { localManutencao = it }, label = { Text("Local da manutenção") },
                         leadingIcon = { Icon(Icons.Default.LocationOn, null) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                     Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(valor, { valor = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
+                    OutlinedTextField(valor, { newValue ->
+                        val filtered = newValue.text.filter { c -> c.isDigit() || c == '.' || c == ',' }
+                        valor = TextFieldValue(filtered, selection = TextRange(filtered.length))
+                    },
                         label = { Text("Valor (R$)") }, leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))

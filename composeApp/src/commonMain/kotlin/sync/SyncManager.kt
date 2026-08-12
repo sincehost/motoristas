@@ -670,13 +670,13 @@ class SyncManager(private val repository: AppRepository) {
                     nome_posto = abastecimento.posto,
                     tipo_combustivel = abastecimento.tipo_combustivel,
                     tipo_pagamento = abastecimento.tipo_pagamento.uppercase(),
-                    litros_abastecidos = abastecimento.litros,
+                    litros_abastecidos = abastecimento.litros.replace(".", "").replace(",", "."),
                     valor_litro = try {
-                        val v = abastecimento.valor.replace(",", ".").toDoubleOrNull() ?: 0.0
-                        val l = abastecimento.litros.replace(",", ".").toDoubleOrNull() ?: 0.0
+                        val v = abastecimento.valor.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0
+                        val l = abastecimento.litros.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0
                         if (l > 0) ((v / l * 100).toLong() / 100.0).toString() else "0.00"
                     } catch (_: Exception) { "0.00" },
-                    valor = abastecimento.valor,
+                    valor = abastecimento.valor.replace(".", "").replace(",", "."),
                     km_posto = abastecimento.km_posto,
                     horas = abastecimento.horas,
                     cupom_fiscal_base64 = abastecimento.foto,

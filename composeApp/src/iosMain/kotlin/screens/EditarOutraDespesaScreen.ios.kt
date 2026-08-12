@@ -18,6 +18,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import api.OutraDespesaItem
@@ -42,7 +44,8 @@ actual fun EditarOutraDespesaScreen(
 
     var tipo by remember { mutableStateOf(item.tipo) }
     var descricao by remember { mutableStateOf(item.descricao) }
-    var valor by remember { mutableStateOf(item.valor.toString()) }
+    val valorInicial = item.valor.toString()
+    var valor by remember { mutableStateOf(TextFieldValue(valorInicial, selection = TextRange(valorInicial.length))) }
     var data by remember { mutableStateOf(converterDataParaExibicao(item.data)) }
     var local by remember { mutableStateOf(item.local) }
     var salvando by remember { mutableStateOf(false) }
@@ -51,7 +54,7 @@ actual fun EditarOutraDespesaScreen(
 
     fun salvar() {
         if (tipo.isEmpty()) { erroMsg = "Selecione o tipo de despesa"; return }
-        if (valor.isBlank()) { erroMsg = "Informe o valor"; return }
+        if (valor.text.isBlank()) { erroMsg = "Informe o valor"; return }
         if (data.isEmpty()) { erroMsg = "Informe a data"; return }
         scope.launch {
             salvando = true
@@ -63,7 +66,7 @@ actual fun EditarOutraDespesaScreen(
                         viagem_id = viagemId,
                         tipo = tipo,
                         descricao = descricao.ifEmpty { tipo },
-                        valor = valor.replace(",", "."),
+                        valor = valor.text.replace(",", "."),
                         data = converterDataParaAPI(data),
                         local = local.ifEmpty { null },
                         foto_comprovante = null
@@ -91,7 +94,12 @@ actual fun EditarOutraDespesaScreen(
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(descricao, { descricao = it }, label = { Text("Descrição") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                     Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(valor, { valor = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
+                    OutlinedTextField(
+                        value = valor,
+                        onValueChange = { newValue ->
+                            val filtered = newValue.text.filter { c -> c.isDigit() || c == '.' || c == ',' }
+                            valor = TextFieldValue(text = filtered, selection = TextRange(filtered.length))
+                        },
                         label = { Text("Valor (R$)") }, leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))

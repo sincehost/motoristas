@@ -1,6 +1,9 @@
 package screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,23 +16,120 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import database.AppRepository
 import kotlinx.coroutines.launch
+import platform.UIKit.*
+import platform.darwin.NSObject
 import ui.AppColors
 import ui.GradientTopBar
+import util.CameraHelper
 import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.converterDataParaExibicao
 
 private val TIPOS_COMBUSTIVEL = listOf("Diesel Caminhão", "Diesel S10", "Diesel Aparelho", "Gasolina", "Etanol")
 private val TIPOS_PAGAMENTO = listOf("dinheiro", "cartao", "pix", "vale")
+
+// Delegate da câmera nativa iOS - fora do @Composable - suporta as duas fotos (marcador/cupom)
+private class EditarCombustivelCameraDelegate(
+    private val tipoFoto: String,
+    private val onFotoCaptured: (String, String) -> Unit, // tipo, base64
+    private val onMessage: (String, Boolean) -> Unit
+) : NSObject(), UIImagePickerControllerDelegateProtocol, UINavigationControllerDelegateProtocol {
+
+    override fun imagePickerController(
+        picker: UIImagePickerController,
+        didFinishPickingMediaWithInfo: Map<Any?, *>
+    ) {
+        val image = didFinishPickingMediaWithInfo[UIImagePickerControllerOriginalImage] as? UIImage
+        if (image != null) {
+            val base64 = CameraHelper.imageToBase64(image)
+            if (base64 != null) {
+                onFotoCaptured(tipoFoto, base64)
+            } else {
+                onMessage("Erro ao converter imagem para base64", true)
+            }
+        } else {
+            onMessage("Nenhuma imagem selecionada", true)
+        }
+        picker.dismissViewControllerAnimated(true, null)
+    }
+
+    override fun imagePickerControllerDidCancel(picker: UIImagePickerController) {
+        onMessage("Captura cancelada", false)
+        picker.dismissViewControllerAnimated(true, null)
+    }
+}
+
+@Composable
+private fun FotoCapturaCombustivelEdit(
+    bitmap: ImageBitmap?,
+    onRemover: () -> Unit,
+    onCapturar: () -> Unit
+) {
+    if (bitmap != null) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop
+            )
+            IconButton(
+                onClick = onRemover,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(36.dp)
+                    .background(AppColors.Error, RoundedCornerShape(50))
+            ) {
+                Icon(Icons.Default.Close, "Remover", tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+            IconButton(
+                onClick = onCapturar,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .size(36.dp)
+                    .background(AppColors.Primary, RoundedCornerShape(50))
+            ) {
+                Icon(Icons.Default.CameraAlt, "Nova foto", tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .border(2.dp, AppColors.Primary.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                .background(AppColors.Primary.copy(alpha = 0.05f))
+                .clickable { onCapturar() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(40.dp), tint = AppColors.Primary)
+                Spacer(Modifier.height(8.dp))
+                Text("Tirar Foto", color = AppColors.Primary, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,12 +159,14 @@ actual fun EditarCombustivelScreen(
     var kmPosto by remember { mutableStateOf("") }
     var tipoCombustivel by remember { mutableStateOf("Diesel Caminhão") }
     var horas by remember { mutableStateOf("") }
-    var litros by remember { mutableStateOf("") }
-    var valorLitro by remember { mutableStateOf("") }
-    var valorTotal by remember { mutableStateOf("") }
+    var litros by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
+    var valorLitro by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
+    var valorTotal by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var tipoPagamento by remember { mutableStateOf("dinheiro") }
     var fotoMarcadorBase64 by remember { mutableStateOf<String?>(null) }
     var fotoCupomBase64 by remember { mutableStateOf<String?>(null) }
+    val fotoMarcadorBitmap = remember(fotoMarcadorBase64) { fotoMarcadorBase64?.let { CameraHelper.base64ToImageBitmap(it) } }
+    val fotoCupomBitmap = remember(fotoCupomBase64) { fotoCupomBase64?.let { CameraHelper.base64ToImageBitmap(it) } }
 
     var combustivelExpanded by remember { mutableStateOf(false) }
 
@@ -80,8 +182,10 @@ actual fun EditarCombustivelScreen(
                 destino = a.destino; dataViagem = a.data_viagem; placa = a.placa
                 data = converterDataParaExibicao(a.data_abastecimento); nomePosto = a.nome_posto; kmPosto = a.km_posto
                 tipoCombustivel = a.tipo_combustivel; horas = a.horas
-                litros = a.litros_abastecidos; valorLitro = a.valor_litro
-                valorTotal = a.valor_total; tipoPagamento = a.forma_pagamento.lowercase()
+                litros = TextFieldValue(a.litros_abastecidos, selection = TextRange(a.litros_abastecidos.length))
+                valorLitro = TextFieldValue(a.valor_litro, selection = TextRange(a.valor_litro.length))
+                valorTotal = TextFieldValue(a.valor_total, selection = TextRange(a.valor_total.length))
+                tipoPagamento = a.forma_pagamento.lowercase()
                 fotoMarcadorBase64 = a.foto_marcador; fotoCupomBase64 = a.foto_cupom
             } else {
                 erroMsg = "Abastecimento não encontrado"
@@ -92,13 +196,50 @@ actual fun EditarCombustivelScreen(
         carregando = false
     }
 
+    // Delegates persistentes da câmera - um para cada tipo de foto
+    val cameraDelegateMarcador = remember {
+        EditarCombustivelCameraDelegate(
+            tipoFoto = "marcador",
+            onFotoCaptured = { _, base64 -> fotoMarcadorBase64 = base64 },
+            onMessage = { msg, erro -> if (erro) erroMsg = msg }
+        )
+    }
+    val cameraDelegateCupom = remember {
+        EditarCombustivelCameraDelegate(
+            tipoFoto = "cupom",
+            onFotoCaptured = { _, base64 -> fotoCupomBase64 = base64 },
+            onMessage = { msg, erro -> if (erro) erroMsg = msg }
+        )
+    }
+
+    // Função para abrir a câmera nativa iOS
+    fun abrirCamera(tipo: String) {
+        val viewController = UIApplication.sharedApplication.keyWindow?.rootViewController
+        if (viewController == null) {
+            erroMsg = "Não foi possível abrir a câmera"
+            return
+        }
+        if (!UIImagePickerController.isSourceTypeAvailable(
+                UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)) {
+            erroMsg = "Câmera não disponível neste dispositivo"
+            return
+        }
+        val delegate = if (tipo == "marcador") cameraDelegateMarcador else cameraDelegateCupom
+        val picker = UIImagePickerController().apply {
+            sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera
+            allowsEditing = false
+            this.delegate = delegate
+        }
+        viewController.presentViewController(picker, true, null)
+    }
+
     fun salvar() {
         if (nomePosto.isBlank()) { erroMsg = "Informe o posto"; return }
         if (kmPosto.isBlank()) { erroMsg = "Informe o KM"; return }
         if (tipoCombustivel == "Diesel Aparelho" && horas.isBlank()) { erroMsg = "Informe as horas"; return }
-        if (litros.isBlank()) { erroMsg = "Informe os litros"; return }
-        if (valorLitro.isBlank()) { erroMsg = "Informe o valor do litro"; return }
-        if (valorTotal.isBlank()) { erroMsg = "Informe o valor total"; return }
+        if (litros.text.isBlank()) { erroMsg = "Informe os litros"; return }
+        if (valorLitro.text.isBlank()) { erroMsg = "Informe o valor do litro"; return }
+        if (valorTotal.text.isBlank()) { erroMsg = "Informe o valor total"; return }
 
         scope.launch {
             salvando = true
@@ -108,8 +249,8 @@ actual fun EditarCombustivelScreen(
                         abastecimento_id = abastecimentoId, motorista_id = motorista?.motorista_id ?: "",
                         viagem_id = viagemId, placa = placa, data_abastecimento = converterDataParaAPI(data),
                         nome_posto = nomePosto, km_posto = kmPosto, tipo_combustivel = tipoCombustivel,
-                        horas = horas, litros_abastecidos = litros.replace(",", "."),
-                        valor_litro = valorLitro.replace(",", "."), valor_total = valorTotal.replace(",", "."),
+                        horas = horas, litros_abastecidos = litros.text.replace(",", "."),
+                        valor_litro = valorLitro.text.replace(",", "."), valor_total = valorTotal.text.replace(",", "."),
                         forma_pagamento = tipoPagamento, foto_cupom = fotoCupomBase64, foto_marcador = fotoMarcadorBase64
                     )
                 )
@@ -166,6 +307,16 @@ actual fun EditarCombustivelScreen(
                             modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                         Spacer(Modifier.height(12.dp))
 
+                        // Foto Quilometragem
+                        Text("Foto Quilometragem", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AppColors.TextSecondary)
+                        Spacer(Modifier.height(8.dp))
+                        FotoCapturaCombustivelEdit(
+                            bitmap = fotoMarcadorBitmap,
+                            onRemover = { fotoMarcadorBase64 = null },
+                            onCapturar = { abrirCamera("marcador") }
+                        )
+                        Spacer(Modifier.height(12.dp))
+
                         // Tipo combustível
                         ui.AppDropdownField(
                             label = "Tipo combustível",
@@ -189,17 +340,32 @@ actual fun EditarCombustivelScreen(
                             Spacer(Modifier.height(12.dp))
                         }
 
-                        OutlinedTextField(litros, { litros = it.filter { c -> c.isDigit() || c == ',' || c == '.' } },
+                        OutlinedTextField(
+                            value = litros,
+                            onValueChange = { newValue ->
+                                val filtered = newValue.text.filter { c -> c.isDigit() || c == ',' || c == '.' }
+                                litros = TextFieldValue(text = filtered, selection = TextRange(filtered.length))
+                            },
                             label = { Text("Litros") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                         Spacer(Modifier.height(12.dp))
 
-                        OutlinedTextField(valorLitro, { valorLitro = it.filter { c -> c.isDigit() || c == ',' || c == '.' } },
+                        OutlinedTextField(
+                            value = valorLitro,
+                            onValueChange = { newValue ->
+                                val filtered = newValue.text.filter { c -> c.isDigit() || c == ',' || c == '.' }
+                                valorLitro = TextFieldValue(text = filtered, selection = TextRange(filtered.length))
+                            },
                             label = { Text("Valor por litro (R$)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                         Spacer(Modifier.height(12.dp))
 
-                        OutlinedTextField(valorTotal, { valorTotal = it.filter { c -> c.isDigit() || c == ',' || c == '.' } },
+                        OutlinedTextField(
+                            value = valorTotal,
+                            onValueChange = { newValue ->
+                                val filtered = newValue.text.filter { c -> c.isDigit() || c == ',' || c == '.' }
+                                valorTotal = TextFieldValue(text = filtered, selection = TextRange(filtered.length))
+                            },
                             label = { Text("Valor total (R$)") }, leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
@@ -215,6 +381,16 @@ actual fun EditarCombustivelScreen(
                                     colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AppColors.Primary, selectedLabelColor = Color.White))
                             }
                         }
+                        Spacer(Modifier.height(12.dp))
+
+                        // Foto Cupom Fiscal
+                        Text("Foto Cupom Fiscal", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AppColors.TextSecondary)
+                        Spacer(Modifier.height(8.dp))
+                        FotoCapturaCombustivelEdit(
+                            bitmap = fotoCupomBitmap,
+                            onRemover = { fotoCupomBase64 = null },
+                            onCapturar = { abrirCamera("cupom") }
+                        )
                     }
                 }
                 Spacer(Modifier.height(24.dp))

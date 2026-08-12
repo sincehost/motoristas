@@ -1,5 +1,6 @@
 package screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -14,11 +15,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,7 +58,7 @@ private fun formatarValorDescarga(valor: String): String {
 
 // Classe delegate FORA do @Composable
 private class AdicionarDescargaCameraDelegate(
-    private val onFotoCaptured: (String) -> Unit,
+    private val onFotoCaptured: (String, ImageBitmap) -> Unit,
     private val onMessage: (String, Boolean) -> Unit
 ) : NSObject(), UIImagePickerControllerDelegateProtocol, UINavigationControllerDelegateProtocol {
 
@@ -73,8 +78,25 @@ private class AdicionarDescargaCameraDelegate(
                     return
                 }
 
-                onFotoCaptured(base64)
-                // Foto capturada silenciosamente - a prévia já confirma
+                val imageData = UIImageJPEGRepresentation(image, 0.7)
+                if (imageData != null) {
+                    val length = imageData.length.toInt()
+                    val bytes = ByteArray(length)
+                    bytes.usePinned { pinned ->
+                        imageData.getBytes(pinned.addressOf(0), length.toULong())
+                    }
+
+                    val skiaImage = SkiaImage.makeFromEncoded(bytes)
+                    if (skiaImage != null) {
+                        val bitmap = skiaImage.toComposeImageBitmap()
+                        onFotoCaptured(base64, bitmap)
+                        // Foto capturada silenciosamente - a prévia já confirma
+                    } else {
+                        onMessage("Erro ao processar imagem", true)
+                    }
+                } else {
+                    onMessage("Erro ao comprimir imagem", true)
+                }
             } catch (e: Exception) {
                 onMessage("Erro: ${e.message}", true)
             }
@@ -129,8 +151,9 @@ actual fun AdicionarDescargaScreen(
     var data by remember { mutableStateOf(dataAtualFormatada()) }
     var placaSelecionada by remember { mutableStateOf<String?>(null) }
     var ordemDescarga by remember { mutableStateOf("") }
-    var valor by remember { mutableStateOf("") }
+    var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var fotoBase64 by remember { mutableStateOf<String?>(null) }
+    var fotoImageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     var expandedPlaca by remember { mutableStateOf(false) }
 
     // Função para mostrar mensagens
@@ -182,8 +205,9 @@ actual fun AdicionarDescargaScreen(
     // Delegate persistente - criado uma vez e mantido
     val cameraDelegate = remember {
         AdicionarDescargaCameraDelegate(
-            onFotoCaptured = { base64 ->
+            onFotoCaptured = { base64, bitmap ->
                 fotoBase64 = base64
+                fotoImageBitmap = bitmap
             },
             onMessage = { msg, erro ->
                 mostrarMensagem(msg, erro)
@@ -240,7 +264,7 @@ actual fun AdicionarDescargaScreen(
             mostrarMensagem("Informe a ordem de descarga", isErro = true)
             return
         }
-        if (valor.isBlank()) {
+        if (valor.text.isBlank()) {
             mostrarMensagem("Informe o valor", isErro = true)
             return
         }
@@ -265,7 +289,7 @@ actual fun AdicionarDescargaScreen(
                             data = dataAPI,
                             placa = placaSelecionada!!,
                             ordem_descarga = ordemDescarga.toIntOrNull() ?: 0,
-                            valor = valor,
+                            valor = valor.text,
                             foto = fotoBase64
                         )
                     )
@@ -284,7 +308,7 @@ actual fun AdicionarDescargaScreen(
                         data = dataAPI,
                         placa = placaSelecionada!!,
                         ordemDescarga = ordemDescarga.toLongOrNull() ?: 0,
-                        valor = valor,
+                        valor = valor.text,
                         foto = fotoBase64
                     )
                     sucesso = true
@@ -570,7 +594,10 @@ actual fun AdicionarDescargaScreen(
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = valor,
-                        onValueChange = { valor = formatarValorDescarga(it) },
+                        onValueChange = { newValue ->
+                            val formatted = formatarValorDescarga(newValue.text)
+                            valor = TextFieldValue(formatted, selection = TextRange(formatted.length))
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
                         leadingIcon = {
@@ -596,40 +623,80 @@ actual fun AdicionarDescargaScreen(
                         color = labelColor
                     )
                     Spacer(Modifier.height(8.dp))
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp)
-                            .clickable { abrirCamera() },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (fotoBase64 != null)
-                                successColor.copy(alpha = 0.1f)
-                            else
-                                inputBackground
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (fotoBase64 != null) successColor else borderColor
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                    if (fotoImageBitmap != null) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Image(
+                                bitmap = fotoImageBitmap!!,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            IconButton(
+                                onClick = {
+                                    fotoImageBitmap = null
+                                    fotoBase64 = null
+                                    // Foto removida silenciosamente
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .size(36.dp)
+                                    .background(errorColor, RoundedCornerShape(50))
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    "Remover",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = { abrirCamera() },
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(8.dp)
+                                    .size(36.dp)
+                                    .background(primaryColor, RoundedCornerShape(50))
+                            ) {
+                                Icon(
+                                    Icons.Default.CameraAlt,
+                                    "Nova foto",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp)
+                                .clickable { abrirCamera() },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = inputBackground),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
                         ) {
-                            Icon(
-                                if (fotoBase64 != null) Icons.Default.CheckCircle else Icons.Default.CameraAlt,
-                                null,
-                                tint = if (fotoBase64 != null) successColor else placeholderColor,
-                                modifier = Modifier.size(32.dp)
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                if (fotoBase64 != null) "Foto capturada ✓" else "Toque para tirar foto",
-                                fontSize = 14.sp,
-                                color = if (fotoBase64 != null) successColor else placeholderColor
-                            )
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.CameraAlt,
+                                    null,
+                                    tint = placeholderColor,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Toque para tirar foto",
+                                    fontSize = 14.sp,
+                                    color = placeholderColor
+                                )
+                            }
                         }
                     }
 

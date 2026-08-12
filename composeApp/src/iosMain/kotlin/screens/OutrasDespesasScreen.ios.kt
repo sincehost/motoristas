@@ -24,6 +24,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import database.AppRepository
@@ -40,7 +42,14 @@ import util.converterDataParaAPI
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
 
-private val TIPOS_DESPESA = listOf("Pedágio", "Refeição", "Hospedagem", "Lavagem", "Estacionamento", "Outros")
+private val TIPOS_DESPESA = listOf(
+    "Pedágio" to Icons.Default.Toll,
+    "Refeição" to Icons.Default.Restaurant,
+    "Hospedagem" to Icons.Default.Hotel,
+    "Lavagem" to Icons.Default.LocalCarWash,
+    "Estacionamento" to Icons.Default.LocalParking,
+    "Outros" to Icons.Default.MoreHoriz
+)
 
 // ===============================
 // CAMERA DELEGATE
@@ -86,7 +95,7 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
 
     var tipoDespesa by remember { mutableStateOf("") }
     var descricao by remember { mutableStateOf("") }
-    var valor by remember { mutableStateOf("") }
+    var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var dataDespesa by remember { mutableStateOf(dataAtualFormatada()) }
     var localDespesa by remember { mutableStateOf("") }
     var salvando by remember { mutableStateOf(false) }
@@ -116,7 +125,7 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
 
     fun salvar() {
         if (tipoDespesa.isBlank()) { erroMsg = "Selecione o tipo de despesa"; return }
-        if (valor.isBlank()) { erroMsg = "Informe o valor"; return }
+        if (valor.text.isBlank()) { erroMsg = "Informe o valor"; return }
         if (dataDespesa.isBlank()) { erroMsg = "Informe a data"; return }
         if (viagemAtual == null) { erroMsg = "Nenhuma viagem em andamento"; return }
         val viagemId = viagemAtual.viagem_id
@@ -125,11 +134,11 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
             val dataApi = converterDataParaAPI(dataDespesa)
             try {
                 repository.salvarOutraDespesa(motorista?.motorista_id ?: "", viagemId, tipoDespesa,
-                    descricao.ifEmpty { tipoDespesa }, valor, dataApi, localDespesa.ifEmpty { null }, fotoBase64)
+                    descricao.ifEmpty { tipoDespesa }, valor.text, dataApi, localDespesa.ifEmpty { null }, fotoBase64)
                 try {
                     val resp = api.ApiClient.salvarOutraDespesa(api.SalvarOutraDespesaRequest(
                         motorista?.motorista_id ?: "", viagemId.toInt(), tipoDespesa,
-                        descricao.ifEmpty { tipoDespesa }, valor, dataApi, localDespesa.ifEmpty { null }, fotoBase64))
+                        descricao.ifEmpty { tipoDespesa }, valor.text, dataApi, localDespesa.ifEmpty { null }, fotoBase64))
                     if (resp.status == "ok") { repository.getOutrasDespesasParaSincronizar().lastOrNull()?.let { repository.marcarOutraDespesaSincronizada(it.id) } }
                 } catch (_: Exception) {}
                 sucessoMsg = "Despesa salva com sucesso!"
@@ -152,17 +161,19 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
                     Text("Tipo de Despesa", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AppColors.TextSecondary)
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TIPOS_DESPESA.take(3).forEach { tipo ->
+                        TIPOS_DESPESA.take(3).forEach { (tipo, icone) ->
                             FilterChip(selected = tipoDespesa == tipo, onClick = { tipoDespesa = tipo },
                                 label = { Text(tipo, fontSize = 13.sp) },
+                                leadingIcon = { Icon(icone, null, modifier = Modifier.size(18.dp)) },
                                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AppColors.Primary, selectedLabelColor = Color.White))
                         }
                     }
                     Spacer(Modifier.height(6.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TIPOS_DESPESA.drop(3).forEach { tipo ->
+                        TIPOS_DESPESA.drop(3).forEach { (tipo, icone) ->
                             FilterChip(selected = tipoDespesa == tipo, onClick = { tipoDespesa = tipo },
                                 label = { Text(tipo, fontSize = 13.sp) },
+                                leadingIcon = { Icon(icone, null, modifier = Modifier.size(18.dp)) },
                                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AppColors.Primary, selectedLabelColor = Color.White))
                         }
                     }
@@ -171,7 +182,10 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
                     OutlinedTextField(descricao, { descricao = it }, label = { Text("Descrição (opcional)") },
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                     Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(valor, { valor = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
+                    OutlinedTextField(valor, { newValue ->
+                        val formatted = newValue.text.filter { c -> c.isDigit() || c == '.' || c == ',' }
+                        valor = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
+                    },
                         label = { Text("Valor (R$)") }, leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))

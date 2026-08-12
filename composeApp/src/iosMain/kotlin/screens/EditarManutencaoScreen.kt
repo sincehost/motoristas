@@ -1,5 +1,9 @@
 package screens
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -12,24 +16,121 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import api.ApiClient
 import api.AtualizarManutencaoRequest
 import database.AppRepository
 import kotlinx.coroutines.launch
+import platform.UIKit.*
+import platform.darwin.NSObject
 import ui.AppColors
 import ui.GradientTopBar
+import util.CameraHelper
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.converterDataParaExibicao
 import kotlin.math.roundToLong
+
+// Delegate da câmera nativa iOS - fora do @Composable - suporta os dois comprovantes
+private class EditarManutencaoCameraDelegate(
+    private val tipoFoto: String,
+    private val onFotoCaptured: (String, String) -> Unit, // tipo, base64
+    private val onMessage: (String, Boolean) -> Unit
+) : NSObject(), UIImagePickerControllerDelegateProtocol, UINavigationControllerDelegateProtocol {
+
+    override fun imagePickerController(
+        picker: UIImagePickerController,
+        didFinishPickingMediaWithInfo: Map<Any?, *>
+    ) {
+        val image = didFinishPickingMediaWithInfo[UIImagePickerControllerOriginalImage] as? UIImage
+        if (image != null) {
+            val base64 = CameraHelper.imageToBase64(image)
+            if (base64 != null) {
+                onFotoCaptured(tipoFoto, base64)
+            } else {
+                onMessage("Erro ao converter imagem para base64", true)
+            }
+        } else {
+            onMessage("Nenhuma imagem selecionada", true)
+        }
+        picker.dismissViewControllerAnimated(true, null)
+    }
+
+    override fun imagePickerControllerDidCancel(picker: UIImagePickerController) {
+        onMessage("Captura cancelada", false)
+        picker.dismissViewControllerAnimated(true, null)
+    }
+}
+
+@Composable
+private fun FotoCapturaManutencaoEdit(
+    bitmap: ImageBitmap?,
+    onRemover: () -> Unit,
+    onCapturar: () -> Unit
+) {
+    if (bitmap != null) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop
+            )
+            IconButton(
+                onClick = onRemover,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(36.dp)
+                    .background(AppColors.Error, RoundedCornerShape(50))
+            ) {
+                Icon(Icons.Default.Close, "Remover", tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+            IconButton(
+                onClick = onCapturar,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .size(36.dp)
+                    .background(Color(0xFF06B6D4), RoundedCornerShape(50))
+            ) {
+                Icon(Icons.Default.CameraAlt, "Nova foto", tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .border(2.dp, Color(0xFF06B6D4).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                .background(Color(0xFF06B6D4).copy(alpha = 0.05f))
+                .clickable { onCapturar() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(40.dp), tint = Color(0xFF06B6D4))
+                Spacer(Modifier.height(8.dp))
+                Text("Tirar Foto", color = Color(0xFF06B6D4), fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,19 +143,21 @@ actual fun EditarManutencaoScreen(
     val motorista = remember { repository.getMotoristaLogado() }
     var carregando by remember { mutableStateOf(true) }
     var salvando by remember { mutableStateOf(false) }
-    
+
     var dataManutencao by remember { mutableStateOf(dataAtualFormatada()) }
     var placa by remember { mutableStateOf("") }
     var servico by remember { mutableStateOf("") }
     var descricaoServico by remember { mutableStateOf("") }
     var localManutencao by remember { mutableStateOf("") }
-    var valor by remember { mutableStateOf("") }
+    var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var kmTrocaOleo by remember { mutableStateOf("") }
     var kmTrocaPneu by remember { mutableStateOf("") }
     var pneus by remember { mutableStateOf("") }
     var tiposPneu by remember { mutableStateOf("") }
     var fotoComprovante1Base64 by remember { mutableStateOf<String?>(null) }
     var fotoComprovante2Base64 by remember { mutableStateOf<String?>(null) }
+    val fotoComprovante1Bitmap = remember(fotoComprovante1Base64) { fotoComprovante1Base64?.let { CameraHelper.base64ToImageBitmap(it) } }
+    val fotoComprovante2Bitmap = remember(fotoComprovante2Base64) { fotoComprovante2Base64?.let { CameraHelper.base64ToImageBitmap(it) } }
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
@@ -68,6 +171,43 @@ actual fun EditarManutencaoScreen(
         } else {
             sucessoMsg = mensagem
         }
+    }
+
+    // Delegates persistentes da câmera - um para cada comprovante
+    val cameraDelegate1 = remember {
+        EditarManutencaoCameraDelegate(
+            tipoFoto = "comprovante1",
+            onFotoCaptured = { _, base64 -> fotoComprovante1Base64 = base64 },
+            onMessage = { msg, erro -> mostrarMensagem(msg, erro) }
+        )
+    }
+    val cameraDelegate2 = remember {
+        EditarManutencaoCameraDelegate(
+            tipoFoto = "comprovante2",
+            onFotoCaptured = { _, base64 -> fotoComprovante2Base64 = base64 },
+            onMessage = { msg, erro -> mostrarMensagem(msg, erro) }
+        )
+    }
+
+    // Função para abrir a câmera nativa iOS
+    fun abrirCamera(tipo: String) {
+        val viewController = UIApplication.sharedApplication.keyWindow?.rootViewController
+        if (viewController == null) {
+            mostrarMensagem("Não foi possível abrir a câmera", isErro = true)
+            return
+        }
+        if (!UIImagePickerController.isSourceTypeAvailable(
+                UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)) {
+            mostrarMensagem("Câmera não disponível neste dispositivo", isErro = true)
+            return
+        }
+        val delegate = if (tipo == "comprovante1") cameraDelegate1 else cameraDelegate2
+        val picker = UIImagePickerController().apply {
+            sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera
+            allowsEditing = false
+            this.delegate = delegate
+        }
+        viewController.presentViewController(picker, true, null)
     }
 
     LaunchedEffect(manutencaoId) {
@@ -86,7 +226,8 @@ actual fun EditarManutencaoScreen(
                 servico = manutencao.servico
                 descricaoServico = manutencao.descricao_servico ?: ""
                 localManutencao = manutencao.local_manutencao ?: ""
-                valor = formatarValor(((manutencao.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
+                val valorFormatado = formatarValor(((manutencao.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
+                valor = TextFieldValue(valorFormatado, selection = TextRange(valorFormatado.length))
                 kmTrocaOleo = manutencao.km_troca_oleo ?: ""
                 kmTrocaPneu = manutencao.km_troca_pneu ?: ""
                 pneus = manutencao.pneus ?: ""
@@ -193,9 +334,10 @@ actual fun EditarManutencaoScreen(
 
                         OutlinedTextField(
                             value = valor,
-                            onValueChange = {
-                                val digits = it.filter { c -> c.isDigit() }.take(7)
-                                valor = formatarValor(digits)
+                            onValueChange = { newValue ->
+                                val digits = newValue.text.filter { c -> c.isDigit() }.take(7)
+                                val formatted = formatarValor(digits)
+                                valor = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
                             },
                             label = { Text("Valor (R\$) *") },
                             leadingIcon = { Icon(Icons.Default.AttachMoney, null, tint = Color(0xFF06B6D4)) },
@@ -231,8 +373,23 @@ actual fun EditarManutencaoScreen(
 
                         Spacer(Modifier.height(16.dp))
 
-                        Text("Fotos dos Comprovantes", fontWeight = FontWeight.Medium, color = AppColors.TextSecondary, fontSize = 12.sp)
-                        Text("(Funcionalidade de câmera em desenvolvimento para iOS)", fontSize = 10.sp, color = Color.Gray)
+                        Text("Comprovante 1", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                        Spacer(Modifier.height(8.dp))
+                        FotoCapturaManutencaoEdit(
+                            bitmap = fotoComprovante1Bitmap,
+                            onRemover = { fotoComprovante1Base64 = null },
+                            onCapturar = { abrirCamera("comprovante1") }
+                        )
+
+                        Spacer(Modifier.height(16.dp))
+
+                        Text("Comprovante 2", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                        Spacer(Modifier.height(8.dp))
+                        FotoCapturaManutencaoEdit(
+                            bitmap = fotoComprovante2Bitmap,
+                            onRemover = { fotoComprovante2Base64 = null },
+                            onCapturar = { abrirCamera("comprovante2") }
+                        )
 
                         Spacer(Modifier.height(24.dp))
 
@@ -241,7 +398,7 @@ actual fun EditarManutencaoScreen(
                                 scope.launch {
                                     if (dataManutencao.isBlank()) { mostrarMensagem("Informe a data", isErro = true); return@launch }
                                     if (servico.isBlank()) { mostrarMensagem("Informe o serviço", isErro = true); return@launch }
-                                    if (valor.isBlank()) { mostrarMensagem("Informe o valor", isErro = true); return@launch }
+                                    if (valor.text.isBlank()) { mostrarMensagem("Informe o valor", isErro = true); return@launch }
                                     if (servico == "Troca de Óleo" && kmTrocaOleo.isBlank()) { mostrarMensagem("Informe o KM da troca de óleo", isErro = true); return@launch }
                                     if (servico == "Troca de Pneu" && kmTrocaPneu.isBlank()) { mostrarMensagem("Informe o KM da troca de pneu", isErro = true); return@launch }
 
@@ -257,7 +414,7 @@ actual fun EditarManutencaoScreen(
                                                 servico = servico,
                                                 descricao_servico = descricaoServico.ifBlank { null },
                                                 local_manutencao = localManutencao.ifBlank { null },
-                                                valor = valor,
+                                                valor = valor.text,
                                                 km_troca_oleo = kmTrocaOleo.ifBlank { null },
                                                 km_troca_pneu = kmTrocaPneu.ifBlank { null },
                                                 pneus = pneus.ifBlank { null }?.split(",")?.mapNotNull { it.trim().toIntOrNull() },

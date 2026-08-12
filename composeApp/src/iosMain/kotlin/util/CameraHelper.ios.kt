@@ -2,6 +2,12 @@ package util
 
 import platform.Foundation.*
 import platform.UIKit.*
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.usePinned
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import org.jetbrains.skia.Image as SkiaImage
 
 /**
  * CameraHelper — Funções auxiliares para câmera no iOS.
@@ -36,5 +42,29 @@ object CameraHelper {
      */
     fun imageToBytes(image: UIImage): ByteArray? {
         return ImageCompressor.compressToBytes(image)
+    }
+
+    /**
+     * Decodifica uma string Base64 (com ou sem o prefixo "data:image/...;base64,")
+     * de volta para ImageBitmap, para exibir uma foto já cadastrada nas telas de edição.
+     *
+     * @return ImageBitmap pronto para uso em Image(bitmap = ...), ou null se falhar
+     */
+    @OptIn(ExperimentalForeignApi::class)
+    fun base64ToImageBitmap(base64: String): ImageBitmap? {
+        return try {
+            val cleanBase64 = if (base64.contains(",")) base64.substringAfter(",") else base64
+            val data = NSData.create(base64EncodedString = cleanBase64, options = 0u) ?: return null
+            val length = data.length.toInt()
+            if (length == 0) return null
+            val bytes = ByteArray(length)
+            bytes.usePinned { pinned ->
+                data.getBytes(pinned.addressOf(0), data.length)
+            }
+            SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
+        } catch (e: Throwable) {
+            LogWriter.log("❌ [iOS] Erro ao decodificar foto base64: ${e.message}")
+            null
+        }
     }
 }

@@ -23,19 +23,54 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import api.ApiClient
 import api.AtualizarArlaRequest
 import database.AppRepository
 import kotlinx.coroutines.launch
+import platform.UIKit.*
+import platform.darwin.NSObject
 import ui.AppColors
 import ui.GradientTopBar
+import util.CameraHelper
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.converterDataParaExibicao
 import kotlin.math.roundToLong
+
+// Delegate da câmera nativa iOS - fora do @Composable
+private class EditarArlaCameraDelegate(
+    private val onFotoCaptured: (String) -> Unit,
+    private val onMessage: (String, Boolean) -> Unit
+) : NSObject(), UIImagePickerControllerDelegateProtocol, UINavigationControllerDelegateProtocol {
+
+    override fun imagePickerController(
+        picker: UIImagePickerController,
+        didFinishPickingMediaWithInfo: Map<Any?, *>
+    ) {
+        val image = didFinishPickingMediaWithInfo[UIImagePickerControllerOriginalImage] as? UIImage
+        if (image != null) {
+            val base64 = CameraHelper.imageToBase64(image)
+            if (base64 != null) {
+                onFotoCaptured(base64)
+            } else {
+                onMessage("Erro ao converter imagem para base64", true)
+            }
+        } else {
+            onMessage("Nenhuma imagem selecionada", true)
+        }
+        picker.dismissViewControllerAnimated(true, null)
+    }
+
+    override fun imagePickerControllerDidCancel(picker: UIImagePickerController) {
+        onMessage("Captura cancelada", false)
+        picker.dismissViewControllerAnimated(true, null)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,14 +84,15 @@ actual fun EditarArlaScreen(
 
     var carregando by remember { mutableStateOf(true) }
     var salvando by remember { mutableStateOf(false) }
-    
+
     var data by remember { mutableStateOf(dataAtualFormatada()) }
-    var valor by remember { mutableStateOf("") }
-    var litros by remember { mutableStateOf("") }
+    var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
+    var litros by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var posto by remember { mutableStateOf("") }
     var kmPosto by remember { mutableStateOf("") }
-    
+
     var fotoBase64 by remember { mutableStateOf<String?>(null) }
+    val fotoBitmap = remember(fotoBase64) { fotoBase64?.let { CameraHelper.base64ToImageBitmap(it) } }
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
@@ -72,6 +108,34 @@ actual fun EditarArlaScreen(
         }
     }
 
+    // Delegate persistente da câmera
+    val cameraDelegate = remember {
+        EditarArlaCameraDelegate(
+            onFotoCaptured = { base64 -> fotoBase64 = base64 },
+            onMessage = { msg, erro -> mostrarMensagem(msg, erro) }
+        )
+    }
+
+    // Função para abrir a câmera nativa iOS
+    fun abrirCamera() {
+        val viewController = UIApplication.sharedApplication.keyWindow?.rootViewController
+        if (viewController == null) {
+            mostrarMensagem("Não foi possível abrir a câmera", isErro = true)
+            return
+        }
+        if (!UIImagePickerController.isSourceTypeAvailable(
+                UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)) {
+            mostrarMensagem("Câmera não disponível neste dispositivo", isErro = true)
+            return
+        }
+        val picker = UIImagePickerController().apply {
+            sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera
+            allowsEditing = false
+            delegate = cameraDelegate
+        }
+        viewController.presentViewController(picker, true, null)
+    }
+
     LaunchedEffect(arlaId) {
         carregando = true
         try {
@@ -84,8 +148,9 @@ actual fun EditarArlaScreen(
             if (response.status == "ok" && response.arla != null) {
                 val arla = response.arla
                 data = converterDataParaExibicao(arla.data_arla)
-                valor = formatarValor(((arla.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
-                litros = arla.litros
+                val valorFormatado = formatarValor(((arla.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
+                valor = TextFieldValue(valorFormatado, selection = TextRange(valorFormatado.length))
+                litros = TextFieldValue(arla.litros, selection = TextRange(arla.litros.length))
                 posto = arla.posto
                 kmPosto = arla.km_posto
                 fotoBase64 = arla.foto
@@ -155,9 +220,10 @@ actual fun EditarArlaScreen(
 
                         OutlinedTextField(
                             value = valor,
-                            onValueChange = {
-                                val digits = it.filter { c -> c.isDigit() }.take(7)
-                                valor = formatarValor(digits)
+                            onValueChange = { newValue ->
+                                val digits = newValue.text.filter { c -> c.isDigit() }.take(7)
+                                val formatted = formatarValor(digits)
+                                valor = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
                             },
                             label = { Text("Valor (R\$) *") },
                             leadingIcon = { Icon(Icons.Default.AttachMoney, null, tint = Color(0xFF06B6D4)) },
@@ -171,9 +237,9 @@ actual fun EditarArlaScreen(
 
                         OutlinedTextField(
                             value = litros,
-                            onValueChange = {
-                                val digits = it.filter { c -> c.isDigit() || c == '.' }.take(6)
-                                litros = digits
+                            onValueChange = { newValue ->
+                                val digits = newValue.text.filter { c -> c.isDigit() || c == '.' }.take(6)
+                                litros = TextFieldValue(text = digits, selection = TextRange(digits.length))
                             },
                             label = { Text("Litros *") },
                             leadingIcon = { Icon(Icons.Default.Opacity, null, tint = Color(0xFF06B6D4)) },
@@ -212,31 +278,74 @@ actual fun EditarArlaScreen(
 
                         Text("Foto do Comprovante", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
-                        
-                        // Nota: Funcionalidade de câmera desabilitada no iOS
-                        // Será implementada posteriormente usando APIs nativas do iOS
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(2.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                                .background(Color.Gray.copy(alpha = 0.05f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    Icons.Default.CameraAlt, 
-                                    "Câmera", 
-                                    modifier = Modifier.size(48.dp), 
-                                    tint = Color.Gray
+
+                        if (fotoBitmap != null) {
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                Image(
+                                    bitmap = fotoBitmap,
+                                    contentDescription = "Foto do comprovante",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp)
+                                        .clip(RoundedCornerShape(12.dp)),
+                                    contentScale = ContentScale.Crop
                                 )
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    "Funcionalidade de câmera\nem desenvolvimento para iOS", 
-                                    color = Color.Gray,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                IconButton(
+                                    onClick = { fotoBase64 = null },
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(8.dp)
+                                        .size(36.dp)
+                                        .background(AppColors.Error, RoundedCornerShape(50))
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        "Remover",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { abrirCamera() },
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .padding(8.dp)
+                                        .size(36.dp)
+                                        .background(Color(0xFF06B6D4), RoundedCornerShape(50))
+                                ) {
+                                    Icon(
+                                        Icons.Default.CameraAlt,
+                                        "Nova foto",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(120.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(2.dp, Color(0xFF06B6D4).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF06B6D4).copy(alpha = 0.05f))
+                                    .clickable { abrirCamera() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        Icons.Default.CameraAlt,
+                                        "Câmera",
+                                        modifier = Modifier.size(48.dp),
+                                        tint = Color(0xFF06B6D4)
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "Tirar Foto",
+                                        color = Color(0xFF06B6D4),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
 
@@ -246,8 +355,8 @@ actual fun EditarArlaScreen(
                             onClick = {
                                 scope.launch {
                                     if (data.isBlank()) { mostrarMensagem("Informe a data", isErro = true); return@launch }
-                                    if (valor.isBlank()) { mostrarMensagem("Informe o valor", isErro = true); return@launch }
-                                    if (litros.isBlank()) { mostrarMensagem("Informe os litros", isErro = true); return@launch }
+                                    if (valor.text.isBlank()) { mostrarMensagem("Informe o valor", isErro = true); return@launch }
+                                    if (litros.text.isBlank()) { mostrarMensagem("Informe os litros", isErro = true); return@launch }
                                     if (posto.isBlank()) { mostrarMensagem("Informe o posto", isErro = true); return@launch }
                                     if (kmPosto.isBlank()) { mostrarMensagem("Informe o KM do posto", isErro = true); return@launch }
 
@@ -257,8 +366,8 @@ actual fun EditarArlaScreen(
                                             AtualizarArlaRequest(
                                                 arla_id = arlaId,
                                                 data = converterDataParaAPI(data),
-                                                valor = valor.replace(".", "").replace(",", ".").toDouble(),
-                                                litros = litros.toDouble(),
+                                                valor = valor.text.replace(".", "").replace(",", ".").toDouble(),
+                                                litros = litros.text.toDouble(),
                                                 posto = posto,
                                                 km_posto = kmPosto,
                                                 foto = fotoBase64

@@ -23,6 +23,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import database.AppRepository
@@ -180,8 +182,8 @@ actual fun AdicionarArlaScreen(
 
     // Campos do formulário
     var data by remember { mutableStateOf(dataAtualFormatada()) }
-    var valor by remember { mutableStateOf("") }
-    var litros by remember { mutableStateOf("") }
+    var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
+    var litros by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var posto by remember { mutableStateOf("") }
     var kmPosto by remember { mutableStateOf("") }
 
@@ -244,11 +246,11 @@ actual fun AdicionarArlaScreen(
             mostrarMensagem("Informe a data", isErro = true)
             return
         }
-        if (valor.isEmpty() || valor.replace(",", ".").toDoubleOrNull() == 0.0) {
+        if (valor.text.isEmpty() || valor.text.replace(",", ".").toDoubleOrNull() == 0.0) {
             mostrarMensagem("Informe o valor", isErro = true)
             return
         }
-        if (litros.isEmpty() || litros.replace(",", ".").toDoubleOrNull() == 0.0) {
+        if (litros.text.isEmpty() || litros.text.replace(",", ".").toDoubleOrNull() == 0.0) {
             mostrarMensagem("Informe os litros", isErro = true)
             return
         }
@@ -277,8 +279,8 @@ actual fun AdicionarArlaScreen(
                             motorista_id = motorista?.motorista_id ?: "",
                             viagem_id = viagemEmAndamento!!.id,
                             data = dataAPI,
-                            valor = valor,
-                            litros = litros,
+                            valor = valor.text,
+                            litros = litros.text,
                             posto = posto,
                             km_posto = kmPosto,
                             foto_base64 = fotoBase64
@@ -296,8 +298,8 @@ actual fun AdicionarArlaScreen(
                         motoristaId = motorista?.motorista_id ?: "",
                         viagemId = viagemEmAndamento!!.id.toLong(),
                         data = dataAPI,
-                        valor = valor,
-                        litros = litros,
+                        valor = valor.text,
+                        litros = litros.text,
                         posto = posto,
                         kmPosto = kmPosto,
                         foto = fotoBase64
@@ -473,7 +475,10 @@ actual fun AdicionarArlaScreen(
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = valor,
-                                onValueChange = { valor = formatarMoedaArlaScreen(it) },
+                                onValueChange = { newValue ->
+                                    val formatted = formatarMoedaArlaScreen(newValue.text)
+                                    valor = TextFieldValue(formatted, selection = TextRange(formatted.length))
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -495,7 +500,10 @@ actual fun AdicionarArlaScreen(
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = litros,
-                                onValueChange = { litros = formatarLitrosArlaScreen(it) },
+                                onValueChange = { newValue ->
+                                    val formatted = formatarLitrosArlaScreen(newValue.text)
+                                    litros = TextFieldValue(formatted, selection = TextRange(formatted.length))
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
