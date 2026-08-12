@@ -599,19 +599,19 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                 placa = response.viagem.placa
                 dataViagem = response.viagem.data_viagem
                 dataChegada = response.viagem.data_chegada
-                kmInicio = run {
-                    val s = response.viagem.km_inicio
-                    // Só remove decimal se for ".0" ou ".00" (nunca 3 dígitos, que
-                    // poderia ser separador de milhar em vez de casa decimal)
-                    val m = Regex("^(\\d+)\\.(\\d{1,2})$").find(s)
-                    if (m != null && m.groupValues[2].all { it == '0' }) m.groupValues[1] else s
-                }
-                kmChegada = response.viagem.km_chegada
+                // Servidor devolve decimal puro do banco ("115676.00") — limpa
+                // pra "115676" antes de exibir no campo de edição.
+                kmInicio = response.viagem.km_inicio.toDoubleOrNull()?.toLong()?.toString() ?: response.viagem.km_inicio
+                kmChegada = response.viagem.km_chegada.toDoubleOrNull()?.toLong()?.toString() ?: response.viagem.km_chegada
                 kmPosto = response.viagem.km_posto
                 pesocarga = response.viagem.pesocarga
                 pesocargaretorno = response.viagem.pesocargaretorno
-                valorfrete = response.viagem.valorfrete
-                valorfreteretorno = response.viagem.valorfreteretorno
+                // Servidor devolve decimal puro ("17000.00") — converte pra
+                // máscara BR ("17.000,00") igual todo campo de valor do app,
+                // senão reenviar sem editar manda formato errado de volta pro
+                // endpoint de atualizar viagem (que espera BR nesse campo).
+                valorfrete = decimalParaMascaraBRViagem(response.viagem.valorfrete)
+                valorfreteretorno = decimalParaMascaraBRViagem(response.viagem.valorfreteretorno)
                 ordemRetorno = response.viagem.ordem_retorno
                 cteRetorno = response.viagem.cte_retorno
                 descricao = response.viagem.descricao
@@ -1676,4 +1676,17 @@ private fun formatarKm(valor: Double): String {
 
 private fun formatarMoeda(valor: Double): String {
     return "R$ " + String.format("%,.2f", valor).replace(",", "X").replace(".", ",").replace("X", ".")
+}
+
+/**
+ * Converte um decimal puro vindo do servidor ("17000.00") pra máscara BR
+ * ("17.000,00") igual todo campo de valor do app. Usado no Editar Viagem:
+ * reenviar sem converter manda formato errado de volta pro endpoint de
+ * atualizar viagem (que espera BR nesse campo), corrompendo o valor salvo.
+ * Sem "R$" — vira o texto que fica no campo e é reenviado pro servidor.
+ */
+private fun decimalParaMascaraBRViagem(valorServidor: String?): String {
+    if (valorServidor.isNullOrBlank()) return ""
+    val numero = valorServidor.replace(",", ".").toDoubleOrNull() ?: return ""
+    return String.format("%,.2f", numero).replace(",", "X").replace(".", ",").replace("X", ".")
 }

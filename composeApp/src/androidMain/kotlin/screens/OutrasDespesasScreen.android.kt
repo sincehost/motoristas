@@ -67,6 +67,7 @@ actual fun OutrasDespesasScreen(
 
     // ★ FIX: Campos do formulário com rememberSaveable — sobrevivem à morte do processo
     var tipoDespesa by rememberSaveable { mutableStateOf("") }
+    var tipoDespesaExpandido by remember { mutableStateOf(false) }
     var descricao by rememberSaveable { mutableStateOf("") }
     var valor by rememberSaveableTextField("")
     var dataDespesa by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
@@ -224,61 +225,20 @@ actual fun OutrasDespesasScreen(
                         Text("Tipo de Despesa *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
 
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                tiposDespesa.take(3).forEach { t ->
-                                    val selecionado = tipoDespesa == t.nome
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(70.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable { tipoDespesa = t.nome },
-                                        color = if (selecionado) Color(0xFFFF6F00) else Color(0xFFF5F5F5),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Column(
-                                            Modifier.fillMaxSize(),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center
-                                        ) {
-                                            Icon(Icons.Default.Receipt, null, tint = if (selecionado) Color.White else AppColors.TextSecondary, modifier = Modifier.size(24.dp))
-                                            Spacer(Modifier.height(4.dp))
-                                            Text(t.nome, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = if (selecionado) Color.White else AppColors.TextSecondary)
-                                        }
-                                    }
+                        ExposedDropdownMenuBox(expanded = tipoDespesaExpandido, onExpandedChange = { tipoDespesaExpandido = it }) {
+                            OutlinedTextField(
+                                value = tipoDespesa.ifEmpty { "Selecione" },
+                                onValueChange = {},
+                                readOnly = true,
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tipoDespesaExpandido) },
+                                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
+                                leadingIcon = { Icon(Icons.Default.Receipt, null, tint = Color(0xFFFF6F00)) }
+                            )
+                            ExposedDropdownMenu(expanded = tipoDespesaExpandido, onDismissRequest = { tipoDespesaExpandido = false }) {
+                                tiposDespesa.forEach { t ->
+                                    DropdownMenuItem(text = { Text(t.nome) }, onClick = { tipoDespesa = t.nome; tipoDespesaExpandido = false })
                                 }
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                tiposDespesa.drop(3).forEach { t ->
-                                    val selecionado = tipoDespesa == t.nome
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(70.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable { tipoDespesa = t.nome },
-                                        color = if (selecionado) Color(0xFFFF6F00) else Color(0xFFF5F5F5),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Column(
-                                            Modifier.fillMaxSize(),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center
-                                        ) {
-                                            Icon(Icons.Default.Receipt, null, tint = if (selecionado) Color.White else AppColors.TextSecondary, modifier = Modifier.size(24.dp))
-                                            Spacer(Modifier.height(4.dp))
-                                            Text(t.nome, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = if (selecionado) Color.White else AppColors.TextSecondary)
-                                        }
-                                    }
-                                }
-                                Spacer(Modifier.weight(1f))
                             }
                         }
 

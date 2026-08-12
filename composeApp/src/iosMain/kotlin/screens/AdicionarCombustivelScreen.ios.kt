@@ -952,10 +952,10 @@ private fun formatarValorLitroComb(input: String): String {
     val digits = input.filter { it.isDigit() }
     if (digits.isEmpty()) return ""
     val value = digits.toLongOrNull() ?: return ""
-    if (value == 0L) return ""  // Não mostra 0,00 quando vazio
-    val inteiros = value / 100
-    val decimais = value % 100
-    return "$inteiros,${decimais.toString().padStart(3, '0')}"
+    val reais = value / 100
+    val centavos = value % 100
+    val reaisFormatado = reais.toString().reversed().chunked(3).joinToString(".").reversed()
+    return "$reaisFormatado,${centavos.toString().padStart(2, '0')}"
 }
 
 private fun formatarMoedaComb(input: String): String {

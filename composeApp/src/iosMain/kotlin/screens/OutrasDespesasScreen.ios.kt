@@ -86,6 +86,7 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
     val focusManager = LocalFocusManager.current
 
     var tipoDespesa by remember { mutableStateOf("") }
+    var tipoDespesaExpandido by remember { mutableStateOf(false) }
     var descricao by remember { mutableStateOf("") }
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var dataDespesa by remember { mutableStateOf(dataAtualFormatada()) }
@@ -152,21 +153,19 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
                 Column(Modifier.padding(20.dp)) {
                     Text("Tipo de Despesa", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AppColors.TextSecondary)
                     Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        tiposDespesa.take(3).forEach { t ->
-                            FilterChip(selected = tipoDespesa == t.nome, onClick = { tipoDespesa = t.nome },
-                                label = { Text(t.nome, fontSize = 13.sp) },
-                                leadingIcon = { Icon(Icons.Default.Receipt, null, modifier = Modifier.size(18.dp)) },
-                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AppColors.Primary, selectedLabelColor = Color.White))
-                        }
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        tiposDespesa.drop(3).forEach { t ->
-                            FilterChip(selected = tipoDespesa == t.nome, onClick = { tipoDespesa = t.nome },
-                                label = { Text(t.nome, fontSize = 13.sp) },
-                                leadingIcon = { Icon(Icons.Default.Receipt, null, modifier = Modifier.size(18.dp)) },
-                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AppColors.Primary, selectedLabelColor = Color.White))
+                    ui.AppDropdownField(
+                        label = "Selecione",
+                        selectedText = tipoDespesa,
+                        expanded = tipoDespesaExpandido,
+                        onExpandedChange = { focusManager.clearFocus(); tipoDespesaExpandido = it },
+                        leadingIcon = { Icon(Icons.Default.Receipt, null, tint = AppColors.Primary) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        tiposDespesa.forEach { t ->
+                            ui.AppDropdownMenuItem(
+                                text = { Text(t.nome) },
+                                onClick = { tipoDespesa = t.nome; tipoDespesaExpandido = false }
+                            )
                         }
                     }
                     Spacer(Modifier.height(16.dp))
@@ -203,9 +202,9 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
                         Box(Modifier.fillMaxWidth().height(200.dp)) {
                             Image(fotoBitmap!!, "Comprovante", Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
                             IconButton(onClick = { fotoBase64 = null; fotoBitmap = null },
-                                modifier = Modifier.align(Alignment.TopEnd).size(32.dp)
-                                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(16.dp))) {
-                                Icon(Icons.Default.Close, "Remover", tint = Color.White, modifier = Modifier.size(18.dp))
+                                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(36.dp)
+                                    .background(AppColors.Error, RoundedCornerShape(50))) {
+                                Icon(Icons.Default.Close, "Remover", tint = Color.White, modifier = Modifier.size(20.dp))
                             }
                         }
                     } else {
