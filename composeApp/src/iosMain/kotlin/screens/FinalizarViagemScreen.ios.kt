@@ -746,6 +746,15 @@ actual fun FinalizarViagemScreen(
                 ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
 
+                        // Dados da Chegada
+                        Text(
+                            "Dados da Chegada",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = Color(0xFF10B981)
+                        )
+                        Spacer(Modifier.height(16.dp))
+
                         // KM Chegada
                         Text(
                             "KM de Chegada *",
@@ -789,9 +798,28 @@ actual fun FinalizarViagemScreen(
 
                         Spacer(Modifier.height(16.dp))
 
+                        // Foto do Painel
+                        Text(
+                            "Foto do Hodômetro na Chegada *",
+                            fontWeight = FontWeight.SemiBold,
+                            color = AppColors.TextPrimary
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        FotoCapturaFinalizar(
+                            foto = fotoPainel,
+                            onClick = { abrirCamera() },
+                            onRemover = {
+                                fotoPainel = null
+                                fotoPainelBase64 = null
+                                // Foto removida silenciosamente
+                            }
+                        )
+
+                        Spacer(Modifier.height(16.dp))
+
                         // Observação
                         Text(
-                            "Observação da Viagem",
+                            "Observações da Viagem",
                             fontWeight = FontWeight.SemiBold,
                             color = AppColors.TextPrimary
                         )
@@ -810,9 +838,16 @@ actual fun FinalizarViagemScreen(
 
                         Spacer(Modifier.height(20.dp))
 
-                        // Teve Frete de Retorno?
+                        // Frete de Retorno
                         Text(
-                            "Teve Frete de Retorno? *",
+                            "Frete de Retorno",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = Color(0xFF10B981)
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Houve frete de retorno? *",
                             fontWeight = FontWeight.SemiBold,
                             color = AppColors.TextPrimary
                         )
@@ -890,9 +925,63 @@ actual fun FinalizarViagemScreen(
 
                                     Spacer(Modifier.height(16.dp))
 
+                                    // Local Carregou
+                                    Text(
+                                        "Local de Carregamento *",
+                                        fontWeight = FontWeight.Medium,
+                                        color = AppColors.TextPrimary,
+                                        fontSize = 14.sp
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    OutlinedTextField(
+                                        value = localCarregou,
+                                        onValueChange = { localCarregou = it },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
+                                        placeholder = { Text("Ex: São Paulo - SP", color = Color(0xFF9CA3AF)) })
+
+
+                                    Spacer(Modifier.height(12.dp))
+
+                                    // Ordem Retorno
+                                    Text(
+                                        "Ordem de Frete *",
+                                        fontWeight = FontWeight.Medium,
+                                        color = AppColors.TextPrimary,
+                                        fontSize = 14.sp
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    OutlinedTextField(
+                                        value = ordemRetorno,
+                                        onValueChange = { ordemRetorno = it },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
+                                        placeholder = { Text("Número da ordem", color = Color(0xFF9CA3AF)) })
+
+
+                                    Spacer(Modifier.height(12.dp))
+
+                                    // CTE Retorno
+                                    Text(
+                                        "Nº do CT-e *",
+                                        fontWeight = FontWeight.Medium,
+                                        color = AppColors.TextPrimary,
+                                        fontSize = 14.sp
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    OutlinedTextField(
+                                        value = cteRetorno,
+                                        onValueChange = { cteRetorno = it },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
+                                        placeholder = { Text("Número do CTE", color = Color(0xFF9CA3AF)) })
+
+
+                                    Spacer(Modifier.height(12.dp))
+
                                     // Peso Carga Retorno
                                     Text(
-                                        "Peso da Carga *",
+                                        "Peso da Carga (kg) *",
                                         fontWeight = FontWeight.Medium,
                                         color = AppColors.TextPrimary,
                                         fontSize = 14.sp
@@ -912,13 +1001,13 @@ actual fun FinalizarViagemScreen(
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         placeholder = { Text("Ex: 25.000", color = Color(0xFF9CA3AF)) },
                                         suffix = { Text("kg") })
-                                    
+
 
                                     Spacer(Modifier.height(12.dp))
 
                                     // Valor Frete Retorno
                                     Text(
-                                        "Valor do Frete *",
+                                        "Valor do Frete (R$) *",
                                         fontWeight = FontWeight.Medium,
                                         color = AppColors.TextPrimary,
                                         fontSize = 14.sp
@@ -939,82 +1028,9 @@ actual fun FinalizarViagemScreen(
                                         prefix = { Text("R$ ") },
                                         placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
                                     
-
-                                    Spacer(Modifier.height(12.dp))
-
-                                    // Local Carregou
-                                    Text(
-                                        "Local Onde Carregou *",
-                                        fontWeight = FontWeight.Medium,
-                                        color = AppColors.TextPrimary,
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    OutlinedTextField(
-                                        value = localCarregou,
-                                        onValueChange = { localCarregou = it },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                        placeholder = { Text("Ex: São Paulo - SP", color = Color(0xFF9CA3AF)) })
-                                    
-
-                                    Spacer(Modifier.height(12.dp))
-
-                                    // Ordem Retorno
-                                    Text(
-                                        "Ordem de Frete *",
-                                        fontWeight = FontWeight.Medium,
-                                        color = AppColors.TextPrimary,
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    OutlinedTextField(
-                                        value = ordemRetorno,
-                                        onValueChange = { ordemRetorno = it },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                        placeholder = { Text("Número da ordem", color = Color(0xFF9CA3AF)) })
-                                    
-
-                                    Spacer(Modifier.height(12.dp))
-
-                                    // CTE Retorno
-                                    Text(
-                                        "CTE Frete Retorno *",
-                                        fontWeight = FontWeight.Medium,
-                                        color = AppColors.TextPrimary,
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    OutlinedTextField(
-                                        value = cteRetorno,
-                                        onValueChange = { cteRetorno = it },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                        placeholder = { Text("Número do CTE", color = Color(0xFF9CA3AF)) })
-                                    
                                 }
                             }
                         }
-
-                        Spacer(Modifier.height(20.dp))
-
-                        // Foto do Painel
-                        Text(
-                            "Foto Quilometragem (Painel) *",
-                            fontWeight = FontWeight.SemiBold,
-                            color = AppColors.TextPrimary
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        FotoCapturaFinalizar(
-                            foto = fotoPainel,
-                            onClick = { abrirCamera() },
-                            onRemover = {
-                                fotoPainel = null
-                                fotoPainelBase64 = null
-                                // Foto removida silenciosamente
-                            }
-                        )
 
                         Spacer(Modifier.height(24.dp))
 

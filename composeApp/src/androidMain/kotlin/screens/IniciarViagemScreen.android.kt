@@ -324,7 +324,7 @@ actual fun IniciarViagemScreen(
                         OutlinedTextField(
                             value = cte,
                             onValueChange = { cte = it },
-                            label = { Text("Nº do CTE *") },
+                            label = { Text("Nº do CT-e *") },
                             leadingIcon = { Icon(Icons.Default.Description, null, tint = AppColors.Primary) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
@@ -346,7 +346,7 @@ actual fun IniciarViagemScreen(
                             OutlinedTextField(
                                 value = cte2,
                                 onValueChange = { cte2 = it },
-                                label = { Text("Nº do CTE 2") },
+                                label = { Text("Nº do CT-e 2") },
                                 leadingIcon = { Icon(Icons.Default.Description, null, tint = AppColors.TextSecondary) },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
@@ -388,7 +388,7 @@ actual fun IniciarViagemScreen(
                                 value = placaSelecionada,
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("Placa do Cavalo *") },
+                                label = { Text("Placa do Cavalo Mecânico *") },
                                 leadingIcon = { Icon(Icons.Default.LocalShipping, null, tint = AppColors.Primary) },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = placaExpandida) },
                                 modifier = Modifier.fillMaxWidth().menuAnchor(),
@@ -443,55 +443,9 @@ actual fun IniciarViagemScreen(
                             modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
 
-                        Spacer(Modifier.height(12.dp))
-
-                        OutlinedTextField(
-                            value = pesoCarga,
-                            onValueChange = { newValue ->
-                                val digits = newValue.text.filter { c -> c.isDigit() }.take(5)
-                                val formatted = formatarPeso(digits)
-
-                                // Atualiza com cursor sempre no final
-                                pesoCarga = TextFieldValue(
-                                    text = formatted,
-                                    selection = TextRange(formatted.length)
-                                )
-                            },
-                            label = { Text("Peso da Carga (kg) *") },
-                            leadingIcon = { Icon(Icons.Default.Scale, null, tint = AppColors.Primary) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true
-                        )
-
-                        Spacer(Modifier.height(12.dp))
-
-                        OutlinedTextField(
-                            value = valorFrete,
-                            onValueChange = { newValue ->
-                                // Remove tudo exceto dígitos
-                                val digits = newValue.text.filter { c -> c.isDigit() }.take(9)
-                                val formatted = formatarValor(digits)
-
-                                // Atualiza com cursor sempre no final
-                                valorFrete = TextFieldValue(
-                                    text = formatted,
-                                    selection = TextRange(formatted.length)
-                                )
-                            },
-                            label = { Text("Valor do Frete (R\$)") },
-                            leadingIcon = { Icon(Icons.Default.AttachMoney, null, tint = AppColors.Primary) },
-                            placeholder = { Text("0,00") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true
-                        )
-
                         Spacer(Modifier.height(16.dp))
 
-                        Text("Foto do Painel de Saída *", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                        Text("Foto do Hodômetro na Saída *", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
 
                         if (cameraState.hasPhoto) {
@@ -536,6 +490,52 @@ actual fun IniciarViagemScreen(
                                 }
                             }
                         }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        OutlinedTextField(
+                            value = pesoCarga,
+                            onValueChange = { newValue ->
+                                val digits = newValue.text.filter { c -> c.isDigit() }.take(5)
+                                val formatted = formatarPeso(digits)
+
+                                // Atualiza com cursor sempre no final
+                                pesoCarga = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
+                            label = { Text("Peso da Carga (kg) *") },
+                            leadingIcon = { Icon(Icons.Default.Scale, null, tint = AppColors.Primary) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+
+                        OutlinedTextField(
+                            value = valorFrete,
+                            onValueChange = { newValue ->
+                                // Remove tudo exceto dígitos
+                                val digits = newValue.text.filter { c -> c.isDigit() }.take(9)
+                                val formatted = formatarValor(digits)
+
+                                // Atualiza com cursor sempre no final
+                                valorFrete = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
+                            label = { Text("Valor do Frete (R\$)") },
+                            leadingIcon = { Icon(Icons.Default.AttachMoney, null, tint = AppColors.Primary) },
+                            placeholder = { Text("0,00") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
+                        )
 
                         Spacer(Modifier.height(24.dp))
 
@@ -692,7 +692,7 @@ actual fun IniciarViagemScreen(
                             } else {
                                 Icon(Icons.Default.Save, null)
                                 Spacer(Modifier.width(8.dp))
-                                Text("SALVAR VIAGEM", fontWeight = FontWeight.Bold)
+                                Text("INICIAR VIAGEM", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
