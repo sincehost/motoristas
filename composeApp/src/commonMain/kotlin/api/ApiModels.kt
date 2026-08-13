@@ -229,7 +229,11 @@ data class ResumoViagem(
     val saldo_viagem: Double = 0.0,
     val descricao: String = "",
     val foto_painel_saida: String = "",
-    val foto_painel_chegada: String = ""
+    val foto_painel_chegada: String = "",
+    val pesocarga: String = "",
+    val pesocarga_retorno: String = "",
+    val ordem_retorno: String = "",
+    val cte_retorno: String = ""
 )
 
 @Serializable

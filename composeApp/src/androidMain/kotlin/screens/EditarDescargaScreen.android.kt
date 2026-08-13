@@ -180,7 +180,12 @@ actual fun EditarDescargaScreen(
                         data = converterDataParaAPI(data),
                         placa = placaSelecionada!!,
                         ordem_descarga = ordemDescarga.toIntOrNull() ?: 0,
-                        valor = valor.text.replace(",", "."),
+                        // Envia mascarado em BR ("60,00") direto — é o
+                        // servidor que converte pra decimal. Convertendo
+                        // aqui antes o servidor reprocessava um valor sem
+                        // vírgula, inflando o valor (removia o "." como se
+                        // fosse separador de milhar).
+                        valor = valor.text,
                         foto = cameraState.base64
                     )
                 )

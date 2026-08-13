@@ -779,6 +779,7 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
 
                         LinhaResumo("Rota:", resumo!!.destino_nome)
                         LinhaResumo("Ordem de Frete:", resumo!!.numerobd)
+                        LinhaResumo("Peso da Carga:", formatarPesoView(resumo!!.pesocarga.toDoubleOrNull()?.toLong()?.toString() ?: resumo!!.pesocarga.filter { it.isDigit() }) + " kg")
                         LinhaResumo("Data Início:", formatarData(resumo!!.data_viagem))
                         LinhaResumoDataChegada(resumo!!.data_chegada)
                         LinhaResumo("KM Início:", formatarKmExibicao(resumo!!.km_inicio))
@@ -842,7 +843,32 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         Spacer(Modifier.height(16.dp))
 
                         LinhaResumo("Valor Frete:", formatarMoeda(resumo!!.valor_frete))
-                        LinhaResumo("Frete Retorno:", formatarMoeda(resumo!!.valor_frete_retorno))
+
+                        // Dados de retorno só aparecem se realmente houver carga de
+                        // retorno cadastrada nessa viagem — senão fica tudo vazio/zerado
+                        // poluindo o resumo à toa.
+                        val temRetorno = resumo!!.pesocarga_retorno.toDoubleOrNull()?.let { it > 0 } == true ||
+                            resumo!!.ordem_retorno.isNotBlank() ||
+                            resumo!!.cte_retorno.isNotBlank() ||
+                            resumo!!.valor_frete_retorno > 0
+                        if (temRetorno) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("Retorno", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = AppColors.TextSecondary)
+                            if (resumo!!.pesocarga_retorno.isNotBlank()) {
+                                LinhaResumo(
+                                    "Peso da Carga de Retorno:",
+                                    formatarPesoView(resumo!!.pesocarga_retorno.toDoubleOrNull()?.toLong()?.toString() ?: resumo!!.pesocarga_retorno.filter { it.isDigit() }) + " kg"
+                                )
+                            }
+                            if (resumo!!.ordem_retorno.isNotBlank()) {
+                                LinhaResumo("Ordem de Frete de Retorno:", resumo!!.ordem_retorno)
+                            }
+                            if (resumo!!.cte_retorno.isNotBlank()) {
+                                LinhaResumo("CT-e de Retorno:", resumo!!.cte_retorno)
+                            }
+                            LinhaResumo("Frete Retorno:", formatarMoeda(resumo!!.valor_frete_retorno))
+                        }
+
                         LinhaResumo("Total Frete:", formatarMoeda(resumo!!.saldo_frete))
                         LinhaResumoDestaque("Saldo Viagem:", formatarMoeda(resumo!!.saldo_viagem), if (resumo!!.saldo_viagem >= 0) AppColors.Secondary else AppColors.Error)
 
