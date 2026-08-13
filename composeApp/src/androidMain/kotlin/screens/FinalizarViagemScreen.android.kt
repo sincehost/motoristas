@@ -262,7 +262,7 @@ actual fun FinalizarViagemScreen(
                         "• KM Chegada digitado: ${formatarKmExibicao(kmChegadaNum)}\n" +
                         "• KM Percorrido: ${formatarKmExibicao(kmPercorrido)} km\n" +
                         "• KM da Rota: ${formatarKmExibicao(kmRotaEsperado)} km\n\n" +
-                        "O km percorrido é ${"%.1f".format(kmPercorrido / kmRotaEsperado)}x maior que a rota. " +
+                        "O km percorrido é ${formatarKmExibicao(kmPercorrido / kmRotaEsperado)}x maior que a rota. " +
                         "O KM esperado seria próximo de ${formatarKmExibicao(kmEsperadoFinal)}.\n\n" +
                         "Verifique se digitou corretamente."
                 return
