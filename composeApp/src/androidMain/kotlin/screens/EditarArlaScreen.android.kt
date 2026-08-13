@@ -45,6 +45,9 @@ import util.DateInputField
 import util.rememberCameraState
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
+import util.formatarKmExibicao
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -78,7 +81,7 @@ actual fun EditarArlaScreen(
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var litros by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var posto by rememberSaveable { mutableStateOf("") }
-    var kmPosto by rememberSaveable { mutableStateOf("") }
+    var kmPosto by remember { mutableStateOf(TextFieldValue("")) }
 
     // Foto
     val cameraState = rememberCameraState(context, prefix = "ARLA_EDIT")
@@ -110,7 +113,8 @@ actual fun EditarArlaScreen(
                 valor = TextFieldValue(formatarDecimalParaExibicao(arla.valor))
                 litros = TextFieldValue(formatarDecimalParaExibicao(arla.litros))
                 posto = arla.posto
-                kmPosto = arla.km_posto
+                val kmPostoTexto = arla.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: arla.km_posto
+                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(kmPostoTexto.length))
 
                 // Carrega foto se existir
 
@@ -159,7 +163,7 @@ actual fun EditarArlaScreen(
     fun atualizarArla() {
         // Validação
         if (posto.isEmpty()) { erro = "Informe o nome do posto"; return }
-        if (kmPosto.isEmpty()) { erro = "Informe o KM do posto"; return }
+        if (kmPosto.text.isEmpty()) { erro = "Informe o KM do posto"; return }
         if (litros.text.isEmpty()) { erro = "Informe os litros"; return }
         if (valor.text.isEmpty()) { erro = "Informe o valor"; return }
 
@@ -170,19 +174,18 @@ actual fun EditarArlaScreen(
                 val response = api.ApiClient.atualizarArla(
                     api.AtualizarArlaRequest(
                         arla_id = arlaId,
+                        motorista_id = motorista?.motorista_id ?: "",
                         data = converterDataParaAPI(data),
-                        valor = valor.text.replace(",", ".").toDouble(),
-                        litros = litros.text.replace(",", ".").toDouble(),
+                        valor = valor.text,
+                        litros = litros.text,
                         posto = posto,
-                        km_posto = kmPosto,
+                        km_posto = normalizarKmParaEnvio(kmPosto.text),
                         foto = cameraState.base64
                     )
                 )
 
                 if (response.status == "ok") {
                     sucesso = "ARLA atualizado com sucesso!"
-                    kotlinx.coroutines.delay(1500)
-                    onVoltar()
                 } else {
                     erro = response.mensagem ?: "Erro ao atualizar"
                 }
@@ -192,6 +195,14 @@ actual fun EditarArlaScreen(
             }
             salvando = false
         }
+    }
+
+    // Diálogos modais de erro e sucesso
+    if (erro != null) {
+        ui.ErroDialog(mensagem = erro!!, onDismiss = { erro = null })
+    }
+    if (sucesso != null) {
+        ui.SucessoDialog(mensagem = sucesso!!, onDismiss = { sucesso = null; onVoltar() })
     }
 
     Scaffold(
@@ -293,11 +304,24 @@ actual fun EditarArlaScreen(
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = kmPosto,
-                            onValueChange = { kmPosto = it.filter { c -> c.isDigit() } },
+                            onValueChange = { newValue ->
+                                val formatted = formatarKmInput(newValue.text)
+                                kmPosto = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            leadingIcon = { Icon(Icons.Default.Speed, null, tint = AppColors.Primary) }
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            leadingIcon = { Icon(Icons.Default.Speed, null, tint = AppColors.Primary) },
+                            placeholder = { Text("Ex.: 115670.5") }
+                        )
+                        Text(
+                            "Digite como aparece no painel. Ex.: 115670.5",
+                            fontSize = 12.sp,
+                            color = AppColors.Primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
 
                         Spacer(Modifier.height(16.dp))
@@ -349,29 +373,6 @@ actual fun EditarArlaScreen(
                         Text("Foto do Comprovante *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
                         FotoCapturaArla(foto = cameraState.bitmap, onClick = { tirarFoto() }, onRemover = { cameraState.clear() })
-
-                        // Mensagens
-                        erro?.let {
-                            Spacer(Modifier.height(16.dp))
-                            Card(colors = CardDefaults.cardColors(containerColor = AppColors.Error.copy(alpha = 0.1f))) {
-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Error, null, tint = AppColors.Error)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(it, color = AppColors.Error)
-                                }
-                            }
-                        }
-
-                        sucesso?.let {
-                            Spacer(Modifier.height(16.dp))
-                            Card(colors = CardDefaults.cardColors(containerColor = if (ui.isDark()) AppColors.SurfaceVariant else AppColors.Secondary.copy(alpha = 0.1f))) {
-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.CheckCircle, null, tint = AppColors.Secondary)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(it, color = AppColors.Secondary)
-                                }
-                            }
-                        }
 
                         Spacer(Modifier.height(24.dp))
 

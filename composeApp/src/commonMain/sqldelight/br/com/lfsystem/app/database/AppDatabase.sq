@@ -253,6 +253,7 @@ CREATE TABLE Abastecimento (
     data TEXT NOT NULL,
     valor TEXT NOT NULL,
     litros TEXT NOT NULL,
+    valor_litro TEXT NOT NULL DEFAULT '',
     posto TEXT NOT NULL,
     km_posto TEXT NOT NULL,
     foto TEXT,
@@ -283,6 +284,7 @@ INSERT INTO Abastecimento (
     data,
     valor,
     litros,
+    valor_litro,
     posto,
     km_posto,
     foto,
@@ -291,7 +293,7 @@ INSERT INTO Abastecimento (
     tipo_combustivel,
     horas,
     sincronizado
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
 marcarAbastecimentoSincronizado:
 UPDATE Abastecimento SET sincronizado = 1 WHERE id = ?;
 

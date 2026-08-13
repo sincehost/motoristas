@@ -46,6 +46,8 @@ import util.CameraHelper
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
@@ -180,7 +182,7 @@ actual fun IniciarViagemScreen(
     var placaSelecionada by remember { mutableStateOf<String?>(null) }
 
     var dataViagem by remember { mutableStateOf(dataAtualFormatada()) }
-    var kmInicio by remember { mutableStateOf("") }
+    var kmInicio by remember { mutableStateOf(TextFieldValue("")) }
     var pesoCarga by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var valorFrete by remember { mutableStateOf(TextFieldValue("0,00", selection = TextRange(4))) }
 
@@ -528,21 +530,34 @@ actual fun IniciarViagemScreen(
 
                         OutlinedTextField(
                             value = kmInicio,
-                            onValueChange = { kmInicio = it.filter { c -> c.isDigit() } },
+                            onValueChange = { newValue ->
+                                val formatted = formatarKmInput(newValue.text)
+                                kmInicio = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
                             label = { Text("KM de Início *") },
+                            placeholder = { Text("Ex.: 115670.5") },
                             leadingIcon = {
                                 Icon(Icons.Default.Speed, null, tint = AppColors.Primary)
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
                             keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number,
+                                keyboardType = KeyboardType.Decimal,
                                 imeAction = ImeAction.Next
                             ),
                             keyboardActions = KeyboardActions(
                                 onNext = { }
                             ),
                             singleLine = true
+                        )
+                        Text(
+                            "Digite como aparece no painel. Ex.: 115670.5",
+                            fontSize = 12.sp,
+                            color = AppColors.Primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
 
                         Spacer(Modifier.height(12.dp))
@@ -718,7 +733,7 @@ actual fun IniciarViagemScreen(
                                         mostrarMensagem("Informe a Data da Viagem", isErro = true)
                                         return@launch
                                     }
-                                    if (kmInicio.isBlank()) {
+                                    if (kmInicio.text.isBlank()) {
                                         mostrarMensagem("Informe o KM de Início", isErro = true)
                                         return@launch
                                     }
@@ -738,15 +753,16 @@ actual fun IniciarViagemScreen(
                                     val dataCriacao = isoFormatter.stringFromDate(NSDate())
 
                                     val dataViagemAPI = converterDataParaAPI(dataViagem)
+                                    val kmInicioNormalizado = normalizarKmParaEnvio(kmInicio.text)
 
-                                    // Converte valor do frete para decimal para API
+                                    // Envia o valor mascarado em BR ("17.000,00") direto, igual todo
+                                    // outro campo de valor do app — é o servidor que converte pra
+                                    // decimal (str_replace ponto/vírgula). Converter aqui pra decimal
+                                    // ANTES de enviar fazia o servidor reprocessar um valor que já
+                                    // não tinha separador de milhar, inflando em 100x (17000.00 virava
+                                    // 1700000 ao remover o "." como se fosse separador de milhar).
                                     val valorFreteParaAPI = if (valorFrete.text.isNotBlank() && valorFrete.text != "0,00") {
-                                        // Remove pontos e vírgula, mantém apenas dígitos
-                                        val valorLimpo = valorFrete.text.replace(".", "").replace(",", "")
-                                        val valorInt = valorLimpo.toIntOrNull() ?: 0
-                                        val reais = valorInt / 100
-                                        val centavos = valorInt % 100
-                                        "${reais}.${centavos.toString().padStart(2, '0')}"
+                                        valorFrete.text
                                     } else {
                                         null
                                     }
@@ -762,7 +778,7 @@ actual fun IniciarViagemScreen(
                                                 cte2 = cte2.ifBlank { null },
                                                 destino_id = destinoSelecionado!!.first.toInt(),
                                                 data_viagem = dataViagemAPI,
-                                                km_inicio = kmInicio,
+                                                km_inicio = kmInicioNormalizado,
                                                 placa = placaSelecionada ?: "",
                                                 pesocarga = pesoCarga.text,
                                                 valorfrete = valorFreteParaAPI,
@@ -776,7 +792,7 @@ actual fun IniciarViagemScreen(
                                                 viagemId = viagemIdReal.toLong(),
                                                 destino = destinoSelecionado!!.second,
                                                 dataInicio = dataViagemAPI,
-                                                kmInicio = kmInicio
+                                                kmInicio = kmInicioNormalizado
                                             )
                                             sucessoMsg = "Viagem registrada com sucesso!"
                                         } else {
@@ -813,7 +829,7 @@ actual fun IniciarViagemScreen(
                                             destinoNome = destinoSelecionado!!.second,
                                             placa = placaSelecionada ?: "",
                                             dataViagem = dataViagemAPI,
-                                            kmInicio = kmInicio,
+                                            kmInicio = kmInicioNormalizado,
                                             pesoCarga = pesoCarga.text,
                                             valorFrete = valorFreteParaAPI,
                                             fotoPainelSaida = fotoBase64,
@@ -826,7 +842,7 @@ actual fun IniciarViagemScreen(
                                             viagemId = -idLocal,
                                             destino = destinoSelecionado!!.second,
                                             dataInicio = dataViagemAPI,
-                                            kmInicio = kmInicio
+                                            kmInicio = kmInicioNormalizado
                                         )
                                         sucessoMsg = "Sem internet. Viagem salva e será sincronizada automaticamente quando conectar."
                                     }

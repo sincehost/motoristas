@@ -38,6 +38,9 @@ import util.CameraHelper
 import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.converterDataParaExibicao
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
+import util.formatarKmExibicao
 
 // Delegate da câmera nativa iOS - fora do @Composable - suporta as duas fotos (marcador/cupom)
 private class EditarCombustivelCameraDelegate(
@@ -157,7 +160,7 @@ actual fun EditarCombustivelScreen(
     var placa by remember { mutableStateOf("") }
     var data by remember { mutableStateOf("") }
     var nomePosto by remember { mutableStateOf("") }
-    var kmPosto by remember { mutableStateOf("") }
+    var kmPosto by remember { mutableStateOf(TextFieldValue("")) }
     var tipoCombustivel by remember { mutableStateOf("Diesel Caminhão") }
     var horas by remember { mutableStateOf("") }
     var litros by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
@@ -181,11 +184,16 @@ actual fun EditarCombustivelScreen(
             if (response.status == "ok" && response.abastecimento != null) {
                 val a = response.abastecimento
                 destino = a.destino; dataViagem = a.data_viagem; placa = a.placa
-                data = converterDataParaExibicao(a.data_abastecimento); nomePosto = a.nome_posto; kmPosto = a.km_posto
+                data = converterDataParaExibicao(a.data_abastecimento); nomePosto = a.nome_posto
+                val kmPostoTexto = a.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: a.km_posto
+                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(kmPostoTexto.length))
                 tipoCombustivel = a.tipo_combustivel; horas = a.horas
-                litros = TextFieldValue(a.litros_abastecidos, selection = TextRange(a.litros_abastecidos.length))
-                valorLitro = TextFieldValue(a.valor_litro, selection = TextRange(a.valor_litro.length))
-                valorTotal = TextFieldValue(a.valor_total, selection = TextRange(a.valor_total.length))
+                val litrosTexto = formatarDecimalParaExibicaoComb(a.litros_abastecidos)
+                litros = TextFieldValue(litrosTexto, selection = TextRange(litrosTexto.length))
+                val valorLitroTexto = formatarDecimalParaExibicaoComb(a.valor_litro)
+                valorLitro = TextFieldValue(valorLitroTexto, selection = TextRange(valorLitroTexto.length))
+                val valorTotalTexto = formatarDecimalParaExibicaoComb(a.valor_total)
+                valorTotal = TextFieldValue(valorTotalTexto, selection = TextRange(valorTotalTexto.length))
                 tipoPagamento = a.forma_pagamento.lowercase()
                 fotoMarcadorBase64 = a.foto_marcador; fotoCupomBase64 = a.foto_cupom
             } else {
@@ -236,7 +244,7 @@ actual fun EditarCombustivelScreen(
 
     fun salvar() {
         if (nomePosto.isBlank()) { erroMsg = "Informe o posto"; return }
-        if (kmPosto.isBlank()) { erroMsg = "Informe o KM"; return }
+        if (kmPosto.text.isBlank()) { erroMsg = "Informe o KM"; return }
         if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L && horas.isBlank()) { erroMsg = "Informe as horas"; return }
         if (litros.text.isBlank()) { erroMsg = "Informe os litros"; return }
         if (valorLitro.text.isBlank()) { erroMsg = "Informe o valor do litro"; return }
@@ -249,9 +257,13 @@ actual fun EditarCombustivelScreen(
                     api.AtualizarAbastecimentoRequest(
                         abastecimento_id = abastecimentoId, motorista_id = motorista?.motorista_id ?: "",
                         viagem_id = viagemId, placa = placa, data_abastecimento = converterDataParaAPI(data),
-                        nome_posto = nomePosto, km_posto = kmPosto, tipo_combustivel = tipoCombustivel,
-                        horas = horas, litros_abastecidos = litros.text.replace(",", "."),
-                        valor_litro = valorLitro.text.replace(",", "."), valor_total = valorTotal.text.replace(",", "."),
+                        nome_posto = nomePosto, km_posto = normalizarKmParaEnvio(kmPosto.text), tipo_combustivel = tipoCombustivel,
+                        // Envia mascarado em BR ("15,00") direto — é o servidor
+                        // que converte pra decimal. Convertendo aqui antes o
+                        // servidor reprocessava um valor sem vírgula, inflando
+                        // em 100x (removia o "." como se fosse milhar).
+                        horas = horas, litros_abastecidos = litros.text,
+                        valor_litro = valorLitro.text, valor_total = valorTotal.text,
                         forma_pagamento = tipoPagamento, foto_cupom = fotoCupomBase64, foto_marcador = fotoMarcadorBase64
                     )
                 )
@@ -303,9 +315,19 @@ actual fun EditarCombustivelScreen(
                             leadingIcon = { Icon(Icons.Default.LocalGasStation, null) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                         Spacer(Modifier.height(12.dp))
 
-                        OutlinedTextField(kmPosto, { kmPosto = it.filter { c -> c.isDigit() } }, label = { Text("KM no posto") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        OutlinedTextField(kmPosto, { newValue ->
+                                val formatted = formatarKmInput(newValue.text)
+                                kmPosto = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
+                            }, label = { Text("KM no posto") },
+                            placeholder = { Text("Ex.: 115670.5") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+                        Text(
+                            "Digite como aparece no painel. Ex.: 115670.5",
+                            fontSize = 12.sp,
+                            color = AppColors.Primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                        )
                         Spacer(Modifier.height(12.dp))
 
                         // Foto Quilometragem
@@ -404,4 +426,22 @@ actual fun EditarCombustivelScreen(
             }
         }
     }
+}
+
+/**
+ * Converte um decimal puro vindo do servidor ("15.00") pra máscara BR
+ * ("15,00") igual todo campo de valor do app. Usa aritmética inteira
+ * (centavos) em vez de string do Double, evitando artefato de ponto
+ * flutuante.
+ */
+private fun formatarDecimalParaExibicaoComb(valorServidor: String?): String {
+    if (valorServidor.isNullOrBlank()) return ""
+    val numero = valorServidor.replace(",", ".").toDoubleOrNull() ?: return valorServidor
+    val centavosTotal = kotlin.math.round(numero * 100).toLong()
+    val negativo = centavosTotal < 0
+    val abs = kotlin.math.abs(centavosTotal)
+    val inteiro = abs / 100
+    val centavos = abs % 100
+    val inteiroFormatado = inteiro.toString().reversed().chunked(3).joinToString(".").reversed()
+    return (if (negativo) "-" else "") + "$inteiroFormatado,${centavos.toString().padStart(2, '0')}"
 }

@@ -44,6 +44,8 @@ import ui.GradientTopBar
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -70,8 +72,8 @@ actual fun ManutencaoScreen(
     var descricaoServico by rememberSaveable { mutableStateOf("") }
     var localManutencao by rememberSaveable { mutableStateOf("") }
     var valor by rememberSaveableTextField("")
-    var kmTrocaOleo by rememberSaveable { mutableStateOf("") }
-    var kmTrocaPneu by rememberSaveable { mutableStateOf("") }
+    var kmTrocaOleo by rememberSaveableTextField("")
+    var kmTrocaPneu by rememberSaveableTextField("")
 
     // Estados para fotos
     val cameraState1 = rememberCameraState(context, prefix = "MANUT_1")
@@ -198,9 +200,9 @@ actual fun ManutencaoScreen(
         // Validações
         if (placaSelecionada.isBlank()) { erro = "Selecione uma placa"; return }
         if (valor.text.isEmpty()) { erro = "Informe o valor"; return }
-        if (servicoSelecionado == "Troca de Óleo" && kmTrocaOleo.isBlank()) { erro = "Informe o KM da troca de óleo"; return }
+        if (servicoSelecionado == "Troca de Óleo" && kmTrocaOleo.text.isBlank()) { erro = "Informe o KM da troca de óleo"; return }
         if (servicoSelecionado == "Troca de Pneu") {
-            if (kmTrocaPneu.isBlank()) { erro = "Informe o KM da troca de pneu"; return }
+            if (kmTrocaPneu.text.isBlank()) { erro = "Informe o KM da troca de pneu"; return }
             if (parsePneus().isEmpty()) { erro = "Selecione pelo menos um pneu"; return }
             for (pneu in parsePneus()) {
                 if (parseTipos()[pneu].isNullOrBlank()) { erro = "Selecione o tipo para o pneu $pneu"; return }
@@ -212,6 +214,8 @@ actual fun ManutencaoScreen(
             erro = null
 
             val dataManutencaoAPI = converterDataParaAPI(dataManutencao)
+            val kmTrocaOleoNormalizado = if (servicoSelecionado == "Troca de Óleo") normalizarKmParaEnvio(kmTrocaOleo.text) else null
+            val kmTrocaPneuNormalizado = if (servicoSelecionado == "Troca de Pneu") normalizarKmParaEnvio(kmTrocaPneu.text) else null
 
             try {
                 val viagemAtual = repository.getViagemAtual()
@@ -228,8 +232,8 @@ actual fun ManutencaoScreen(
                             descricao_servico = descricaoServico,
                             local_manutencao = localManutencao,
                             valor = valor.text,
-                            km_troca_oleo = if (servicoSelecionado == "Troca de Óleo") kmTrocaOleo else null,
-                            km_troca_pneu = if (servicoSelecionado == "Troca de Pneu") kmTrocaPneu else null,
+                            km_troca_oleo = kmTrocaOleoNormalizado,
+                            km_troca_pneu = kmTrocaPneuNormalizado,
                             pneus = parsePneus().toList(),
                             tipos_pneu = parseTipos(),
                             foto_comprovante1 = cameraState1.base64,
@@ -251,8 +255,8 @@ actual fun ManutencaoScreen(
                         descricaoServico = descricaoServico,
                         localManutencao = localManutencao,
                         valor = valor.text,
-                        kmTrocaOleo = if (servicoSelecionado == "Troca de Óleo") kmTrocaOleo else null,
-                        kmTrocaPneu = if (servicoSelecionado == "Troca de Pneu") kmTrocaPneu else null,
+                        kmTrocaOleo = kmTrocaOleoNormalizado,
+                        kmTrocaPneu = kmTrocaPneuNormalizado,
                         pneus = pneusSelecionadosStr,
                         tiposPneu = tiposPneuStr,
                         fotoComprovante1 = cameraState1.base64,
@@ -386,13 +390,25 @@ actual fun ManutencaoScreen(
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = kmTrocaOleo,
-                            onValueChange = { kmTrocaOleo = it.filter { c -> c.isDigit() } },
+                            onValueChange = { newValue ->
+                                val formatted = formatarKmInput(newValue.text)
+                                kmTrocaOleo = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF8B5CF6)) },
-                            placeholder = { Text("Ex: 150000", color = Color(0xFF9CA3AF)) },
+                            placeholder = { Text("Ex.: 115670.5", color = Color(0xFF9CA3AF)) },
                             singleLine = true
+                        )
+                        Text(
+                            "Digite como aparece no painel. Ex.: 115670.5",
+                            fontSize = 12.sp,
+                            color = AppColors.Primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
                     }
 
@@ -403,13 +419,25 @@ actual fun ManutencaoScreen(
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = kmTrocaPneu,
-                            onValueChange = { kmTrocaPneu = it.filter { c -> c.isDigit() } },
+                            onValueChange = { newValue ->
+                                val formatted = formatarKmInput(newValue.text)
+                                kmTrocaPneu = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF8B5CF6)) },
-                            placeholder = { Text("Ex: 150000", color = Color(0xFF9CA3AF)) },
+                            placeholder = { Text("Ex.: 115670.5", color = Color(0xFF9CA3AF)) },
                             singleLine = true
+                        )
+                        Text(
+                            "Digite como aparece no painel. Ex.: 115670.5",
+                            fontSize = 12.sp,
+                            color = AppColors.Primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
                     }
 

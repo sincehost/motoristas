@@ -64,11 +64,13 @@ actual fun EditarOutraDespesaScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
+    var carregando by remember { mutableStateOf(true) }
     var salvando  by remember { mutableStateOf(false) }
     var erro      by remember { mutableStateOf<String?>(null) }
     var sucesso   by remember { mutableStateOf<String?>(null) }
 
-    // Pré-popula com os dados que já vieram do card — sem nenhuma chamada de API
+    // Pré-popula com os dados que já vieram do card — o "buscar" completo
+    // (com foto) roda depois, no LaunchedEffect abaixo.
     var tipoDespesa  by rememberSaveable { mutableStateOf(item.tipo) }
     var descricao    by rememberSaveable { mutableStateOf(item.descricao) }
     var dataDespesa  by rememberSaveable { mutableStateOf(odFormatarDataParaForm(item.data)) }
@@ -96,6 +98,35 @@ actual fun EditarOutraDespesaScreen(
         }
     }
 
+    // Busca os dados completos (com foto) — o item recebido da lista não
+    // tem a foto, só o "buscar" dedicado devolve ela em base64.
+    LaunchedEffect(item.id) {
+        carregando = true
+        try {
+            val response = ApiClient.buscarOutraDespesa(
+                api.BuscarOutraDespesaRequest(
+                    despesa_id = item.id,
+                    motorista_id = motorista?.motorista_id ?: ""
+                )
+            )
+            if (response.status == "ok" && response.despesa != null) {
+                val despesa = response.despesa
+                tipoDespesa = despesa.tipo
+                descricao = despesa.descricao
+                dataDespesa = odFormatarDataParaForm(despesa.data)
+                localDespesa = despesa.local
+                val valorTexto = odFormatarDecimal(despesa.valor)
+                valor = TextFieldValue(valorTexto, selection = TextRange(valorTexto.length))
+                cameraState.loadExisting(despesa.foto)
+            }
+            // Se a busca falhar, mantém os dados básicos já recebidos da
+            // lista (item) — só a foto fica indisponível nesse caso.
+        } catch (e: Exception) {
+            // Offline — mantém os dados básicos já recebidos da lista
+        }
+        carregando = false
+    }
+
     fun salvar() {
         if (tipoDespesa.isEmpty()) { erro = "Selecione o tipo de despesa"; return }
         if (valor.text.isEmpty())  { erro = "Informe o valor"; return }
@@ -105,7 +136,10 @@ actual fun EditarOutraDespesaScreen(
             salvando = true
             erro = null
             try {
-                val valorAPI = valor.text.replace(".", "").replace(",", ".")
+                // Envia mascarado em BR ("10.000,00") direto — é o servidor
+                // que converte pra decimal. Convertendo aqui antes o
+                // servidor reprocessava um valor sem vírgula, inflando o
+                // valor (removia o "." como se fosse separador de milhar).
                 val response = ApiClient.atualizarOutraDespesa(
                     AtualizarOutraDespesaRequest(
                         despesa_id      = item.id,
@@ -113,7 +147,7 @@ actual fun EditarOutraDespesaScreen(
                         viagem_id       = viagemId,
                         tipo            = tipoDespesa,
                         descricao       = descricao.ifEmpty { tipoDespesa },
-                        valor           = valorAPI,
+                        valor           = valor.text,
                         data            = converterDataParaAPI(dataDespesa),
                         local           = localDespesa.ifEmpty { null },
                         foto_comprovante = cameraState.base64
@@ -121,8 +155,6 @@ actual fun EditarOutraDespesaScreen(
                 )
                 if (response.status == "ok") {
                     sucesso = "Despesa atualizada com sucesso!"
-                    kotlinx.coroutines.delay(1500)
-                    onVoltar()
                 } else {
                     erro = response.mensagem ?: "Erro ao atualizar"
                 }
@@ -133,9 +165,22 @@ actual fun EditarOutraDespesaScreen(
         }
     }
 
+    if (erro != null) {
+        ui.ErroDialog(mensagem = erro!!, onDismiss = { erro = null })
+    }
+    if (sucesso != null) {
+        ui.SucessoDialog(mensagem = sucesso!!, onDismiss = { sucesso = null; onVoltar() })
+    }
+
     Scaffold(
         topBar = { GradientTopBar(title = "Editar Despesa", onBackClick = onVoltar) }
     ) { padding ->
+        if (carregando) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = AppColors.Primary)
+            }
+            return@Scaffold
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -281,30 +326,6 @@ actual fun EditarOutraDespesaScreen(
                                 Spacer(Modifier.height(6.dp))
                                 Text("Tirar Foto", color = AppColors.Primary, fontWeight = FontWeight.Bold)
                                 Text("Toque para capturar", color = AppColors.TextSecondary, fontSize = 12.sp)
-                            }
-                        }
-                    }
-
-                    // ── Mensagens ─────────────────────────────────
-                    erro?.let {
-                        Spacer(Modifier.height(14.dp))
-                        Card(colors = CardDefaults.cardColors(containerColor = AppColors.Error.copy(alpha = 0.1f)),
-                            shape = RoundedCornerShape(10.dp)) {
-                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Error, null, tint = AppColors.Error)
-                                Spacer(Modifier.width(8.dp))
-                                Text(it, color = AppColors.Error, fontSize = 14.sp)
-                            }
-                        }
-                    }
-                    sucesso?.let {
-                        Spacer(Modifier.height(14.dp))
-                        Card(colors = CardDefaults.cardColors(containerColor = if (ui.isDark()) AppColors.SurfaceVariant else AppColors.Secondary.copy(alpha = 0.1f)),
-                            shape = RoundedCornerShape(10.dp)) {
-                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.CheckCircle, null, tint = AppColors.Secondary)
-                                Spacer(Modifier.width(8.dp))
-                                Text(it, color = AppColors.Secondary, fontSize = 14.sp)
                             }
                         }
                     }

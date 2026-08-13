@@ -253,6 +253,34 @@ data class ExcluirDespesaResponse(
     val mensagem: String? = null
 )
 
+// ========== OUTRA DESPESA - BUSCAR PARA EDIÇÃO (com foto) ==========
+@Serializable
+data class BuscarOutraDespesaRequest(
+    val despesa_id: Int,
+    val motorista_id: String
+)
+
+@Serializable
+data class BuscarOutraDespesaResponse(
+    val status: String,
+    val mensagem: String? = null,
+    val despesa: OutraDespesaCompleta? = null
+)
+
+@Serializable
+data class OutraDespesaCompleta(
+    val id: Int,
+    val viagem_id: Int,
+    val destino: String,
+    val data_viagem: String,
+    val tipo: String,
+    val descricao: String = "",
+    val valor: String,
+    val data: String,
+    val local: String = "",
+    val foto: String? = null
+)
+
 // ========== ABASTECIMENTO - DETALHES E EDIÇÃO ==========
 @Serializable
 data class DetalheAbastecimentoRequest(
@@ -469,9 +497,18 @@ data class ArlaCompleto(
 @Serializable
 data class AtualizarArlaRequest(
     val arla_id: Int,
+    // Servidor valida que o ARLA pertence a esse motorista antes de editar
+    // — sem mandar isso, a checagem de permissão falhava e o servidor
+    // sempre respondia "Dados incompletos".
+    val motorista_id: String,
     val data: String,
-    val valor: Double,
-    val litros: Double,
+    // String mascarada em BR ("15,00"), igual todo outro campo de valor do
+    // app — o servidor converte pra decimal. Já foi Double aqui, e como o
+    // servidor espera string BR-mascarada (str_replace ponto/vírgula), um
+    // JSON number tipo 150.55 virava "150.55" no PHP e o "." era removido
+    // como se fosse separador de milhar, inflando o valor.
+    val valor: String,
+    val litros: String,
     val posto: String,
     val km_posto: String,
     val foto: String? = null

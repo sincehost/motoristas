@@ -41,6 +41,9 @@ import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.converterDataParaExibicao
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
+import util.formatarKmExibicao
 import kotlin.math.roundToLong
 
 // Delegate da câmera nativa iOS - fora do @Composable - suporta os dois comprovantes
@@ -150,8 +153,8 @@ actual fun EditarManutencaoScreen(
     var descricaoServico by remember { mutableStateOf("") }
     var localManutencao by remember { mutableStateOf("") }
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
-    var kmTrocaOleo by remember { mutableStateOf("") }
-    var kmTrocaPneu by remember { mutableStateOf("") }
+    var kmTrocaOleo by remember { mutableStateOf(TextFieldValue("")) }
+    var kmTrocaPneu by remember { mutableStateOf(TextFieldValue("")) }
     var pneus by remember { mutableStateOf("") }
     var tiposPneu by remember { mutableStateOf("") }
     var fotoComprovante1Base64 by remember { mutableStateOf<String?>(null) }
@@ -228,8 +231,12 @@ actual fun EditarManutencaoScreen(
                 localManutencao = manutencao.local_manutencao ?: ""
                 val valorFormatado = formatarValor(((manutencao.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
                 valor = TextFieldValue(valorFormatado, selection = TextRange(valorFormatado.length))
-                kmTrocaOleo = manutencao.km_troca_oleo ?: ""
-                kmTrocaPneu = manutencao.km_troca_pneu ?: ""
+                val kmTrocaOleoRaw = manutencao.km_troca_oleo ?: ""
+                val kmTrocaOleoTexto = kmTrocaOleoRaw.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmTrocaOleoRaw
+                kmTrocaOleo = TextFieldValue(kmTrocaOleoTexto, selection = TextRange(kmTrocaOleoTexto.length))
+                val kmTrocaPneuRaw = manutencao.km_troca_pneu ?: ""
+                val kmTrocaPneuTexto = kmTrocaPneuRaw.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmTrocaPneuRaw
+                kmTrocaPneu = TextFieldValue(kmTrocaPneuTexto, selection = TextRange(kmTrocaPneuTexto.length))
                 pneus = manutencao.pneus ?: ""
                 tiposPneu = manutencao.tipos_pneu ?: ""
                 fotoComprovante1Base64 = manutencao.foto_comprovante1
@@ -350,25 +357,51 @@ actual fun EditarManutencaoScreen(
 
                         OutlinedTextField(
                             value = kmTrocaOleo,
-                            onValueChange = { kmTrocaOleo = it.filter { c -> c.isDigit() } },
+                            onValueChange = { newValue ->
+                                val formatted = formatarKmInput(newValue.text)
+                                kmTrocaOleo = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
                             label = { Text("KM Troca de Óleo") },
+                            placeholder = { Text("Ex.: 115670.5") },
                             leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF06B6D4)) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true
+                        )
+                        Text(
+                            "Digite como aparece no painel. Ex.: 115670.5",
+                            fontSize = 12.sp,
+                            color = AppColors.Primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
                         Spacer(Modifier.height(12.dp))
 
                         OutlinedTextField(
                             value = kmTrocaPneu,
-                            onValueChange = { kmTrocaPneu = it.filter { c -> c.isDigit() } },
+                            onValueChange = { newValue ->
+                                val formatted = formatarKmInput(newValue.text)
+                                kmTrocaPneu = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
                             label = { Text("KM Troca de Pneu") },
+                            placeholder = { Text("Ex.: 115670.5") },
                             leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF06B6D4)) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true
+                        )
+                        Text(
+                            "Digite como aparece no painel. Ex.: 115670.5",
+                            fontSize = 12.sp,
+                            color = AppColors.Primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
 
                         Spacer(Modifier.height(16.dp))
@@ -399,8 +432,8 @@ actual fun EditarManutencaoScreen(
                                     if (dataManutencao.isBlank()) { mostrarMensagem("Informe a data", isErro = true); return@launch }
                                     if (servico.isBlank()) { mostrarMensagem("Informe o serviço", isErro = true); return@launch }
                                     if (valor.text.isBlank()) { mostrarMensagem("Informe o valor", isErro = true); return@launch }
-                                    if (servico == "Troca de Óleo" && kmTrocaOleo.isBlank()) { mostrarMensagem("Informe o KM da troca de óleo", isErro = true); return@launch }
-                                    if (servico == "Troca de Pneu" && kmTrocaPneu.isBlank()) { mostrarMensagem("Informe o KM da troca de pneu", isErro = true); return@launch }
+                                    if (servico == "Troca de Óleo" && kmTrocaOleo.text.isBlank()) { mostrarMensagem("Informe o KM da troca de óleo", isErro = true); return@launch }
+                                    if (servico == "Troca de Pneu" && kmTrocaPneu.text.isBlank()) { mostrarMensagem("Informe o KM da troca de pneu", isErro = true); return@launch }
 
                                     salvando = true
                                     try {
@@ -415,8 +448,8 @@ actual fun EditarManutencaoScreen(
                                                 descricao_servico = descricaoServico.ifBlank { null },
                                                 local_manutencao = localManutencao.ifBlank { null },
                                                 valor = valor.text,
-                                                km_troca_oleo = kmTrocaOleo.ifBlank { null },
-                                                km_troca_pneu = kmTrocaPneu.ifBlank { null },
+                                                km_troca_oleo = kmTrocaOleo.text.ifBlank { null }?.let { normalizarKmParaEnvio(it) },
+                                                km_troca_pneu = kmTrocaPneu.text.ifBlank { null }?.let { normalizarKmParaEnvio(it) },
                                                 pneus = pneus.ifBlank { null }?.split(",")?.mapNotNull { it.trim().toIntOrNull() },
                                                 tipos_pneu = tiposPneu.ifBlank { null }?.split(";")?.mapNotNull {
                                                     val parts = it.split(":")

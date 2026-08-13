@@ -45,6 +45,9 @@ import util.DateInputField
 import util.rememberCameraState
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
+import util.formatarKmExibicao
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -84,7 +87,7 @@ actual fun EditarCombustivelScreen(
     var placaSelecionada by remember { mutableStateOf<Pair<Long, String>?>(null) }
     var data by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
     var nomePosto by rememberSaveable { mutableStateOf("") }
-    var kmPosto by rememberSaveable { mutableStateOf("") }
+    var kmPosto by remember { mutableStateOf(TextFieldValue("")) }
     var tipoCombustivel by rememberSaveable { mutableStateOf("") }
     var horas by rememberSaveable { mutableStateOf("") }
     var litrosAbastecidos by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
@@ -130,7 +133,8 @@ actual fun EditarCombustivelScreen(
                 placaSelecionada = equipamentos.find { it.second == abast.placa }
                 data = formatarDataBRParaExibicao(abast.data_abastecimento)
                 nomePosto = abast.nome_posto
-                kmPosto = abast.km_posto
+                val kmPostoTexto = abast.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: abast.km_posto
+                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(kmPostoTexto.length))
                 tipoCombustivel = abast.tipo_combustivel
                 horas = abast.horas
                 litrosAbastecidos = TextFieldValue(formatarDecimalParaExibicao(abast.litros_abastecidos))
@@ -202,7 +206,7 @@ actual fun EditarCombustivelScreen(
         // Validação
         if (placaSelecionada == null) { erro = "Selecione uma placa"; return }
         if (nomePosto.isEmpty()) { erro = "Informe o nome do posto"; return }
-        if (kmPosto.isEmpty()) { erro = "Informe o KM no posto"; return }
+        if (kmPosto.text.isEmpty()) { erro = "Informe o KM no posto"; return }
         if (tipoCombustivel.isEmpty()) { erro = "Selecione o tipo de combustível"; return }
         if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L && horas.isEmpty()) { erro = "Informe as horas"; return }
         if (litrosAbastecidos.text.isEmpty()) { erro = "Informe os litros abastecidos"; return }
@@ -224,12 +228,16 @@ actual fun EditarCombustivelScreen(
                         placa = placaSelecionada!!.second,
                         data_abastecimento = converterDataParaAPI(data),
                         nome_posto = nomePosto,
-                        km_posto = kmPosto,
+                        km_posto = normalizarKmParaEnvio(kmPosto.text),
                         tipo_combustivel = tipoCombustivel,
                         horas = horas,
-                        litros_abastecidos = litrosAbastecidos.text.replace(",", "."),
-                        valor_litro = valorLitro.text.replace(",", "."),
-                        valor_total = valorTotal.text.replace(",", "."),
+                        // Envia mascarado em BR ("15,00") direto — é o servidor
+                        // que converte pra decimal. Convertendo aqui antes o
+                        // servidor reprocessava um valor sem vírgula, inflando
+                        // em 100x (removia o "." como se fosse milhar).
+                        litros_abastecidos = litrosAbastecidos.text,
+                        valor_litro = valorLitro.text,
+                        valor_total = valorTotal.text,
                         forma_pagamento = tipoPagamento,
                         foto_cupom = cameraStateCupom.base64,
                         foto_marcador = cameraStateMarcador.base64
@@ -379,11 +387,24 @@ actual fun EditarCombustivelScreen(
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = kmPosto,
-                            onValueChange = { kmPosto = it.filter { c -> c.isDigit() } },
+                            onValueChange = { newValue ->
+                                val formatted = formatarKmInput(newValue.text)
+                                kmPosto = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            placeholder = { Text("Ex.: 115670.5") },
                             leadingIcon = { Icon(Icons.Default.Speed, null, tint = AppColors.Primary) }
+                        )
+                        Text(
+                            "Digite como aparece no painel. Ex.: 115670.5",
+                            fontSize = 12.sp,
+                            color = AppColors.Primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
 
                         Spacer(Modifier.height(16.dp))

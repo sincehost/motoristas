@@ -26,6 +26,8 @@ import ui.AppColors
 import ui.GradientTopBar
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -113,6 +115,7 @@ actual fun ChecklistPosViagemScreen(
     fun salvarChecklist() {
         if (viagemAtual == null) return
         val dataApi = converterDataParaAPI(dataAtualFormatada())
+        val pendKmAtualNormalizado = if (pendKmAtual.isNotBlank()) normalizarKmParaEnvio(pendKmAtual) else null
 
         scope.launch {
             salvando = true
@@ -129,7 +132,7 @@ actual fun ChecklistPosViagemScreen(
                     funcMotorRuido = funcMotorRuido, funcCambioOk = funcCambioOk,
                     pendManutencaoUrgente = pendManutencaoUrgente, pendDescricaoManutencao = pendDescricaoManutencao.ifEmpty { null },
                     pendAbastecimentoNecessario = pendAbastecimentoNecessario, pendTrocaOleoProxima = pendTrocaOleoProxima,
-                    pendKmAtual = pendKmAtual.ifEmpty { null },
+                    pendKmAtual = pendKmAtualNormalizado,
                     observacoes = observacoes.ifEmpty { null }
                 )
 
@@ -150,7 +153,7 @@ actual fun ChecklistPosViagemScreen(
                             func_cambio_ok = if (funcCambioOk) 1 else 0,
                             pend_manutencao_urgente = if (pendManutencaoUrgente) 1 else 0, pend_descricao_manutencao = pendDescricaoManutencao.ifEmpty { null },
                             pend_abastecimento_necessario = if (pendAbastecimentoNecessario) 1 else 0,
-                            pend_troca_oleo_proxima = if (pendTrocaOleoProxima) 1 else 0, pend_km_atual = pendKmAtual.ifEmpty { null },
+                            pend_troca_oleo_proxima = if (pendTrocaOleoProxima) 1 else 0, pend_km_atual = pendKmAtualNormalizado,
                             observacoes = observacoes.ifEmpty { null }
                         )
                     )
@@ -312,7 +315,8 @@ actual fun ChecklistPosViagemScreen(
                     ChecklistItem("Abastecimento necessário", pendAbastecimentoNecessario) { pendAbastecimentoNecessario = it }
                     ChecklistItem("Troca de óleo próxima", pendTrocaOleoProxima) { pendTrocaOleoProxima = it }
                     Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(value = pendKmAtual, onValueChange = { pendKmAtual = it.filter { c -> c.isDigit() } }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), label = { Text("KM atual do veículo") }, leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFFF57F17)) }, placeholder = { Text("Ex: 350000") }, colors = ui.darkTextFieldColors())
+                    OutlinedTextField(value = pendKmAtual, onValueChange = { pendKmAtual = formatarKmInput(it) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), label = { Text("KM atual do veículo") }, leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFFF57F17)) }, placeholder = { Text("Ex.: 350000.5") }, colors = ui.darkTextFieldColors())
+                    Text("Digite como aparece no painel. Ex.: 350000.5", fontSize = 12.sp, color = AppColors.Primary, modifier = Modifier.padding(start = 4.dp, top = 2.dp))
                 }
 
                 Spacer(Modifier.height(16.dp))

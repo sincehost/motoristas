@@ -36,6 +36,9 @@ actual class DatabaseDriverFactory(private val context: Context) {
                     try {
                         db.execSQL("ALTER TABLE Abastecimento ADD COLUMN horas TEXT")
                     } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE Abastecimento ADD COLUMN valor_litro TEXT NOT NULL DEFAULT ''")
+                    } catch (_: Exception) {}
                 }
             }
         )

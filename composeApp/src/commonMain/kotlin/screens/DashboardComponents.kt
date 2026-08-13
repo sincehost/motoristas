@@ -18,6 +18,7 @@ import sync.SyncState
 import sync.SyncStatus
 import ui.AppColors
 import ui.isDark
+import util.formatarKmExibicao
 
 // ===============================
 // CARD DE STATUS DE SINCRONIZAÇÃO
@@ -156,7 +157,8 @@ fun ViagemStatusCard(
                     if (kmInicio.isNotBlank()) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Icon(Icons.Default.Speed, null, modifier = Modifier.size(14.dp), tint = AppColors.TextSecondary)
-                            Text("KM saída: $kmInicio", fontSize = 11.sp, color = AppColors.TextSecondary)
+                            val kmInicioTexto = kmInicio.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmInicio
+                            Text("KM de Início: $kmInicioTexto", fontSize = 11.sp, color = AppColors.TextSecondary)
                         }
                     }
                 }

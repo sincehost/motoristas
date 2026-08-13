@@ -523,7 +523,10 @@ private fun RelatorioItemBadge(label: String, value: String, badgeColor: Color) 
 }
 
 private fun formatNumber(value: Double): String {
-    return String.format("%,.2f", value).replace(",", "X").replace(".", ",").replace("X", ".")
+    // Locale explícito (US) é obrigatório: sem isso, em aparelho com locale
+    // pt-BR o %,.2f já sai formatado em BR e o replace abaixo (que assume
+    // entrada US) inverte de novo, corrompendo o resultado.
+    return String.format(java.util.Locale.US, "%,.2f", value).replace(",", "X").replace(".", ",").replace("X", ".")
 }
 
 private fun formatMoney(value: Double): String {

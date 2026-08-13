@@ -27,6 +27,8 @@ import ui.AppColors
 import ui.GradientTopBar
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -169,20 +171,20 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
     var pendAbastecimentoNecessario by remember { mutableStateOf(false) }; var pendTrocaOleoProxima by remember { mutableStateOf(false) }
     var pendKmAtual by remember { mutableStateOf("") }; var observacoes by remember { mutableStateOf("") }
 
-    fun salvar() { if (viagemAtual == null) return; val d = converterDataParaAPI(dataAtualFormatada()); scope.launch {
+    fun salvar() { if (viagemAtual == null) return; val d = converterDataParaAPI(dataAtualFormatada()); val pendKmAtualNormalizado = if (pendKmAtual.isNotBlank()) normalizarKmParaEnvio(pendKmAtual) else null; scope.launch {
         salvando = true; try { repository.salvarChecklistPos(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id, d, "",
             avariaCarroceria, avariaCabine, avariaPneus, avariaEspelhos, avariaFarois, avariaDescricao.ifEmpty { null },
             posNivelOleo, posNivelAgua, posNivelCombustivel, posNivelArla,
             limpCabineLimpa, limpCarroceriaLimpa, limpBauVazio,
             funcFreiosOk, funcDirecaoOk, funcSuspensaoOk, funcMotorRuido, funcCambioOk,
-            pendManutencaoUrgente, pendDescricaoManutencao.ifEmpty { null }, pendAbastecimentoNecessario, pendTrocaOleoProxima, pendKmAtual.ifEmpty { null },
+            pendManutencaoUrgente, pendDescricaoManutencao.ifEmpty { null }, pendAbastecimentoNecessario, pendTrocaOleoProxima, pendKmAtualNormalizado,
             observacoes.ifEmpty { null })
         try { val r = api.ApiClient.salvarChecklistPos(api.SalvarChecklistPosRequest(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id.toInt(), d, "",
             if(avariaCarroceria)1 else 0, if(avariaCabine)1 else 0, if(avariaPneus)1 else 0, if(avariaEspelhos)1 else 0, if(avariaFarois)1 else 0, avariaDescricao.ifEmpty{null},
             if(posNivelOleo)1 else 0, if(posNivelAgua)1 else 0, if(posNivelCombustivel)1 else 0, if(posNivelArla)1 else 0,
             if(limpCabineLimpa)1 else 0, if(limpCarroceriaLimpa)1 else 0, if(limpBauVazio)1 else 0,
             if(funcFreiosOk)1 else 0, if(funcDirecaoOk)1 else 0, if(funcSuspensaoOk)1 else 0, if(funcMotorRuido)1 else 0, if(funcCambioOk)1 else 0,
-            if(pendManutencaoUrgente)1 else 0, pendDescricaoManutencao.ifEmpty{null}, if(pendAbastecimentoNecessario)1 else 0, if(pendTrocaOleoProxima)1 else 0, pendKmAtual.ifEmpty{null},
+            if(pendManutencaoUrgente)1 else 0, pendDescricaoManutencao.ifEmpty{null}, if(pendAbastecimentoNecessario)1 else 0, if(pendTrocaOleoProxima)1 else 0, pendKmAtualNormalizado,
             observacoes.ifEmpty{null}))
         if (r.status == "ok") { repository.getChecklistsPosParaSincronizar().lastOrNull()?.let { repository.marcarChecklistPosSincronizado(it.id) } }
         } catch (_: Exception) {}
@@ -216,7 +218,8 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
                 if (pendManutencaoUrgente) OutlinedTextField(pendDescricaoManutencao, { pendDescricaoManutencao = it }, label={Text("Descreva")}, modifier=Modifier.fillMaxWidth().padding(top=8.dp), minLines=2, colors = ui.darkTextFieldColors(), shape=RoundedCornerShape(8.dp))
                 CheckItem("Abastecimento necessário", pendAbastecimentoNecessario) { pendAbastecimentoNecessario = it }
                 CheckItem("Troca óleo próxima", pendTrocaOleoProxima) { pendTrocaOleoProxima = it }
-                OutlinedTextField(pendKmAtual, { pendKmAtual = it.filter { c -> c.isDigit() } }, label={Text("KM atual")}, modifier=Modifier.fillMaxWidth().padding(top=8.dp), shape=RoundedCornerShape(8.dp)) }
+                OutlinedTextField(pendKmAtual, { pendKmAtual = formatarKmInput(it) }, label={Text("KM atual")}, placeholder={Text("Ex.: 350000.5")}, modifier=Modifier.fillMaxWidth().padding(top=8.dp), shape=RoundedCornerShape(8.dp))
+                Text("Digite como aparece no painel. Ex.: 350000.5", fontSize = 12.sp, color = AppColors.Primary, modifier = Modifier.padding(start = 4.dp, top = 2.dp)) }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(observacoes, { observacoes = it }, label = { Text("Observações (opcional)") }, modifier = Modifier.fillMaxWidth(), minLines = 3, colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp))
             Spacer(Modifier.height(20.dp))

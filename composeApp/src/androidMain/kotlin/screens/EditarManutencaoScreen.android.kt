@@ -43,6 +43,9 @@ import ui.GradientTopBar
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
+import util.formatarKmExibicao
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -74,8 +77,8 @@ actual fun EditarManutencaoScreen(
     var descricaoServico by rememberSaveable { mutableStateOf("") }
     var localManutencao by rememberSaveable { mutableStateOf("") }
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
-    var kmTrocaOleo by rememberSaveable { mutableStateOf("") }
-    var kmTrocaPneu by rememberSaveable { mutableStateOf("") }
+    var kmTrocaOleo by remember { mutableStateOf(TextFieldValue("")) }
+    var kmTrocaPneu by remember { mutableStateOf(TextFieldValue("")) }
 
     // Estados para fotos
     val cameraState1 = rememberCameraState(context, prefix = "MANUT_1")
@@ -138,8 +141,12 @@ actual fun EditarManutencaoScreen(
                 descricaoServico = manut.descricao_servico ?: ""
                 localManutencao = manut.local_manutencao ?: ""
                 valor = TextFieldValue(formatarDecimalParaExibicao(manut.valor))
-                kmTrocaOleo = manut.km_troca_oleo ?: ""
-                kmTrocaPneu = manut.km_troca_pneu ?: ""
+                val kmTrocaOleoRaw = manut.km_troca_oleo ?: ""
+                val kmTrocaOleoTexto = kmTrocaOleoRaw.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmTrocaOleoRaw
+                kmTrocaOleo = TextFieldValue(kmTrocaOleoTexto, selection = TextRange(kmTrocaOleoTexto.length))
+                val kmTrocaPneuRaw = manut.km_troca_pneu ?: ""
+                val kmTrocaPneuTexto = kmTrocaPneuRaw.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmTrocaPneuRaw
+                kmTrocaPneu = TextFieldValue(kmTrocaPneuTexto, selection = TextRange(kmTrocaPneuTexto.length))
 
                 // Pneus (se for troca de pneu)
                 if (!manut.pneus.isNullOrEmpty()) {
@@ -231,9 +238,9 @@ actual fun EditarManutencaoScreen(
         // Validações
         if (placaSelecionada.isNullOrBlank()) { erro = "Selecione uma placa"; return }
         if (valor.text.isEmpty()) { erro = "Informe o valor"; return }
-        if (servicoSelecionado == "Troca de Óleo" && kmTrocaOleo.isBlank()) { erro = "Informe o KM da troca de óleo"; return }
+        if (servicoSelecionado == "Troca de Óleo" && kmTrocaOleo.text.isBlank()) { erro = "Informe o KM da troca de óleo"; return }
         if (servicoSelecionado == "Troca de Pneu") {
-            if (kmTrocaPneu.isBlank()) { erro = "Informe o KM da troca de pneu"; return }
+            if (kmTrocaPneu.text.isBlank()) { erro = "Informe o KM da troca de pneu"; return }
             if (pneusSelecionados.isEmpty()) { erro = "Selecione pelo menos um pneu"; return }
             for (pneu in pneusSelecionados) {
                 if (tiposPneu[pneu].isNullOrBlank()) { erro = "Selecione o tipo para o pneu $pneu"; return }
@@ -258,8 +265,8 @@ actual fun EditarManutencaoScreen(
                         descricao_servico = descricaoServico,
                         local_manutencao = localManutencao,
                         valor = valor.text,
-                        km_troca_oleo = if (servicoSelecionado == "Troca de Óleo") kmTrocaOleo else null,
-                        km_troca_pneu = if (servicoSelecionado == "Troca de Pneu") kmTrocaPneu else null,
+                        km_troca_oleo = if (servicoSelecionado == "Troca de Óleo") normalizarKmParaEnvio(kmTrocaOleo.text) else null,
+                        km_troca_pneu = if (servicoSelecionado == "Troca de Pneu") normalizarKmParaEnvio(kmTrocaPneu.text) else null,
                         pneus = pneusSelecionados.toList(),
                         tipos_pneu = tiposPneu,
                         foto_comprovante1 = cameraState1.base64,
@@ -269,8 +276,6 @@ actual fun EditarManutencaoScreen(
 
                 if (response.status == "ok") {
                     sucesso = "Manutenção atualizada com sucesso!"
-                    kotlinx.coroutines.delay(1500)
-                    onVoltar()
                 } else {
                     erro = response.mensagem ?: "Erro ao atualizar"
                 }
@@ -280,6 +285,14 @@ actual fun EditarManutencaoScreen(
             }
             salvando = false
         }
+    }
+
+    // Diálogos modais de erro e sucesso
+    if (erro != null) {
+        ui.ErroDialog(mensagem = erro!!, onDismiss = { erro = null })
+    }
+    if (sucesso != null) {
+        ui.SucessoDialog(mensagem = sucesso!!, onDismiss = { sucesso = null; onVoltar() })
     }
 
     Scaffold(
@@ -422,13 +435,25 @@ actual fun EditarManutencaoScreen(
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = kmTrocaOleo,
-                                onValueChange = { kmTrocaOleo = it.filter { c -> c.isDigit() } },
+                                onValueChange = { newValue ->
+                                    val formatted = formatarKmInput(newValue.text)
+                                    kmTrocaOleo = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(formatted.length)
+                                    )
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF8B5CF6)) },
-                                placeholder = { Text("Ex: 150000", color = Color(0xFF9CA3AF)) },
+                                placeholder = { Text("Ex.: 115670.5", color = Color(0xFF9CA3AF)) },
                                 singleLine = true
+                            )
+                            Text(
+                                "Digite como aparece no painel. Ex.: 115670.5",
+                                fontSize = 12.sp,
+                                color = AppColors.Primary,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                             )
                         }
 
@@ -439,13 +464,25 @@ actual fun EditarManutencaoScreen(
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = kmTrocaPneu,
-                                onValueChange = { kmTrocaPneu = it.filter { c -> c.isDigit() } },
+                                onValueChange = { newValue ->
+                                    val formatted = formatarKmInput(newValue.text)
+                                    kmTrocaPneu = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(formatted.length)
+                                    )
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF8B5CF6)) },
-                                placeholder = { Text("Ex: 150000", color = Color(0xFF9CA3AF)) },
+                                placeholder = { Text("Ex.: 115670.5", color = Color(0xFF9CA3AF)) },
                                 singleLine = true
+                            )
+                            Text(
+                                "Digite como aparece no painel. Ex.: 115670.5",
+                                fontSize = 12.sp,
+                                color = AppColors.Primary,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                             )
                         }
 
@@ -573,29 +610,6 @@ actual fun EditarManutencaoScreen(
                             onRemover = { cameraState2.clear() },
                             titulo = "Comprovante 2 (Opcional)"
                         )
-
-                        // Mensagens
-                        erro?.let {
-                            Spacer(Modifier.height(16.dp))
-                            Card(colors = CardDefaults.cardColors(containerColor = AppColors.Error.copy(alpha = 0.1f))) {
-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Error, null, tint = AppColors.Error)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(it, color = AppColors.Error)
-                                }
-                            }
-                        }
-
-                        sucesso?.let {
-                            Spacer(Modifier.height(16.dp))
-                            Card(colors = CardDefaults.cardColors(containerColor = if (ui.isDark()) AppColors.SurfaceVariant else AppColors.Secondary.copy(alpha = 0.1f))) {
-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.CheckCircle, null, tint = AppColors.Secondary)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(it, color = AppColors.Secondary)
-                                }
-                            }
-                        }
 
                         Spacer(Modifier.height(24.dp))
 

@@ -40,6 +40,9 @@ import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.converterDataParaExibicao
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
+import util.formatarKmExibicao
 import kotlin.math.roundToLong
 
 // Delegate da câmera nativa iOS - fora do @Composable
@@ -89,7 +92,7 @@ actual fun EditarArlaScreen(
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var litros by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var posto by remember { mutableStateOf("") }
-    var kmPosto by remember { mutableStateOf("") }
+    var kmPosto by remember { mutableStateOf(TextFieldValue("")) }
 
     var fotoBase64 by remember { mutableStateOf<String?>(null) }
     val fotoBitmap = remember(fotoBase64) { fotoBase64?.let { CameraHelper.base64ToImageBitmap(it) } }
@@ -152,7 +155,8 @@ actual fun EditarArlaScreen(
                 valor = TextFieldValue(valorFormatado, selection = TextRange(valorFormatado.length))
                 litros = TextFieldValue(arla.litros, selection = TextRange(arla.litros.length))
                 posto = arla.posto
-                kmPosto = arla.km_posto
+                val kmPostoTexto = arla.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: arla.km_posto
+                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(kmPostoTexto.length))
                 fotoBase64 = arla.foto
             } else {
                 mostrarMensagem(response.mensagem ?: "ARLA não encontrado", isErro = true)
@@ -265,13 +269,26 @@ actual fun EditarArlaScreen(
 
                         OutlinedTextField(
                             value = kmPosto,
-                            onValueChange = { kmPosto = it.filter { c -> c.isDigit() } },
+                            onValueChange = { newValue ->
+                                val formatted = formatarKmInput(newValue.text)
+                                kmPosto = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
                             label = { Text("KM do Posto *") },
                             leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF06B6D4)) },
+                            placeholder = { Text("Ex.: 115670.5") },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true
+                        )
+                        Text(
+                            "Digite como aparece no painel. Ex.: 115670.5",
+                            fontSize = 12.sp,
+                            color = AppColors.Primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
 
                         Spacer(Modifier.height(16.dp))
@@ -358,18 +375,19 @@ actual fun EditarArlaScreen(
                                     if (valor.text.isBlank()) { mostrarMensagem("Informe o valor", isErro = true); return@launch }
                                     if (litros.text.isBlank()) { mostrarMensagem("Informe os litros", isErro = true); return@launch }
                                     if (posto.isBlank()) { mostrarMensagem("Informe o posto", isErro = true); return@launch }
-                                    if (kmPosto.isBlank()) { mostrarMensagem("Informe o KM do posto", isErro = true); return@launch }
+                                    if (kmPosto.text.isBlank()) { mostrarMensagem("Informe o KM do posto", isErro = true); return@launch }
 
                                     salvando = true
                                     try {
                                         val response = ApiClient.atualizarArla(
                                             AtualizarArlaRequest(
                                                 arla_id = arlaId,
+                                                motorista_id = motorista?.motorista_id ?: "",
                                                 data = converterDataParaAPI(data),
-                                                valor = valor.text.replace(".", "").replace(",", ".").toDouble(),
-                                                litros = litros.text.toDouble(),
+                                                valor = valor.text,
+                                                litros = litros.text,
                                                 posto = posto,
-                                                km_posto = kmPosto,
+                                                km_posto = normalizarKmParaEnvio(kmPosto.text),
                                                 foto = fotoBase64
                                             )
                                         )

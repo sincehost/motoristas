@@ -357,6 +357,14 @@ object ApiClient {
         }.body()
     }
 
+    suspend fun buscarOutraDespesa(request: BuscarOutraDespesaRequest): BuscarOutraDespesaResponse {
+        return client.post("${getBaseUrl()}/despesa/buscar.php") {
+            contentType(ContentType.Application.Json)
+            withAuth()
+            setBody(request)
+        }.body()
+    }
+
     // SUBSTITUIR a função atualizarArla existente por:
     suspend fun atualizarArla(request: AtualizarArlaRequest): AtualizarArlaResponse {
         return client.post("${getBaseUrl()}/arla/atualizar_arla.php") {

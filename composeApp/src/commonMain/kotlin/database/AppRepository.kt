@@ -397,7 +397,8 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         fotoMarcador: String?,
         tipoPagamento: String = "dinheiro",
         tipoCombustivel: String = "Diesel Caminhão",
-        horas: String? = null
+        horas: String? = null,
+        valorLitro: String = ""
     ) {
         queries.insertAbastecimento(
             motoristaId,
@@ -406,6 +407,7 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
             data,
             valor,
             litros,
+            valorLitro,
             posto,
             kmPosto,
             foto,

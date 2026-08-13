@@ -12,6 +12,7 @@ actual class DatabaseDriverFactory {
             // Colunas do Abastecimento
             "ALTER TABLE Abastecimento ADD COLUMN tipo_combustivel TEXT NOT NULL DEFAULT 'Diesel Caminhão'",
             "ALTER TABLE Abastecimento ADD COLUMN horas TEXT",
+            "ALTER TABLE Abastecimento ADD COLUMN valor_litro TEXT NOT NULL DEFAULT ''",
             // Colunas da FinalizacaoViagem (retorno de carga)
             "ALTER TABLE FinalizacaoViagem ADD COLUMN teve_retorno INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE FinalizacaoViagem ADD COLUMN local_carregou TEXT",

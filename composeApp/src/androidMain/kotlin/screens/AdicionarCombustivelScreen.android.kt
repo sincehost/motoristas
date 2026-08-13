@@ -46,6 +46,9 @@ import util.rememberCameraState
 import util.rememberSaveableTextField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
+import util.formatarKmExibicao
 import java.io.File
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
@@ -70,7 +73,6 @@ actual fun AdicionarCombustivelScreen(
     var sucesso by remember { mutableStateOf<String?>(null) }
     var carregando by remember { mutableStateOf(true) }
     var modoOffline by remember { mutableStateOf(false) }
-    var kmInicioViagem by remember { mutableStateOf("") }
 
     // Viagem em andamento (pega automaticamente)
     var viagemEmAndamento by remember { mutableStateOf<api.ViagemAberta?>(null) }
@@ -101,7 +103,6 @@ actual fun AdicionarCombustivelScreen(
                 data = viagemLocal.data_inicio,
                 km_inicio = viagemLocal.km_inicio
             )
-            kmInicioViagem = viagemLocal.km_inicio
             modoOffline = false
             carregando = false
             return@LaunchedEffect
@@ -117,7 +118,6 @@ actual fun AdicionarCombustivelScreen(
             if (response.status == "ok" && response.viagens.isNotEmpty()) {
                 val viagem = response.viagens.first()
                 viagemEmAndamento = viagem
-                kmInicioViagem = viagem.km_inicio
                 // Salva localmente para funcionar offline depois
                 repository.salvarViagemAtual(viagem.id.toLong(), viagem.destino, viagem.data)
                 modoOffline = false
@@ -149,7 +149,7 @@ actual fun AdicionarCombustivelScreen(
         if (placaSelecionadaId >= 0) Pair(placaSelecionadaId, placaSelecionadaNome) else null
     var data by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
     var nomePosto by rememberSaveable { mutableStateOf("") }
-    var kmPosto by rememberSaveable { mutableStateOf("") }
+    var kmPosto by rememberSaveableTextField("")
     var tipoCombustivel by rememberSaveable { mutableStateOf("") }
     var horas by rememberSaveable { mutableStateOf("") }
     var litrosAbastecidos by rememberSaveableTextField("")
@@ -225,7 +225,7 @@ actual fun AdicionarCombustivelScreen(
         if (viagemEmAndamento == null) { erro = "Nenhuma viagem em andamento"; return }
         if (placaSelecionada == null) { erro = "Selecione uma placa"; return }
         if (nomePosto.isEmpty()) { erro = "Informe o nome do posto"; return }
-        if (kmPosto.isEmpty()) { erro = "Informe o KM no posto"; return }
+        if (kmPosto.text.isEmpty()) { erro = "Informe o KM no posto"; return }
         if (tipoCombustivel.isEmpty()) { erro = "Selecione o tipo de combustível"; return }
         if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L && horas.isEmpty()) { erro = "Informe as horas"; return }
         if (litrosAbastecidos.text.isEmpty()) { erro = "Informe os litros abastecidos"; return }
@@ -248,12 +248,13 @@ actual fun AdicionarCombustivelScreen(
                     valor = valorTotal.text,
                     litros = litrosAbastecidos.text,
                     posto = nomePosto,
-                    kmPosto = kmPosto,
+                    kmPosto = normalizarKmParaEnvio(kmPosto.text),
                     foto = cameraStateCupom.base64,
                     fotoMarcador = cameraStateMarcador.base64,
                     tipoPagamento = tipoPagamento,
                     tipoCombustivel = tipoCombustivel,
-                    horas = horas.ifEmpty { null }
+                    horas = horas.ifEmpty { null },
+                    valorLitro = valorLitro.text
                 )
 
                 sucesso = "Abastecimento salvo! Sincronize quando tiver internet."
@@ -419,11 +420,24 @@ actual fun AdicionarCombustivelScreen(
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = kmPosto,
-                                onValueChange = { kmPosto = it.filter { c -> c.isDigit() } },
+                                onValueChange = { newValue ->
+                                    val formatted = formatarKmInput(newValue.text)
+                                    kmPosto = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(formatted.length)
+                                    )
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                placeholder = { Text("Ex.: 115670.5") },
                                 leadingIcon = { Icon(Icons.Default.Speed, null, tint = AppColors.Primary) }
+                            )
+                            Text(
+                                "Digite como aparece no painel. Ex.: 115670.5",
+                                fontSize = 12.sp,
+                                color = AppColors.Primary,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                             )
 
                             Spacer(Modifier.height(16.dp))
@@ -531,73 +545,6 @@ actual fun AdicionarCombustivelScreen(
                                 prefix = { Text("R$ ") },
                                 placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
                             
-
-                            // ★ Card de Consumo km/L (calculado automaticamente)
-                            val kmPostoNum = kmPosto.filter { it.isDigit() }.toLongOrNull() ?: 0L
-                            val kmInicioNum = kmInicioViagem.filter { it.isDigit() }.toLongOrNull() ?: 0L
-                            val litrosNum = try {
-                                litrosAbastecidos.text.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0
-                            } catch (_: Exception) { 0.0 }
-
-                            if (kmPostoNum > 0 && kmInicioNum > 0 && litrosNum > 0 && kmPostoNum > kmInicioNum) {
-                                val distancia = kmPostoNum - kmInicioNum
-                                val kmPorLitro = distancia.toDouble() / litrosNum
-
-                                Spacer(Modifier.height(16.dp))
-
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (kmPorLitro >= 2.5) Color(0xFF10B981).copy(alpha = 0.08f)
-                                                         else if (kmPorLitro >= 1.8) Color(0xFFF59E0B).copy(alpha = 0.08f)
-                                                         else Color(0xFFEF4444).copy(alpha = 0.08f)
-                                    ),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Column(Modifier.fillMaxWidth().padding(14.dp)) {
-                                        Row(
-                                            Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    Icons.Default.Speed, null,
-                                                    tint = if (kmPorLitro >= 2.5) Color(0xFF10B981)
-                                                           else if (kmPorLitro >= 1.8) Color(0xFFF59E0B)
-                                                           else Color(0xFFEF4444),
-                                                    modifier = Modifier.size(22.dp)
-                                                )
-                                                Spacer(Modifier.width(8.dp))
-                                                Text("Consumo Estimado", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = AppColors.TextPrimary)
-                                            }
-                                            Surface(
-                                                color = if (kmPorLitro >= 2.5) Color(0xFF10B981)
-                                                        else if (kmPorLitro >= 1.8) Color(0xFFF59E0B)
-                                                        else Color(0xFFEF4444),
-                                                shape = RoundedCornerShape(16.dp)
-                                            ) {
-                                                Text(
-                                                    String.format("%.2f km/L", kmPorLitro).replace(".", ","),
-                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 14.sp
-                                                )
-                                            }
-                                        }
-                                        Spacer(Modifier.height(8.dp))
-                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("KM percorridos:", fontSize = 12.sp, color = AppColors.TextSecondary)
-                                            Text("$distancia km", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
-                                        }
-                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("KM início da viagem:", fontSize = 12.sp, color = AppColors.TextSecondary)
-                                            Text("$kmInicioNum km", fontSize = 12.sp, color = AppColors.TextSecondary)
-                                        }
-                                    }
-                                }
-                            }
 
                             Spacer(Modifier.height(16.dp))
 

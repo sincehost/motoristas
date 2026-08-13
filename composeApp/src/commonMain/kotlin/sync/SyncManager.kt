@@ -670,13 +670,25 @@ class SyncManager(private val repository: AppRepository) {
                     .firstOrNull { it.servidor_id == abastecimento.equipamento_id }
                     ?.placa ?: ""
             } catch (_: Exception) { "" }
-            val litrosConvertido = abastecimento.litros.replace(".", "").replace(",", ".")
-            val valorConvertido = abastecimento.valor.replace(".", "").replace(",", ".")
-            val valorLitroConvertido = try {
-                val v = valorConvertido.toDoubleOrNull() ?: 0.0
-                val l = litrosConvertido.toDoubleOrNull() ?: 0.0
-                if (l > 0) ((v / l * 100).toLong() / 100.0).toString() else "0.00"
-            } catch (_: Exception) { "0.00" }
+
+            // Envia os valores mascarados em BR ("15,00") direto, igual todo
+            // outro campo de valor do app (ARLA, manutenção, etc.) — é o
+            // servidor que converte pra decimal. Converter aqui ANTES de
+            // enviar fazia o servidor reprocessar um valor que já não tinha
+            // vírgula decimal, inflando em 100x (15,00 virava "15.00" aqui,
+            // depois o servidor removia o "." como se fosse separador de
+            // milhar, virando 1500). valor_litro agora vem do campo que o
+            // motorista realmente digitou (persistido localmente), não mais
+            // calculado a partir de valor/litros.
+            val valorLitroParaEnviar = abastecimento.valor_litro.ifBlank {
+                // Fallback pra registros antigos sincronizados antes dessa
+                // coluna existir: estima a partir de valor/litros.
+                try {
+                    val v = abastecimento.valor.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0
+                    val l = abastecimento.litros.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0
+                    if (l > 0) ((v / l * 100).toLong() / 100.0).toString().replace(".", ",") else "0,00"
+                } catch (_: Exception) { "0,00" }
+            }
 
             LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             LogWriter.log("📤 SINCRONIZANDO ABASTECIMENTO - ID: ${abastecimento.id}")
@@ -684,9 +696,9 @@ class SyncManager(private val repository: AppRepository) {
             LogWriter.log("   equipamento_id: ${abastecimento.equipamento_id} -> placa: '$placaResolvida'")
             LogWriter.log("   tipo_combustivel: ${abastecimento.tipo_combustivel}")
             LogWriter.log("   tipo_pagamento: ${abastecimento.tipo_pagamento}")
-            LogWriter.log("   litros: '${abastecimento.litros}' -> '$litrosConvertido'")
-            LogWriter.log("   valor: '${abastecimento.valor}' -> '$valorConvertido'")
-            LogWriter.log("   valor_litro calculado: $valorLitroConvertido")
+            LogWriter.log("   litros: '${abastecimento.litros}'")
+            LogWriter.log("   valor: '${abastecimento.valor}'")
+            LogWriter.log("   valor_litro: '$valorLitroParaEnviar'")
 
             val resp = comRetry("Abastecimento") { ApiClient.salvarAbastecimento(
                 SalvarAbastecimentoRequest(
@@ -700,9 +712,9 @@ class SyncManager(private val repository: AppRepository) {
                     // sempre minúsculo ("ctf", "dinheiro") — NÃO uppercase aqui, senão
                     // o servidor rejeita com "forma de pagamento inválida".
                     tipo_pagamento = abastecimento.tipo_pagamento,
-                    litros_abastecidos = litrosConvertido,
-                    valor_litro = valorLitroConvertido,
-                    valor = valorConvertido,
+                    litros_abastecidos = abastecimento.litros,
+                    valor_litro = valorLitroParaEnviar,
+                    valor = abastecimento.valor,
                     km_posto = abastecimento.km_posto,
                     horas = abastecimento.horas,
                     cupom_fiscal_base64 = abastecimento.foto,

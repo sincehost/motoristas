@@ -19,10 +19,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
+import util.formatarKmExibicao
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -541,6 +546,7 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
     var loading by remember { mutableStateOf(true) }
     var salvando by remember { mutableStateOf(false) }
     var erro by remember { mutableStateOf<String?>(null) }
+    var sucesso by remember { mutableStateOf<String?>(null) }
 
     var viagem by remember { mutableStateOf<ViagemDetalhe?>(null) }
     var destinos by remember { mutableStateOf<List<DestinoItem>>(emptyList()) }
@@ -555,10 +561,10 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
     var placa by remember { mutableStateOf("") }
     var dataViagem by remember { mutableStateOf("") }
     var dataChegada by remember { mutableStateOf("") }
-    var kmInicio by remember { mutableStateOf("") }
+    var kmInicio by remember { mutableStateOf(TextFieldValue("")) }
     var kmChegada by remember { mutableStateOf("") }
     var kmPosto by remember { mutableStateOf("") }
-    var pesocarga by remember { mutableStateOf("") }
+    var pesocarga by remember { mutableStateOf(TextFieldValue("")) }
     var pesocargaretorno by remember { mutableStateOf("") }
     var valorfrete by remember { mutableStateOf("") }
     var valorfreteretorno by remember { mutableStateOf("") }
@@ -568,16 +574,13 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     // Função para mostrar mensagens
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
-        scope.launch {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(
-                message = mensagem,
-                duration = if (isErro) SnackbarDuration.Long else SnackbarDuration.Short
-            )
+        if (isErro) {
+            erro = mensagem
+        } else {
+            sucesso = mensagem
         }
     }
 
@@ -601,10 +604,19 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                 dataChegada = response.viagem.data_chegada
                 // Servidor devolve decimal puro do banco ("115676.00") — limpa
                 // pra "115676" antes de exibir no campo de edição.
-                kmInicio = response.viagem.km_inicio.toDoubleOrNull()?.toLong()?.toString() ?: response.viagem.km_inicio
-                kmChegada = response.viagem.km_chegada.toDoubleOrNull()?.toLong()?.toString() ?: response.viagem.km_chegada
-                kmPosto = response.viagem.km_posto
-                pesocarga = response.viagem.pesocarga
+                val kmInicioTexto = response.viagem.km_inicio.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: response.viagem.km_inicio
+                kmInicio = TextFieldValue(kmInicioTexto, selection = TextRange(kmInicioTexto.length))
+                kmChegada = response.viagem.km_chegada.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: response.viagem.km_chegada
+                kmPosto = response.viagem.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: response.viagem.km_posto
+                // Servidor devolve decimal puro ("20000.00") — filtrar só
+                // dígitos concatenava a parte decimal junto (virava
+                // "2000000"), estourando o milhar errado ("2.000.000").
+                // Precisa parsear como número primeiro, peso não tem casa
+                // decimal nesse app.
+                val pesoDigitos = response.viagem.pesocarga.toDoubleOrNull()?.toLong()?.toString()
+                    ?: response.viagem.pesocarga.filter { it.isDigit() }
+                val pesocargaTexto = formatarPesoView(pesoDigitos)
+                pesocarga = TextFieldValue(pesocargaTexto, selection = TextRange(pesocargaTexto.length))
                 pesocargaretorno = response.viagem.pesocargaretorno
                 // Servidor devolve decimal puro ("17000.00") — converte pra
                 // máscara BR ("17.000,00") igual todo campo de valor do app,
@@ -634,14 +646,29 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                     viagem_id = viagemId,
                     numerobd = numerobd, numerobd2 = numerobd2, cte = cte, cte2 = cte2,
                     destino_id = destinoId, placa = placa, data_viagem = dataViagem, data_chegada = dataChegada,
-                    km_inicio = kmInicio, km_chegada = kmChegada, km_posto = kmPosto,
-                    pesocarga = pesocarga, pesocargaretorno = pesocargaretorno, valorfrete = valorfrete, valorfreteretorno = valorfreteretorno,
+                    km_inicio = normalizarKmParaEnvio(kmInicio.text),
+                    km_chegada = if (kmChegada.isNotBlank()) normalizarKmParaEnvio(kmChegada) else kmChegada,
+                    km_posto = if (kmPosto.isNotBlank()) normalizarKmParaEnvio(kmPosto) else kmPosto,
+                    pesocarga = pesocarga.text.filter { it.isDigit() }, pesocargaretorno = pesocargaretorno, valorfrete = valorfrete, valorfreteretorno = valorfreteretorno,
                     ordem_retorno = ordemRetorno, cte_retorno = cteRetorno, descricao = descricao
                 ))
                 if (response.status == "ok") {
+                    // Se essa é a viagem em andamento, atualiza o cache local
+                    // (ViagemAtual) também — senão o Dashboard e a tela
+                    // Finalizar Viagem continuam mostrando o KM antigo até a
+                    // viagem ser finalizada, mesmo já tendo salvo o novo no
+                    // servidor.
+                    val viagemAtualCache = repository.getViagemAtual()
+                    if (viagemAtualCache != null && viagemAtualCache.viagem_id == viagemId.toLong()) {
+                        repository.salvarViagemAtual(
+                            viagemId = viagemAtualCache.viagem_id,
+                            destino = viagemAtualCache.destino,
+                            dataInicio = viagemAtualCache.data_inicio,
+                            kmInicio = normalizarKmParaEnvio(kmInicio.text),
+                            kmRota = viagemAtualCache.km_rota
+                        )
+                    }
                     mostrarMensagem("Viagem atualizada com sucesso!")
-                    kotlinx.coroutines.delay(1500)
-                    onVoltar()
                 } else {
                     mostrarMensagem(formatarMensagemErro(response.mensagem ?: "Erro ao salvar"), isErro = true)
                 }
@@ -655,28 +682,20 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
     var destinoExpandido by remember { mutableStateOf(false) }
     var placaExpandida by remember { mutableStateOf(false) }
 
+    // Diálogos modais de erro e sucesso
+    if (erro != null) {
+        ui.ErroDialog(mensagem = erro!!, onDismiss = { erro = null })
+    }
+    if (sucesso != null) {
+        ui.SucessoDialog(mensagem = sucesso!!, onDismiss = { sucesso = null; onVoltar() })
+    }
+
     Scaffold(
         topBar = {
             GradientTopBar(
                 title = "Editar Viagem",
                 onBackClick = onVoltar
             )
-        },
-        snackbarHost = {
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.padding(16.dp)
-            ) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = if (data.visuals.message.contains("sucesso", ignoreCase = true) ||
-                        data.visuals.message.contains("atualizada", ignoreCase = true))
-                        AppColors.Secondary else AppColors.Error,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    actionColor = Color.White
-                )
-            }
         }
     ) { padding ->
         when {
@@ -720,13 +739,53 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         // finalizar), então esses campos ainda não existem nesse momento.
                         // Continuam sendo carregados e reenviados sem alteração (ver LaunchedEffect
                         // e salvar()) para não apagar nada caso já existam no servidor.
-                        CampoTexto("KM de Início:", kmInicio, { kmInicio = it.filter { c -> c.isDigit() } }, KeyboardType.Number)
+                        Text("KM de Início:", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = kmInicio,
+                            onValueChange = { newValue ->
+                                val formatted = formatarKmInput(newValue.text)
+                                kmInicio = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            placeholder = { Text("Ex.: 115670.5") },
+                            singleLine = true
+                        )
+                        Text(
+                            "Digite como aparece no painel. Ex.: 115670.5",
+                            fontSize = 12.sp,
+                            color = AppColors.Primary,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                        )
+                        Spacer(Modifier.height(16.dp))
                         CampoTexto("Data de Início:", dataViagem, { dataViagem = it })
                         CampoTexto("Ordem de Frete:", numerobd, { numerobd = it })
                         CampoTexto("Ordem de Frete 2:", numerobd2, { numerobd2 = it })
                         CampoTexto("CTE:", cte, { cte = it })
                         CampoTexto("CTE 2:", cte2, { cte2 = it })
-                        CampoTexto("Peso da Carga:", pesocarga, { pesocarga = it }, KeyboardType.Number)
+                        Text("Peso da Carga:", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = pesocarga,
+                            onValueChange = { newValue ->
+                                val digits = newValue.text.filter { c -> c.isDigit() }.take(5)
+                                val formatted = formatarPesoView(digits)
+                                pesocarga = TextFieldValue(
+                                    text = formatted,
+                                    selection = TextRange(formatted.length)
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
+                        )
+                        Spacer(Modifier.height(16.dp))
                         CampoTexto("Valor do Frete:", valorfrete, { valorfrete = it }, KeyboardType.Decimal)
 
                         Text("Descrição:", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
@@ -826,11 +885,11 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
             }
 
             drawSection("Dados da Viagem", "#07275A")
-            drawItem("KM Início:", formatarKm(res.km_inicio))
-            drawItem("KM Chegada:", formatarKm(res.km_chegada))
-            drawItem("KM da Rota:", "${formatarInteiro(res.km_da_rota)} km")
-            drawItem("KM Percorridos:", "${formatarInteiro(res.km_percorridos)} km")
-            drawItem("KM Ultrapassados:", "${formatarInteiro(res.km_ultrapassados)} km")
+            drawItem("KM Início:", formatarKmExibicao(res.km_inicio))
+            drawItem("KM Chegada:", formatarKmExibicao(res.km_chegada))
+            drawItem("KM da Rota:", "${formatarKmExibicao(res.km_da_rota)} km")
+            drawItem("KM Percorridos:", "${formatarKmExibicao(res.km_percorridos)} km")
+            drawItem("KM Ultrapassados:", "${formatarKmExibicao(res.km_ultrapassados)} km")
 
             drawSection("Combustíveis", "#F59E0B")
             drawItem("Diesel Caminhão:", "${formatarNumero(res.litros_diesel_caminhao)} L")
@@ -935,13 +994,13 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         LinhaResumo("Ordem de Frete:", resumo!!.numerobd)
                         LinhaResumo("Data Início:", formatarData(resumo!!.data_viagem))
                         LinhaResumoDataChegada(resumo!!.data_chegada)
-                        LinhaResumo("KM Início:", formatarKm(resumo!!.km_inicio))
-                        LinhaResumo("KM Chegada:", formatarKm(resumo!!.km_chegada))
-                        LinhaResumo("KM da Rota:", formatarInteiro(resumo!!.km_da_rota) + " km")
-                        LinhaResumo("KM Percorridos:", formatarInteiro(resumo!!.km_percorridos) + " km")
+                        LinhaResumo("KM Início:", formatarKmExibicao(resumo!!.km_inicio))
+                        LinhaResumo("KM Chegada:", formatarKmExibicao(resumo!!.km_chegada))
+                        LinhaResumo("KM da Rota:", formatarKmExibicao(resumo!!.km_da_rota) + " km")
+                        LinhaResumo("KM Percorridos:", formatarKmExibicao(resumo!!.km_percorridos) + " km")
                         LinhaResumoDestaque(
                             "KM Ultrapassados",
-                            formatarInteiro(resumo!!.km_ultrapassados) + " km",
+                            formatarKmExibicao(resumo!!.km_ultrapassados) + " km",
                             if (resumo!!.km_ultrapassados > 0) AppColors.Error else AppColors.Secondary
                         )
 
@@ -1662,20 +1721,17 @@ private fun formatarData(data: String): String {
 private fun formatarNumero(valor: Double): String {
     return String.format("%.2f", valor).replace(".", ",")
 }
-private fun formatarInteiro(valor: Double): String {
-    return valor.toInt().toString()
+/** Peso da carga: só milhar, sem decimal. "15000" -> "15.000" */
+private fun formatarPesoView(digits: String): String {
+    if (digits.isEmpty()) return ""
+    return digits.reversed().chunked(3).joinToString(".").reversed()
 }
-private fun formatarInteiro(valor: Int): String {
-    return valor.toString()
-}
-private fun formatarKm(valor: Double): String {
-    // Mostra com 1 decimal: 22423.9
-    val formatted = String.format("%,.1f", valor)
-    return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
-}
-
 private fun formatarMoeda(valor: Double): String {
-    return "R$ " + String.format("%,.2f", valor).replace(",", "X").replace(".", ",").replace("X", ".")
+    // Locale explícito (US) é obrigatório aqui: String.format sem Locale usa
+    // o locale padrão do aparelho — em aparelho com locale pt-BR o %,.2f já
+    // sai "17.000,00" (BR) e o replace abaixo (que assume entrada US
+    // "17,000.00") inverte de novo, corrompendo pra "17,000.00".
+    return "R$ " + String.format(java.util.Locale.US, "%,.2f", valor).replace(",", "X").replace(".", ",").replace("X", ".")
 }
 
 /**
@@ -1688,5 +1744,5 @@ private fun formatarMoeda(valor: Double): String {
 private fun decimalParaMascaraBRViagem(valorServidor: String?): String {
     if (valorServidor.isNullOrBlank()) return ""
     val numero = valorServidor.replace(",", ".").toDoubleOrNull() ?: return ""
-    return String.format("%,.2f", numero).replace(",", "X").replace(".", ",").replace("X", ".")
+    return String.format(java.util.Locale.US, "%,.2f", numero).replace(",", "X").replace(".", ",").replace("X", ".")
 }

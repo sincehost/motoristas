@@ -41,6 +41,8 @@ import util.CameraHelper
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
@@ -194,7 +196,7 @@ actual fun AdicionarCombustivelScreen(
     var placaSelecionada by remember { mutableStateOf<Pair<Long, String>?>(null) }
     var data by remember { mutableStateOf(dataAtualFormatada()) }
     var nomePosto by remember { mutableStateOf("") }
-    var kmPosto by remember { mutableStateOf("") }
+    var kmPosto by remember { mutableStateOf(TextFieldValue("")) }
     var tipoCombustivel by remember { mutableStateOf("") }
     var horas by remember { mutableStateOf("") }
     var litrosAbastecidos by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
@@ -288,7 +290,7 @@ actual fun AdicionarCombustivelScreen(
             mostrarMensagem("Informe o nome do posto", isErro = true)
             return
         }
-        if (kmPosto.isEmpty()) {
+        if (kmPosto.text.isEmpty()) {
             mostrarMensagem("Informe o KM no posto", isErro = true)
             return
         }
@@ -337,12 +339,13 @@ actual fun AdicionarCombustivelScreen(
                     valor = valorTotal.text,
                     litros = litrosAbastecidos.text,
                     posto = nomePosto,
-                    kmPosto = kmPosto,
+                    kmPosto = normalizarKmParaEnvio(kmPosto.text),
                     foto = fotoCupomBase64,
                     fotoMarcador = fotoMarcadorBase64,
                     tipoPagamento = tipoPagamento,
                     tipoCombustivel = tipoCombustivel,
-                    horas = horas.ifEmpty { null }
+                    horas = horas.ifEmpty { null },
+                    valorLitro = valorLitro.text
                 )
 
                 mostrarMensagem("Abastecimento salvo! Sincronize quando tiver internet.")
@@ -593,13 +596,26 @@ actual fun AdicionarCombustivelScreen(
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = kmPosto,
-                                onValueChange = { kmPosto = it.filter { c -> c.isDigit() } },
+                                onValueChange = { newValue ->
+                                    val formatted = formatarKmInput(newValue.text)
+                                    kmPosto = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(formatted.length)
+                                    )
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                placeholder = { Text("Ex.: 115670.5") },
                                 leadingIcon = {
                                     Icon(Icons.Default.Speed, null, tint = AppColors.Primary)
                                 }
+                            )
+                            Text(
+                                "Digite como aparece no painel. Ex.: 115670.5",
+                                fontSize = 12.sp,
+                                color = AppColors.Primary,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                             )
 
                             Spacer(Modifier.height(16.dp))

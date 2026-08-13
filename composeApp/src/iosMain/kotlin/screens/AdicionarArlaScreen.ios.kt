@@ -41,6 +41,8 @@ import util.CameraHelper
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.formatarKmInput
+import util.normalizarKmParaEnvio
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
@@ -185,7 +187,7 @@ actual fun AdicionarArlaScreen(
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var litros by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var posto by remember { mutableStateOf("") }
-    var kmPosto by remember { mutableStateOf("") }
+    var kmPosto by remember { mutableStateOf(TextFieldValue("")) }
 
     // Foto
     var fotoComprovante by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -258,7 +260,7 @@ actual fun AdicionarArlaScreen(
             mostrarMensagem("Informe o nome do posto", isErro = true)
             return
         }
-        if (kmPosto.isEmpty()) {
+        if (kmPosto.text.isEmpty()) {
             mostrarMensagem("Informe o KM no posto", isErro = true)
             return
         }
@@ -268,6 +270,7 @@ actual fun AdicionarArlaScreen(
         }
 
         val dataAPI = converterDataParaAPI(data)
+        val kmPostoNormalizado = normalizarKmParaEnvio(kmPosto.text)
 
         scope.launch {
             salvando = true
@@ -282,7 +285,7 @@ actual fun AdicionarArlaScreen(
                             valor = valor.text,
                             litros = litros.text,
                             posto = posto,
-                            km_posto = kmPosto,
+                            km_posto = kmPostoNormalizado,
                             foto_base64 = fotoBase64
                         )
                     )
@@ -301,7 +304,7 @@ actual fun AdicionarArlaScreen(
                         valor = valor.text,
                         litros = litros.text,
                         posto = posto,
-                        kmPosto = kmPosto,
+                        kmPosto = kmPostoNormalizado,
                         foto = fotoBase64
                     )
                     sucessoMsg = "ARLA salvo! Sincronize quando tiver internet."
@@ -543,13 +546,26 @@ actual fun AdicionarArlaScreen(
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = kmPosto,
-                                onValueChange = { kmPosto = it.filter { c -> c.isDigit() } },
+                                onValueChange = { newValue ->
+                                    val formatted = formatarKmInput(newValue.text)
+                                    kmPosto = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(formatted.length)
+                                    )
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                placeholder = { Text("Ex.: 115670.5") },
                                 leadingIcon = {
                                     Icon(Icons.Default.Speed, null, tint = Color(0xFF06B6D4))
                                 })
+                            Text(
+                                "Digite como aparece no painel. Ex.: 115670.5",
+                                fontSize = 12.sp,
+                                color = AppColors.Primary,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                            )
                             
 
                             Spacer(Modifier.height(16.dp))

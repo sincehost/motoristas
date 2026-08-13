@@ -187,8 +187,6 @@ actual fun EditarDescargaScreen(
 
                 if (response.status == "ok") {
                     sucesso = "Descarga atualizada com sucesso!"
-                    kotlinx.coroutines.delay(1500)
-                    onVoltar()
                 } else {
                     erro = response.mensagem ?: "Erro ao atualizar"
                 }
@@ -198,6 +196,14 @@ actual fun EditarDescargaScreen(
             }
             salvando = false
         }
+    }
+
+    // Diálogos modais de erro e sucesso
+    if (erro != null) {
+        ui.ErroDialog(mensagem = erro!!, onDismiss = { erro = null })
+    }
+    if (sucesso != null) {
+        ui.SucessoDialog(mensagem = sucesso!!, onDismiss = { sucesso = null; onVoltar() })
     }
 
     Scaffold(
@@ -360,29 +366,6 @@ actual fun EditarDescargaScreen(
                             onClick = { tirarFoto() },
                             onRemover = { cameraState.clear() }
                         )
-
-                        // Mensagens
-                        erro?.let {
-                            Spacer(Modifier.height(16.dp))
-                            Card(colors = CardDefaults.cardColors(containerColor = AppColors.Error.copy(alpha = 0.1f))) {
-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Error, null, tint = AppColors.Error)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(it, color = AppColors.Error)
-                                }
-                            }
-                        }
-
-                        sucesso?.let {
-                            Spacer(Modifier.height(16.dp))
-                            Card(colors = CardDefaults.cardColors(containerColor = if (ui.isDark()) AppColors.SurfaceVariant else AppColors.Secondary.copy(alpha = 0.1f))) {
-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.CheckCircle, null, tint = AppColors.Secondary)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(it, color = AppColors.Secondary)
-                                }
-                            }
-                        }
 
                         Spacer(Modifier.height(24.dp))
 
