@@ -86,8 +86,13 @@ actual fun EditarOutraDespesaScreen(
 
     var tipo by remember { mutableStateOf(item.tipo) }
     var descricao by remember { mutableStateOf(item.descricao) }
-    val valorInicial = item.valor.toString()
-    var valor by remember { mutableStateOf(TextFieldValue(valorInicial, selection = TextRange(valorInicial.length))) }
+    // Seleciona o texto inteiro ao carregar (não só cursor no final) — assim
+    // o primeiro dígito que o motorista digitar substitui o valor inteiro,
+    // em vez de ser acrescentado aos dígitos que já tavam lá. Sem isso,
+    // editar "140,00" digitando um dígito a mais lia TODOS os dígitos
+    // visíveis (14000) como se fossem centavos novos, inflando o valor.
+    val valorInicial = formatarDecimalParaExibicaoOD(item.valor.toString())
+    var valor by remember { mutableStateOf(TextFieldValue(valorInicial, selection = TextRange(0, valorInicial.length))) }
     var data by remember { mutableStateOf(converterDataParaExibicao(item.data)) }
     var local by remember { mutableStateOf(item.local) }
 
@@ -147,8 +152,14 @@ actual fun EditarOutraDespesaScreen(
                 val despesa = response.despesa
                 tipo = despesa.tipo
                 descricao = despesa.descricao
-                val valorTexto = despesa.valor
-                valor = TextFieldValue(valorTexto, selection = TextRange(valorTexto.length))
+                // Servidor devolve decimal puro ("140.00", ponto) — converte
+                // pra máscara BR ("140,00", vírgula) igual todo campo de
+                // valor do app. Sem isso, se o motorista não editasse o
+                // campo, o "140.00" (com ponto) seria reenviado como está e
+                // o servidor removeria o ponto achando que era separador de
+                // milhar, inflando o valor 100x (140.00 -> 14000).
+                val valorTexto = formatarDecimalParaExibicaoOD(despesa.valor)
+                valor = TextFieldValue(valorTexto, selection = TextRange(0, valorTexto.length))
                 data = converterDataParaExibicao(despesa.data)
                 local = despesa.local
                 fotoBase64 = despesa.foto
@@ -301,4 +312,22 @@ actual fun EditarOutraDespesaScreen(
             }
         }
     }
+}
+
+/**
+ * Converte um decimal puro vindo do servidor ("140.00") pra máscara BR
+ * ("140,00") igual todo campo de valor do app. Usa aritmética inteira
+ * (centavos) em vez de string do Double, evitando artefato de ponto
+ * flutuante.
+ */
+private fun formatarDecimalParaExibicaoOD(valorServidor: String?): String {
+    if (valorServidor.isNullOrBlank()) return ""
+    val numero = valorServidor.replace(",", ".").toDoubleOrNull() ?: return valorServidor
+    val centavosTotal = kotlin.math.round(numero * 100).toLong()
+    val negativo = centavosTotal < 0
+    val abs = kotlin.math.abs(centavosTotal)
+    val inteiro = abs / 100
+    val centavos = abs % 100
+    val inteiroFormatado = inteiro.toString().reversed().chunked(3).joinToString(".").reversed()
+    return (if (negativo) "-" else "") + "$inteiroFormatado,${centavos.toString().padStart(2, '0')}"
 }

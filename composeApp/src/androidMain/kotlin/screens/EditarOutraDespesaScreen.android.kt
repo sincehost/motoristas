@@ -40,7 +40,6 @@ import ui.AppColors
 import ui.GradientTopBar
 import util.DateInputField
 import util.rememberCameraState
-import util.rememberSaveableTextField
 import util.converterDataParaAPI
 
 private val TIPOS_OD = listOf(
@@ -76,8 +75,13 @@ actual fun EditarOutraDespesaScreen(
     var dataDespesa  by rememberSaveable { mutableStateOf(odFormatarDataParaForm(item.data)) }
     var localDespesa by rememberSaveable { mutableStateOf(item.local) }
 
+    // Seleciona o texto inteiro ao carregar (não só cursor no final) — assim
+    // o primeiro dígito que o motorista digitar substitui o valor inteiro,
+    // em vez de ser acrescentado aos dígitos que já tavam lá. Sem isso,
+    // editar "140,00" digitando um dígito a mais lia TODOS os dígitos
+    // visíveis (14000) como se fossem centavos novos, inflando o valor.
     val valorInicial = odFormatarDecimal(item.valor.toString())
-    var valor by rememberSaveableTextField(valorInicial)
+    var valor by remember { mutableStateOf(TextFieldValue(valorInicial, selection = TextRange(0, valorInicial.length))) }
 
     val cameraState = rememberCameraState(context, prefix = "OD_EDIT")
 
@@ -116,7 +120,7 @@ actual fun EditarOutraDespesaScreen(
                 dataDespesa = odFormatarDataParaForm(despesa.data)
                 localDespesa = despesa.local
                 val valorTexto = odFormatarDecimal(despesa.valor)
-                valor = TextFieldValue(valorTexto, selection = TextRange(valorTexto.length))
+                valor = TextFieldValue(valorTexto, selection = TextRange(0, valorTexto.length))
                 cameraState.loadExisting(despesa.foto)
             }
             // Se a busca falhar, mantém os dados básicos já recebidos da
