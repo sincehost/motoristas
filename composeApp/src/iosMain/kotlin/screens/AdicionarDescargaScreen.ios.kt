@@ -130,7 +130,6 @@ actual fun AdicionarDescargaScreen(
     val primaryColor = Color(0xFF1E88E5)
     val backgroundColor = Color(0xFFF5F7FA)
     val cardColor = Color.White
-    val successColor = Color(0xFF10B981)
     val errorColor = Color(0xFFEF4444)
     val inputBackground = Color(0xFFF9FAFB)
     val borderColor = Color(0xFFE5E7EB)
@@ -139,7 +138,6 @@ actual fun AdicionarDescargaScreen(
 
     // Estados básicos
     var salvando by remember { mutableStateOf(false) }
-    var sucesso by remember { mutableStateOf(false) }
     var carregando by remember { mutableStateOf(true) }
 
     // Dados carregados
@@ -295,7 +293,6 @@ actual fun AdicionarDescargaScreen(
                     )
                     if (response.status == "ok") {
                         // API salvou com sucesso
-                        sucesso = true
                         sucessoMsg = "Descarga registrada com sucesso!"
                     } else {
                         mostrarMensagem(response.mensagem ?: "Erro ao salvar", isErro = true)
@@ -311,7 +308,6 @@ actual fun AdicionarDescargaScreen(
                         valor = valor.text,
                         foto = fotoBase64
                     )
-                    sucesso = true
                     sucessoMsg = "Descarga salva! Sincronize quando tiver internet."
                 }
             } catch (e: Exception) {
@@ -329,63 +325,6 @@ actual fun AdicionarDescargaScreen(
             contentAlignment = Alignment.Center
         ) {
             CircularProgressIndicator(color = primaryColor)
-        }
-        return
-    }
-
-    // ========== TELA DE SUCESSO ==========
-    if (sucesso) {
-        Box(
-            modifier = Modifier.fillMaxSize().background(backgroundColor),
-            contentAlignment = Alignment.Center
-        ) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(32.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = cardColor),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .background(successColor.copy(alpha = 0.1f), RoundedCornerShape(40.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            null,
-                            tint = successColor,
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-                    Spacer(Modifier.height(24.dp))
-                    Text(
-                        "Descarga Registrada!",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1F2937)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Dados salvos com sucesso",
-                        fontSize = 16.sp,
-                        color = Color(0xFF6B7280)
-                    )
-                    Spacer(Modifier.height(32.dp))
-                    Button(
-                        onClick = onSucesso,
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
-                    ) {
-                        Text("Voltar ao Menu", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
         }
         return
     }

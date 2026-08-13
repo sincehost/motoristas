@@ -264,7 +264,7 @@ actual fun EditarCombustivelScreen(
                         // em 100x (removia o "." como se fosse milhar).
                         horas = horas, litros_abastecidos = litros.text,
                         valor_litro = valorLitro.text, valor_total = valorTotal.text,
-                        forma_pagamento = tipoPagamento, foto_cupom = fotoCupomBase64, foto_marcador = fotoMarcadorBase64
+                        tipo_pagamento = tipoPagamento, foto_cupom = fotoCupomBase64, foto_marcador = fotoMarcadorBase64
                     )
                 )
                 if (resp.status == "ok") sucessoMsg = "Abastecimento atualizado!" else erroMsg = resp.mensagem ?: "Erro"

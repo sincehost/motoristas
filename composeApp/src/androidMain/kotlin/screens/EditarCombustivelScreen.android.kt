@@ -238,7 +238,7 @@ actual fun EditarCombustivelScreen(
                         litros_abastecidos = litrosAbastecidos.text,
                         valor_litro = valorLitro.text,
                         valor_total = valorTotal.text,
-                        forma_pagamento = tipoPagamento,
+                        tipo_pagamento = tipoPagamento,
                         foto_cupom = cameraStateCupom.base64,
                         foto_marcador = cameraStateMarcador.base64
                     )

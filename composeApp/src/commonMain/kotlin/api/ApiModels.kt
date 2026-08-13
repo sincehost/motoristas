@@ -362,7 +362,11 @@ data class AtualizarAbastecimentoRequest(
     val litros_abastecidos: String,
     val valor_litro: String,
     val valor_total: String,
-    val forma_pagamento: String,
+    // O servidor lê $input['tipo_pagamento'] (igual salvar.php) — o campo
+    // já se chamou "forma_pagamento" aqui, uma chave que nunca existia no
+    // JSON enviado, então a validação sempre falhava com "Dados
+    // incompletos" independente do que o motorista preenchesse.
+    val tipo_pagamento: String,
     val foto_cupom: String? = null,
     val foto_marcador: String? = null
 )
