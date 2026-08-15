@@ -141,7 +141,8 @@ data class AtualizarViagemResponse(
 @Serializable
 data class DespesasRequest(
 
-    val viagem_id: Int
+    val viagem_id: Int,
+    val motorista_id: String
 )
 
 @Serializable
@@ -195,7 +196,8 @@ data class DespesasResponse(
 @Serializable
 data class ResumoRequest(
 
-    val viagem_id: Int
+    val viagem_id: Int,
+    val motorista_id: String
 )
 
 @Serializable

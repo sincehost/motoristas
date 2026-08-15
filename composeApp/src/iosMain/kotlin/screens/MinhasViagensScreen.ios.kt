@@ -748,10 +748,10 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
 
     LaunchedEffect(viagemId) {
         try {
-            val response = ApiClient.resumoViagem(ResumoRequest(viagem_id = viagemId))
+            val response = ApiClient.resumoViagem(ResumoRequest(viagem_id = viagemId, motorista_id = motorista?.motorista_id ?: ""))
             if (response.status == "ok") resumo = response.resumo else erro = response.mensagem
             try {
-                val responseDespesas = ApiClient.despesasViagem(DespesasRequest(viagem_id = viagemId))
+                val responseDespesas = ApiClient.despesasViagem(DespesasRequest(viagem_id = viagemId, motorista_id = motorista?.motorista_id ?: ""))
                 if (responseDespesas.status == "ok") {
                     outrasDespesas = responseDespesas.outras_despesas
                 }
@@ -948,7 +948,7 @@ private fun DespesasViagemContent(
             loading = true
             erro = null
             try {
-                val response = ApiClient.despesasViagem(DespesasRequest(viagem_id = viagemId))
+                val response = ApiClient.despesasViagem(DespesasRequest(viagem_id = viagemId, motorista_id = motorista?.motorista_id ?: ""))
                 if (response.status == "ok") {
                     viagemAberta = response.viagem_aberta
                     abastecimentos = response.abastecimentos
