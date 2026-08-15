@@ -186,7 +186,7 @@ actual fun EditarCombustivelScreen(
                 destino = a.destino; dataViagem = a.data_viagem; placa = a.placa
                 data = converterDataParaExibicao(a.data_abastecimento); nomePosto = a.nome_posto
                 val kmPostoTexto = a.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: a.km_posto
-                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(kmPostoTexto.length))
+                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(0, kmPostoTexto.length))
                 tipoCombustivel = a.tipo_combustivel; horas = a.horas
                 val litrosTexto = formatarDecimalParaExibicaoComb(a.litros_abastecidos)
                 litros = TextFieldValue(litrosTexto, selection = TextRange(litrosTexto.length))

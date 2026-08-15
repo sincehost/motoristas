@@ -188,6 +188,11 @@ actual fun AdicionarDescargaScreen(
             erro = "Informe a ordem de descarga"
             return
         }
+        val ordemDescargaInt = ordemDescarga.toIntOrNull()
+        if (ordemDescargaInt == null || ordemDescargaInt <= 0) {
+            erro = "Nº Ordem de Descarga inválido. Valor informado excede o limite permitido (máx. 2.147.483.647)."
+            return
+        }
         if (valor.text.isEmpty()) {
             erro = "Informe o valor"
             return
@@ -213,7 +218,7 @@ actual fun AdicionarDescargaScreen(
                             viagem_id = viagemEmAndamento!!.id,
                             data = dataAPI,
                             placa = placaSelecionada,
-                            ordem_descarga = ordemDescarga.toIntOrNull() ?: 0,
+                            ordem_descarga = ordemDescargaInt,
                             valor = valor.text,
                             foto = cameraState.base64!! // Garantido que não é null pela validação acima
                         )
@@ -234,7 +239,7 @@ actual fun AdicionarDescargaScreen(
                         viagemId = viagemEmAndamento!!.id.toLong(),
                         data = dataAPI,
                         placa = placaSelecionada,
-                        ordemDescarga = ordemDescarga.toLongOrNull() ?: 0,
+                        ordemDescarga = ordemDescargaInt.toLong(),
                         valor = valor.text,
                         foto = cameraState.base64!!
                     )
@@ -390,7 +395,7 @@ actual fun AdicionarDescargaScreen(
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = ordemDescarga,
-                                onValueChange = { ordemDescarga = it.filter { c -> c.isDigit() } },
+                                onValueChange = { ordemDescarga = it.filter { c -> c.isDigit() }.take(10) },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

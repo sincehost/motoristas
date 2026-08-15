@@ -38,7 +38,8 @@ data class ListarViagensRequest(
 @Serializable
 data class ExcluirViagemRequest(
 
-    val viagem_id: Int
+    val viagem_id: Int,
+    val motorista_id: String
 )
 
 @Serializable
@@ -51,7 +52,8 @@ data class ExcluirViagemResponse(
 @Serializable
 data class ViagemDetalheRequest(
 
-    val viagem_id: Int
+    val viagem_id: Int,
+    val motorista_id: String
 )
 
 @Serializable
@@ -108,6 +110,7 @@ data class ViagemDetalheResponse(
 data class AtualizarViagemRequest(
 
     val viagem_id: Int,
+    val motorista_id: String,
     val numerobd: String = "",
     val numerobd2: String = "",
     val cte: String = "",

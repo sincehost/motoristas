@@ -224,7 +224,7 @@ private fun ListaViagensContent(
             excluindo = true
             try {
                 val response = ApiClient.excluirViagem(
-                    ExcluirViagemRequest(viagem_id = viagem.id)
+                    ExcluirViagemRequest(viagem_id = viagem.id, motorista_id = motorista?.motorista_id ?: "")
                 )
                 if (response.status == "ok") {
                     // Excluir do banco local também
@@ -587,7 +587,7 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
     // Carrega dados
     LaunchedEffect(viagemId) {
         try {
-            val response = ApiClient.detalheViagem(ViagemDetalheRequest(viagem_id = viagemId))
+            val response = ApiClient.detalheViagem(ViagemDetalheRequest(viagem_id = viagemId, motorista_id = motorista?.motorista_id ?: ""))
             if (response.status == "ok" && response.viagem != null) {
                 viagem = response.viagem
                 destinos = response.destinos
@@ -644,6 +644,7 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                 val response = ApiClient.atualizarViagem(AtualizarViagemRequest(
 
                     viagem_id = viagemId,
+                    motorista_id = motorista?.motorista_id ?: "",
                     numerobd = numerobd, numerobd2 = numerobd2, cte = cte, cte2 = cte2,
                     destino_id = destinoId, placa = placa, data_viagem = dataViagem, data_chegada = dataChegada,
                     km_inicio = normalizarKmParaEnvio(kmInicio.text),

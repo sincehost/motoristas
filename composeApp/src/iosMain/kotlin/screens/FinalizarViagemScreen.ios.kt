@@ -175,7 +175,7 @@ actual fun FinalizarViagemScreen(
                 // desatualizado e bloqueava a finalização indevidamente.
                 try {
                     val resp = api.ApiClient.detalheViagem(
-                        api.ViagemDetalheRequest(viagem_id = viagemId.toInt())
+                        api.ViagemDetalheRequest(viagem_id = viagemId.toInt(), motorista_id = motorista?.motorista_id ?: "")
                     )
                     if (resp.status == "ok" && resp.viagem != null) {
                         if (resp.viagem.km_inicio.isNotEmpty()) kmInicioViagem = resp.viagem.km_inicio

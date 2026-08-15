@@ -8,10 +8,6 @@
     <!-- Notificações: lembrete de dados pendentes (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Galeria de fotos: usa Android Photo Picker (não precisa de permissão) -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
-
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />

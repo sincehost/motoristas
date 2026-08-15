@@ -110,11 +110,13 @@ actual fun EditarArlaScreen(
 
                 // Campos do formulário
                 data = formatarDataBRParaExibicao(arla.data_arla)
-                valor = TextFieldValue(formatarDecimalParaExibicao(arla.valor))
-                litros = TextFieldValue(formatarDecimalParaExibicao(arla.litros))
+                val valorTexto = formatarDecimalParaExibicao(arla.valor)
+                valor = TextFieldValue(valorTexto, selection = TextRange(0, valorTexto.length))
+                val litrosTexto = formatarDecimalParaExibicao(arla.litros)
+                litros = TextFieldValue(litrosTexto, selection = TextRange(0, litrosTexto.length))
                 posto = arla.posto
                 val kmPostoTexto = arla.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: arla.km_posto
-                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(kmPostoTexto.length))
+                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(0, kmPostoTexto.length))
 
                 // Carrega foto se existir
 

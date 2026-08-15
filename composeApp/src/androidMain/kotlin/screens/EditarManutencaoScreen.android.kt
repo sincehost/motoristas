@@ -140,13 +140,14 @@ actual fun EditarManutencaoScreen(
                 servicoSelecionado = manut.servico
                 descricaoServico = manut.descricao_servico ?: ""
                 localManutencao = manut.local_manutencao ?: ""
-                valor = TextFieldValue(formatarDecimalParaExibicao(manut.valor))
+                val valorTexto = formatarDecimalParaExibicao(manut.valor)
+                valor = TextFieldValue(valorTexto, selection = TextRange(0, valorTexto.length))
                 val kmTrocaOleoRaw = manut.km_troca_oleo ?: ""
                 val kmTrocaOleoTexto = kmTrocaOleoRaw.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmTrocaOleoRaw
-                kmTrocaOleo = TextFieldValue(kmTrocaOleoTexto, selection = TextRange(kmTrocaOleoTexto.length))
+                kmTrocaOleo = TextFieldValue(kmTrocaOleoTexto, selection = TextRange(0, kmTrocaOleoTexto.length))
                 val kmTrocaPneuRaw = manut.km_troca_pneu ?: ""
                 val kmTrocaPneuTexto = kmTrocaPneuRaw.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmTrocaPneuRaw
-                kmTrocaPneu = TextFieldValue(kmTrocaPneuTexto, selection = TextRange(kmTrocaPneuTexto.length))
+                kmTrocaPneu = TextFieldValue(kmTrocaPneuTexto, selection = TextRange(0, kmTrocaPneuTexto.length))
 
                 // Pneus (se for troca de pneu)
                 if (!manut.pneus.isNullOrEmpty()) {

@@ -262,6 +262,11 @@ actual fun AdicionarDescargaScreen(
             mostrarMensagem("Informe a ordem de descarga", isErro = true)
             return
         }
+        val ordemDescargaInt = ordemDescarga.toIntOrNull()
+        if (ordemDescargaInt == null || ordemDescargaInt <= 0) {
+            mostrarMensagem("Nº Ordem de Descarga inválido. Valor informado excede o limite permitido (máx. 2.147.483.647).", isErro = true)
+            return
+        }
         if (valor.text.isBlank()) {
             mostrarMensagem("Informe o valor", isErro = true)
             return
@@ -286,7 +291,7 @@ actual fun AdicionarDescargaScreen(
                             viagem_id = viagem.viagem_id.toInt(),
                             data = dataAPI,
                             placa = placaSelecionada!!,
-                            ordem_descarga = ordemDescarga.toIntOrNull() ?: 0,
+                            ordem_descarga = ordemDescargaInt,
                             valor = valor.text,
                             foto = fotoBase64
                         )
@@ -304,7 +309,7 @@ actual fun AdicionarDescargaScreen(
                         viagemId = viagem.viagem_id,
                         data = dataAPI,
                         placa = placaSelecionada!!,
-                        ordemDescarga = ordemDescarga.toLongOrNull() ?: 0,
+                        ordemDescarga = ordemDescargaInt.toLong(),
                         valor = valor.text,
                         foto = fotoBase64
                     )
@@ -510,7 +515,7 @@ actual fun AdicionarDescargaScreen(
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = ordemDescarga,
-                        onValueChange = { ordemDescarga = it.filter { c -> c.isDigit() } },
+                        onValueChange = { ordemDescarga = it.filter { c -> c.isDigit() }.take(10) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
                         leadingIcon = {

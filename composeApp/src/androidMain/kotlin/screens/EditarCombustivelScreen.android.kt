@@ -134,12 +134,15 @@ actual fun EditarCombustivelScreen(
                 data = formatarDataBRParaExibicao(abast.data_abastecimento)
                 nomePosto = abast.nome_posto
                 val kmPostoTexto = abast.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: abast.km_posto
-                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(kmPostoTexto.length))
+                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(0, kmPostoTexto.length))
                 tipoCombustivel = abast.tipo_combustivel
                 horas = abast.horas
-                litrosAbastecidos = TextFieldValue(formatarDecimalParaExibicao(abast.litros_abastecidos))
-                valorLitro = TextFieldValue(formatarDecimalParaExibicao(abast.valor_litro))
-                valorTotal = TextFieldValue(formatarDecimalParaExibicao(abast.valor_total))
+                val litrosTexto = formatarDecimalParaExibicao(abast.litros_abastecidos)
+                litrosAbastecidos = TextFieldValue(litrosTexto, selection = TextRange(0, litrosTexto.length))
+                val valorLitroTexto = formatarDecimalParaExibicao(abast.valor_litro)
+                valorLitro = TextFieldValue(valorLitroTexto, selection = TextRange(0, valorLitroTexto.length))
+                val valorTotalTexto = formatarDecimalParaExibicao(abast.valor_total)
+                valorTotal = TextFieldValue(valorTotalTexto, selection = TextRange(0, valorTotalTexto.length))
                 tipoPagamento = abast.forma_pagamento.lowercase() // ← garante lowercase
 
                 // Carrega fotos se existirem

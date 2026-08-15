@@ -216,7 +216,7 @@ actual fun EditarDescargaScreen(
 
                         OutlinedTextField(
                             value = ordemDescarga,
-                            onValueChange = { ordemDescarga = it.filter { c -> c.isDigit() } },
+                            onValueChange = { ordemDescarga = it.filter { c -> c.isDigit() }.take(10) },
                             label = { Text("Ordem de Descarga *") },
                             leadingIcon = { Icon(Icons.Default.Numbers, null, tint = Color(0xFF06B6D4)) },
                             modifier = Modifier.fillMaxWidth(),
@@ -323,6 +323,11 @@ actual fun EditarDescargaScreen(
                                 scope.launch {
                                     if (data.isBlank()) { mostrarMensagem("Informe a data", isErro = true); return@launch }
                                     if (ordemDescarga.isBlank()) { mostrarMensagem("Informe a ordem de descarga", isErro = true); return@launch }
+                                    val ordemDescargaInt = ordemDescarga.toIntOrNull()
+                                    if (ordemDescargaInt == null || ordemDescargaInt <= 0) {
+                                        mostrarMensagem("Nº Ordem de Descarga inválido. Valor informado excede o limite permitido (máx. 2.147.483.647).", isErro = true)
+                                        return@launch
+                                    }
                                     if (valor.text.isBlank()) { mostrarMensagem("Informe o valor", isErro = true); return@launch }
 
                                     salvando = true
@@ -334,7 +339,7 @@ actual fun EditarDescargaScreen(
                                                 viagem_id = viagemId,
                                                 data = converterDataParaAPI(data),
                                                 placa = placa,
-                                                ordem_descarga = ordemDescarga.toIntOrNull() ?: 0,
+                                                ordem_descarga = ordemDescargaInt,
                                                 // Envia mascarado em BR ("60,00") direto — é o
                                                 // servidor que converte pra decimal. Convertendo
                                                 // aqui antes o servidor reprocessava um valor sem

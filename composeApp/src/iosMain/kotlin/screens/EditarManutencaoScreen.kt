@@ -230,13 +230,13 @@ actual fun EditarManutencaoScreen(
                 descricaoServico = manutencao.descricao_servico ?: ""
                 localManutencao = manutencao.local_manutencao ?: ""
                 val valorFormatado = formatarValor(((manutencao.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
-                valor = TextFieldValue(valorFormatado, selection = TextRange(valorFormatado.length))
+                valor = TextFieldValue(valorFormatado, selection = TextRange(0, valorFormatado.length))
                 val kmTrocaOleoRaw = manutencao.km_troca_oleo ?: ""
                 val kmTrocaOleoTexto = kmTrocaOleoRaw.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmTrocaOleoRaw
-                kmTrocaOleo = TextFieldValue(kmTrocaOleoTexto, selection = TextRange(kmTrocaOleoTexto.length))
+                kmTrocaOleo = TextFieldValue(kmTrocaOleoTexto, selection = TextRange(0, kmTrocaOleoTexto.length))
                 val kmTrocaPneuRaw = manutencao.km_troca_pneu ?: ""
                 val kmTrocaPneuTexto = kmTrocaPneuRaw.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmTrocaPneuRaw
-                kmTrocaPneu = TextFieldValue(kmTrocaPneuTexto, selection = TextRange(kmTrocaPneuTexto.length))
+                kmTrocaPneu = TextFieldValue(kmTrocaPneuTexto, selection = TextRange(0, kmTrocaPneuTexto.length))
                 pneus = manutencao.pneus ?: ""
                 tiposPneu = manutencao.tipos_pneu ?: ""
                 fotoComprovante1Base64 = manutencao.foto_comprovante1

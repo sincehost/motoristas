@@ -165,6 +165,11 @@ actual fun EditarDescargaScreen(
         // Validação
         if (placaSelecionada.isNullOrBlank()) { erro = "Selecione a placa"; return }
         if (ordemDescarga.isEmpty()) { erro = "Informe a ordem de descarga"; return }
+        val ordemDescargaInt = ordemDescarga.toIntOrNull()
+        if (ordemDescargaInt == null || ordemDescargaInt <= 0) {
+            erro = "Nº Ordem de Descarga inválido. Valor informado excede o limite permitido (máx. 2.147.483.647)."
+            return
+        }
         if (valor.text.isEmpty()) { erro = "Informe o valor"; return }
         if (cameraState.base64.isNullOrBlank()) { erro = "Tire a foto do comprovante"; return }
 
@@ -179,7 +184,7 @@ actual fun EditarDescargaScreen(
                         viagem_id = viagemId,
                         data = converterDataParaAPI(data),
                         placa = placaSelecionada!!,
-                        ordem_descarga = ordemDescarga.toIntOrNull() ?: 0,
+                        ordem_descarga = ordemDescargaInt,
                         // Envia mascarado em BR ("60,00") direto — é o
                         // servidor que converte pra decimal. Convertendo
                         // aqui antes o servidor reprocessava um valor sem
@@ -331,7 +336,7 @@ actual fun EditarDescargaScreen(
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = ordemDescarga,
-                            onValueChange = { ordemDescarga = it.filter { c -> c.isDigit() } },
+                            onValueChange = { ordemDescarga = it.filter { c -> c.isDigit() }.take(10) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

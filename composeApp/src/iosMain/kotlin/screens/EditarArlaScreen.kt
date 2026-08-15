@@ -152,11 +152,17 @@ actual fun EditarArlaScreen(
                 val arla = response.arla
                 data = converterDataParaExibicao(arla.data_arla)
                 val valorFormatado = formatarValor(((arla.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
-                valor = TextFieldValue(valorFormatado, selection = TextRange(valorFormatado.length))
-                litros = TextFieldValue(arla.litros, selection = TextRange(arla.litros.length))
+                valor = TextFieldValue(valorFormatado, selection = TextRange(0, valorFormatado.length))
+                // Servidor devolve decimal puro ("15.50", ponto) — precisa
+                // virar a máscara BR ("15,50") igual todo campo de valor/
+                // litros do app, senão reenviar sem editar manda formato
+                // errado de volta pro endpoint (que lê "," como decimal e
+                // "." como separador de milhar, inflando o valor ~100x).
+                val litrosFormatado = formatarValor(((arla.litros.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
+                litros = TextFieldValue(litrosFormatado, selection = TextRange(0, litrosFormatado.length))
                 posto = arla.posto
                 val kmPostoTexto = arla.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: arla.km_posto
-                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(kmPostoTexto.length))
+                kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(0, kmPostoTexto.length))
                 fotoBase64 = arla.foto
             } else {
                 mostrarMensagem(response.mensagem ?: "ARLA não encontrado", isErro = true)
@@ -242,8 +248,9 @@ actual fun EditarArlaScreen(
                         OutlinedTextField(
                             value = litros,
                             onValueChange = { newValue ->
-                                val digits = newValue.text.filter { c -> c.isDigit() || c == '.' }.take(6)
-                                litros = TextFieldValue(text = digits, selection = TextRange(digits.length))
+                                val digits = newValue.text.filter { c -> c.isDigit() }.take(7)
+                                val formatted = formatarValor(digits)
+                                litros = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
                             },
                             label = { Text("Litros *") },
                             leadingIcon = { Icon(Icons.Default.Opacity, null, tint = Color(0xFF06B6D4)) },

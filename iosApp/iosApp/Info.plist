@@ -16,7 +16,5 @@
 <string>Precisamos da câmera para fotografar o painel do veículo</string>
 <key>NSPhotoLibraryUsageDescription</key>
 <string>Precisamos acessar suas fotos para selecionar imagens</string>
-<key>NSLocationWhenInUseUsageDescription</key>
-<string>Precisamos da sua localização para registrar o local da viagem</string>
 </dict>
 </plist>
