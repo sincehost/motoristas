@@ -29,10 +29,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import database.AppRepository
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import platform.UIKit.*
 import platform.Foundation.*
+import platform.Vision.*
 import platform.darwin.NSObject
 import kotlinx.cinterop.*
 import ui.AppColors
@@ -43,6 +45,7 @@ import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
+import util.analisarTextoCupom
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
@@ -50,7 +53,7 @@ import org.jetbrains.skia.Image as SkiaImage
 // Classe delegate FORA do @Composable - com tipo de foto
 private class CombustivelCameraDelegate(
     private val tipoFoto: String, // "marcador" ou "cupom"
-    private val onFotoCaptured: (String, String, ImageBitmap) -> Unit, // tipo, base64, bitmap
+    private val onFotoCaptured: (String, String, ImageBitmap, UIImage) -> Unit, // tipo, base64, bitmap, imagem original (p/ Scanear Nota)
     private val onMessage: (String, Boolean) -> Unit
 ) : NSObject(), UIImagePickerControllerDelegateProtocol, UINavigationControllerDelegateProtocol {
 
@@ -81,7 +84,7 @@ private class CombustivelCameraDelegate(
                     val skiaImage = SkiaImage.makeFromEncoded(bytes)
                     if (skiaImage != null) {
                         val bitmap = skiaImage.toComposeImageBitmap()
-                        onFotoCaptured(tipoFoto, base64, bitmap)
+                        onFotoCaptured(tipoFoto, base64, bitmap, image)
                         // Foto capturada silenciosamente - a prévia já confirma
                     } else {
                         onMessage("Erro ao processar imagem", true)
@@ -223,11 +226,50 @@ actual fun AdicionarCombustivelScreen(
         }
     }
 
+    // Scanear Nota — OCR + QR/código de barras 100% on-device (Vision framework).
+    // Reaproveita a mesma foto do cupom fiscal: essa foto vale como comprovante
+    // E como fonte da leitura, o motorista não precisa tirar duas fotos.
+    var escaneandoNota by remember { mutableStateOf(false) }
+    var aguardandoScan by remember { mutableStateOf(false) }
+    var resultadoScan by remember { mutableStateOf<String?>(null) }
+
+    fun executarScanCupom(imagem: UIImage) {
+        escaneandoNota = true
+        resultadoScan = null
+        scope.launch(Dispatchers.Default) {
+            val (texto, codigo) = runVisionScan(imagem)
+            withContext(Dispatchers.Main) {
+                escaneandoNota = false
+                if (texto.isBlank() && codigo == null) {
+                    resultadoScan = "Não conseguimos ler o cupom automaticamente. Preencha os campos manualmente."
+                    return@withContext
+                }
+                val resultado = analisarTextoCupom(texto, qrCodeText = codigo, barcodeText = codigo)
+                var achouAlgo = false
+                resultado.valorDetectado?.let { valorTotal = decimalParaTextFieldValueComb(it); achouAlgo = true }
+                resultado.litrosDetectado?.let { litrosAbastecidos = decimalParaTextFieldValueComb(it); achouAlgo = true }
+                resultado.dataDetectada?.let { data = it; achouAlgo = true }
+                resultado.postoDetectado?.let { if (nomePosto.isBlank()) { nomePosto = it; achouAlgo = true } }
+
+                // Se achou valor total e litros, calcula o valor do litro (evita depender
+                // do OCR pegar esse número específico, que costuma vir bem pequeno no cupom).
+                val litrosNum = resultado.litrosDetectado?.toDoubleOrNull()
+                val valorNum = resultado.valorDetectado?.toDoubleOrNull()
+                if (litrosNum != null && litrosNum > 0 && valorNum != null) {
+                    valorLitro = decimalParaTextFieldValueComb((valorNum / litrosNum).toString())
+                }
+
+                resultadoScan = if (achouAlgo) "Cupom lido! Confira os dados antes de salvar."
+                                else "Não conseguimos identificar os dados automaticamente. Preencha manualmente."
+            }
+        }
+    }
+
     // Delegates persistentes - um para cada tipo de foto
     val cameraDelegateMarcador = remember {
         CombustivelCameraDelegate(
             tipoFoto = "marcador",
-            onFotoCaptured = { tipo, base64, bitmap ->
+            onFotoCaptured = { tipo, base64, bitmap, _ ->
                 fotoMarcadorBase64 = base64
                 fotoMarcador = bitmap
             },
@@ -240,9 +282,13 @@ actual fun AdicionarCombustivelScreen(
     val cameraDelegateCupom = remember {
         CombustivelCameraDelegate(
             tipoFoto = "cupom",
-            onFotoCaptured = { tipo, base64, bitmap ->
+            onFotoCaptured = { tipo, base64, bitmap, uiImage ->
                 fotoCupomBase64 = base64
                 fotoCupom = bitmap
+                if (aguardandoScan) {
+                    aguardandoScan = false
+                    executarScanCupom(uiImage)
+                }
             },
             onMessage = { msg, erro ->
                 mostrarMensagem(msg, erro)
@@ -504,6 +550,45 @@ actual fun AdicionarCombustivelScreen(
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+
+                            // Scanear Nota — OCR + QR/código de barras, preenche os campos abaixo
+                            Button(
+                                onClick = {
+                                    aguardandoScan = true
+                                    abrirCamera("cupom")
+                                },
+                                enabled = !escaneandoNota,
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2))
+                            ) {
+                                if (escaneandoNota) {
+                                    CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Lendo cupom...", fontWeight = FontWeight.Bold)
+                                } else {
+                                    Icon(Icons.Default.DocumentScanner, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("SCANEAR NOTA", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Text(
+                                "Tire uma foto do cupom fiscal e a gente tenta preencher os campos abaixo. Sempre confira antes de salvar.",
+                                fontSize = 12.sp,
+                                color = AppColors.TextSecondary,
+                                modifier = Modifier.padding(top = 6.dp)
+                            )
+                            resultadoScan?.let { msg ->
+                                Spacer(Modifier.height(8.dp))
+                                Card(colors = CardDefaults.cardColors(containerColor = AppColors.Primary.copy(alpha = 0.1f))) {
+                                    Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Info, null, tint = AppColors.Primary, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(msg, fontSize = 13.sp, color = AppColors.TextPrimary)
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(16.dp))
 
                             // Data
                             DateInputField(
@@ -982,4 +1067,60 @@ private fun formatarMoedaComb(input: String): String {
     val centavos = value % 100
     val reaisFormatado = reais.toString().reversed().chunked(3).joinToString(".").reversed()
     return "$reaisFormatado,${centavos.toString().padStart(2, '0')}"
+}
+
+/** Converte decimal puro ("123.45", vindo do scan) pro TextFieldValue já formatado em BR (mesmo padrão de formatarMoedaComb). */
+private fun decimalParaTextFieldValueComb(valorDecimal: String): TextFieldValue {
+    val valor = valorDecimal.toDoubleOrNull() ?: return TextFieldValue("")
+    val centavosTotais = kotlin.math.round(valor * 100).toLong()
+    if (centavosTotais < 0) return TextFieldValue("")
+    val reais = centavosTotais / 100
+    val centavos = centavosTotais % 100
+    val reaisFormatado = reais.toString().reversed().chunked(3).joinToString(".").reversed()
+    val formatted = "$reaisFormatado,${centavos.toString().padStart(2, '0')}"
+    return TextFieldValue(formatted, selection = TextRange(formatted.length))
+}
+
+/**
+ * Roda OCR (VNRecognizeTextRequest) e leitura de QR/código de barras
+ * (VNDetectBarcodesRequest) na foto do cupom, 100% on-device via Vision
+ * framework — sem depender de nenhum serviço externo.
+ *
+ * Chamar sempre fora da main thread (função não é @Composable-safe pra UI).
+ */
+@OptIn(ExperimentalForeignApi::class)
+private fun runVisionScan(imagem: UIImage): Pair<String, String?> {
+    val cgImage = imagem.CGImage ?: return Pair("", null)
+    val handler = VNImageRequestHandler(cGImage = cgImage, options = emptyMap<Any?, Any?>())
+
+    var textoDetectado = ""
+    val textRequest = VNRecognizeTextRequest { request, _ ->
+        val resultados = (request as? VNRecognizeTextRequest)?.results as? List<*>
+        textoDetectado = resultados
+            ?.filterIsInstance<VNRecognizedTextObservation>()
+            ?.mapNotNull { obs -> (obs.topCandidates(1UL).firstOrNull() as? VNRecognizedText)?.string }
+            ?.joinToString("\n")
+            ?: ""
+    }
+    textRequest.recognitionLevel = VNRequestTextRecognitionLevelAccurate
+    textRequest.usesLanguageCorrection = true
+    textRequest.recognitionLanguages = listOf("pt-BR")
+
+    var codigoDetectado: String? = null
+    val barcodeRequest = VNDetectBarcodesRequest { request, _ ->
+        val resultados = (request as? VNDetectBarcodesRequest)?.results as? List<*>
+        codigoDetectado = resultados
+            ?.filterIsInstance<VNBarcodeObservation>()
+            ?.firstOrNull()
+            ?.payloadStringValue
+    }
+
+    try {
+        handler.performRequests(listOf(textRequest, barcodeRequest))
+    } catch (e: Exception) {
+        // Leitura falhou (foto ruim, sem texto reconhecível etc.) — segue com
+        // o que já tiver sido preenchido pelos requests (provavelmente nada).
+    }
+
+    return Pair(textoDetectado, codigoDetectado)
 }

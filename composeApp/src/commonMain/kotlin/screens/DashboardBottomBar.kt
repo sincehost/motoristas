@@ -293,7 +293,7 @@ fun DespesasMenuOverlay(
             colors = CardDefaults.cardColors(containerColor = AppColors.Surface)
         ) {
             Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                DespesaMenuItem("Diesel", Icons.Default.LocalGasStation, AppColors.Primary) {
+                DespesaMenuItem("Abastecimento", Icons.Default.LocalGasStation, AppColors.Primary) {
                     onDismiss(); onNavigate(Screen.ADICIONAR_COMBUSTIVEL)
                 }
                 DespesaMenuItem("ARLA 32", Icons.Default.WaterDrop, Color(0xFF06B6D4)) {

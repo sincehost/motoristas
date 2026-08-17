@@ -37,6 +37,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import database.AppRepository
 import kotlinx.coroutines.launch
 import ui.AppColors
@@ -49,6 +53,7 @@ import util.converterDataParaAPI
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
 import util.formatarKmExibicao
+import util.analisarTextoCupom
 import java.io.File
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
@@ -167,6 +172,72 @@ actual fun AdicionarCombustivelScreen(
 
     // Camera
     var currentPhotoType by rememberSaveable { mutableStateOf("") }
+
+    // Scanear Nota — OCR + QR/código de barras 100% on-device (ML Kit).
+    // Reaproveita a mesma foto do cupom fiscal: essa foto vale como comprovante
+    // E como fonte da leitura, o motorista não precisa tirar duas fotos.
+    var escaneandoNota by remember { mutableStateOf(false) }
+    var aguardandoScan by remember { mutableStateOf(false) }
+    var resultadoScan by remember { mutableStateOf<String?>(null) }
+
+    fun executarScanCupom(bitmap: Bitmap) {
+        escaneandoNota = true
+        resultadoScan = null
+        val image = InputImage.fromBitmap(bitmap, 0)
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        val scanner = BarcodeScanning.getClient()
+
+        var textoOcr: String? = null
+        var codigoLido: String? = null
+        var pendentes = 2
+
+        fun finalizarSePronto() {
+            pendentes--
+            if (pendentes > 0) return
+            escaneandoNota = false
+            val texto = textoOcr ?: ""
+            if (texto.isBlank() && codigoLido == null) {
+                resultadoScan = "Não conseguimos ler o cupom automaticamente. Preencha os campos manualmente."
+                return
+            }
+            val resultado = analisarTextoCupom(texto, qrCodeText = codigoLido, barcodeText = codigoLido)
+            var achouAlgo = false
+            resultado.valorDetectado?.let { valorTotal = decimalParaTextFieldValueComb(it); achouAlgo = true }
+            resultado.litrosDetectado?.let { litrosAbastecidos = decimalParaTextFieldValueComb(it); achouAlgo = true }
+            resultado.dataDetectada?.let { data = it; achouAlgo = true }
+            resultado.postoDetectado?.let { if (nomePosto.isBlank()) { nomePosto = it; achouAlgo = true } }
+
+            // Se achou valor total e litros, calcula o valor do litro (evita depender
+            // do OCR pegar esse número específico, que costuma vir bem pequeno no cupom).
+            val litrosNum = resultado.litrosDetectado?.toDoubleOrNull()
+            val valorNum = resultado.valorDetectado?.toDoubleOrNull()
+            if (litrosNum != null && litrosNum > 0 && valorNum != null) {
+                valorLitro = decimalParaTextFieldValueComb((valorNum / litrosNum).toString())
+            }
+
+            resultadoScan = if (achouAlgo) "Cupom lido! Confira os dados antes de salvar."
+                            else "Não conseguimos identificar os dados automaticamente. Preencha manualmente."
+        }
+
+        recognizer.process(image)
+            .addOnSuccessListener { visionText -> textoOcr = visionText.text; finalizarSePronto() }
+            .addOnFailureListener { finalizarSePronto() }
+
+        scanner.process(image)
+            .addOnSuccessListener { barcodes -> codigoLido = barcodes.firstOrNull()?.rawValue; finalizarSePronto() }
+            .addOnFailureListener { finalizarSePronto() }
+    }
+
+    // Dispara o scan assim que a foto do cupom (câmera ou galeria) ficar pronta,
+    // mas só quando veio do botão "Scanear Nota" — a foto normal do cupom não
+    // aciona OCR sozinha.
+    LaunchedEffect(cameraStateCupom.bitmap) {
+        val bmp = cameraStateCupom.bitmap
+        if (aguardandoScan && bmp != null) {
+            aguardandoScan = false
+            executarScanCupom(bmp)
+        }
+    }
 
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         val currentState = if (currentPhotoType == "marcador") cameraStateMarcador else cameraStateCupom
@@ -361,6 +432,45 @@ actual fun AdicionarCombustivelScreen(
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+
+                            // Scanear Nota — OCR + QR/código de barras, preenche os campos abaixo
+                            Button(
+                                onClick = {
+                                    aguardandoScan = true
+                                    tirarFoto("cupom")
+                                },
+                                enabled = !escaneandoNota,
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2))
+                            ) {
+                                if (escaneandoNota) {
+                                    CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Lendo cupom...", fontWeight = FontWeight.Bold)
+                                } else {
+                                    Icon(Icons.Default.DocumentScanner, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("SCANEAR NOTA", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Text(
+                                "Tire uma foto do cupom fiscal e a gente tenta preencher os campos abaixo. Sempre confira antes de salvar.",
+                                fontSize = 12.sp,
+                                color = AppColors.TextSecondary,
+                                modifier = Modifier.padding(top = 6.dp)
+                            )
+                            resultadoScan?.let { msg ->
+                                Spacer(Modifier.height(8.dp))
+                                Card(colors = CardDefaults.cardColors(containerColor = AppColors.Primary.copy(alpha = 0.1f))) {
+                                    Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Info, null, tint = AppColors.Primary, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(msg, fontSize = 13.sp, color = AppColors.TextPrimary)
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(16.dp))
 
                             // Data
                             DateInputField(
@@ -691,6 +801,17 @@ private fun formatarMoedaComb(input: String): String {
     symbols.groupingSeparator = '.'
     val formatter = java.text.DecimalFormat("#,##0.00", symbols)
     return formatter.format(decimal)
+}
+
+/** Converte um decimal puro ("123.45", vindo do scan) pro TextFieldValue já formatado em BR (mesmo padrão de formatarMoedaComb/formatarDecimalComb). */
+private fun decimalParaTextFieldValueComb(valorDecimal: String): TextFieldValue {
+    val valor = valorDecimal.toDoubleOrNull() ?: return TextFieldValue("")
+    val symbols = java.text.DecimalFormatSymbols(java.util.Locale("pt", "BR"))
+    symbols.decimalSeparator = ','
+    symbols.groupingSeparator = '.'
+    val formatter = java.text.DecimalFormat("#,##0.00", symbols)
+    val formatted = formatter.format(valor)
+    return TextFieldValue(formatted, TextRange(formatted.length))
 }
 
 private fun formatarDataBR(data: String): String {

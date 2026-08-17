@@ -71,6 +71,10 @@ kotlin {
             implementation("androidx.security:security-crypto:1.1.0-alpha06")
             implementation("androidx.biometric:biometric:1.1.0")
             implementation("androidx.core:core-ktx:1.13.1")
+
+            // Scanear Nota — leitura de cupom fiscal (OCR + QR/código de barras), 100% on-device
+            implementation("com.google.mlkit:text-recognition:16.0.1")
+            implementation("com.google.mlkit:barcode-scanning:17.3.0")
         }
 
         iosMain.dependencies {
