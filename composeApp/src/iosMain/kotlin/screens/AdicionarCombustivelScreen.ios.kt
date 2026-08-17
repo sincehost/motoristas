@@ -1116,10 +1116,12 @@ private fun runVisionScan(imagem: UIImage): Pair<String, String?> {
     }
 
     try {
-        handler.performRequests(listOf(textRequest, barcodeRequest))
+        // error=null: não precisamos do NSError detalhado — se a leitura falhar
+        // (foto ruim, sem texto reconhecível etc.), os requests simplesmente não
+        // preenchem textoDetectado/codigoDetectado e o chamador trata isso normal.
+        handler.performRequests(listOf(textRequest, barcodeRequest), null)
     } catch (e: Exception) {
-        // Leitura falhou (foto ruim, sem texto reconhecível etc.) — segue com
-        // o que já tiver sido preenchido pelos requests (provavelmente nada).
+        // Leitura falhou — segue com o que já tiver sido preenchido (provavelmente nada).
     }
 
     return Pair(textoDetectado, codigoDetectado)
