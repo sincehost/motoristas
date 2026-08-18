@@ -152,6 +152,7 @@ actual fun EditarCombustivelScreen(
     var salvando by remember { mutableStateOf(false) }
     var modoOffline by remember { mutableStateOf(false) }
     var erroMsg by remember { mutableStateOf<String?>(null) }
+    var mostrarPermissaoCameraNegada by remember { mutableStateOf(false) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     // Dados da viagem (info)
@@ -234,7 +235,7 @@ actual fun EditarCombustivelScreen(
             return
         }
         if (CameraHelper.cameraSemPermissao()) {
-            erroMsg = "Câmera sem permissão. Vá em Ajustes → Câmera e ative para este app."
+            mostrarPermissaoCameraNegada = true
             return
         }
 
@@ -291,6 +292,7 @@ actual fun EditarCombustivelScreen(
 
     if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
     if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onVoltar() }
+    if (mostrarPermissaoCameraNegada) ui.CameraPermissaoNegadaDialog { mostrarPermissaoCameraNegada = false }
 
     Scaffold(topBar = { GradientTopBar(title = "Editar Combustível", onBackClick = onVoltar) }) { padding ->
         when {

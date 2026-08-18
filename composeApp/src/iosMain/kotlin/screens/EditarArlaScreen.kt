@@ -102,6 +102,7 @@ actual fun EditarArlaScreen(
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
     var erroMsg by remember { mutableStateOf<String?>(null) }
+    var mostrarPermissaoCameraNegada by remember { mutableStateOf(false) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
@@ -128,7 +129,7 @@ actual fun EditarArlaScreen(
             return
         }
         if (CameraHelper.cameraSemPermissao()) {
-            mostrarMensagem("Câmera sem permissão. Vá em Ajustes → Câmera e ative para este app.", isErro = true)
+            mostrarPermissaoCameraNegada = true
             return
         }
 
@@ -184,6 +185,7 @@ actual fun EditarArlaScreen(
     // Diálogos modais
     if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
     if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onVoltar() }
+    if (mostrarPermissaoCameraNegada) ui.CameraPermissaoNegadaDialog { mostrarPermissaoCameraNegada = false }
 
     Scaffold(
         topBar = {

@@ -119,6 +119,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
     var salvando by remember { mutableStateOf(false) }
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
+    var mostrarPermissaoCameraNegada by remember { mutableStateOf(false) }
     var placaExpanded by remember { mutableStateOf(false) }
     var servicoExpanded by remember { mutableStateOf(false) }
 
@@ -147,7 +148,8 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
         focusManager.clearFocus()
         val vc = UIApplication.sharedApplication.keyWindow?.rootViewController ?: return
         if (CameraHelper.cameraSemPermissao()) {
-            fotoMsg = "Câmera sem permissão. Vá em Ajustes → Câmera e ative para este app."; fotoMsgIsError = true; return
+            mostrarPermissaoCameraNegada = true
+            return
         }
         if (!UIImagePickerController.isSourceTypeAvailable(UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)) {
             fotoMsg = "Câmera não disponível"; fotoMsgIsError = true; return
@@ -227,6 +229,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
     // Diálogos modais de erro e sucesso
     if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
     if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onVoltar() }
+    if (mostrarPermissaoCameraNegada) ui.CameraPermissaoNegadaDialog { mostrarPermissaoCameraNegada = false }
 
     Scaffold(topBar = { GradientTopBar(title = "Adicionar Manutenção", onBackClick = onVoltar) }) { padding ->
         Column(

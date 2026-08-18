@@ -121,6 +121,7 @@ actual fun AdicionarArlaScreen(
     var carregando by remember { mutableStateOf(true) }
     var modoOffline by remember { mutableStateOf(false) }
     var erroMsg by remember { mutableStateOf<String?>(null) }
+    var mostrarPermissaoCameraNegada by remember { mutableStateOf(false) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     // Viagem em andamento (pega automaticamente)
@@ -224,7 +225,7 @@ actual fun AdicionarArlaScreen(
         }
 
         if (CameraHelper.cameraSemPermissao()) {
-            mostrarMensagem("Câmera sem permissão. Vá em Ajustes → Câmera e ative para este app.", isErro = true)
+            mostrarPermissaoCameraNegada = true
             return
         }
 
@@ -341,6 +342,7 @@ actual fun AdicionarArlaScreen(
     // Diálogos modais de erro e sucesso
     if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
     if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onSucesso() }
+    if (mostrarPermissaoCameraNegada) ui.CameraPermissaoNegadaDialog { mostrarPermissaoCameraNegada = false }
 
     Scaffold(
         topBar = {

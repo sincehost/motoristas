@@ -93,6 +93,7 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
     var localDespesa by remember { mutableStateOf("") }
     var salvando by remember { mutableStateOf(false) }
     var erroMsg by remember { mutableStateOf<String?>(null) }
+    var mostrarPermissaoCameraNegada by remember { mutableStateOf(false) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     // === FOTO ===
@@ -109,7 +110,7 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
     fun abrirCamera() {
         val vc = UIApplication.sharedApplication.keyWindow?.rootViewController ?: return
         if (CameraHelper.cameraSemPermissao()) {
-            erroMsg = "Câmera sem permissão. Vá em Ajustes → Câmera e ative para este app."
+            mostrarPermissaoCameraNegada = true
             return
         }
         if (!UIImagePickerController.isSourceTypeAvailable(UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)) return
@@ -156,6 +157,7 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
 
     if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
     if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onSucesso() }
+    if (mostrarPermissaoCameraNegada) ui.CameraPermissaoNegadaDialog { mostrarPermissaoCameraNegada = false }
 
     Scaffold(topBar = { GradientTopBar(title = "Outras Despesas", onBackClick = onVoltar) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).background(AppColors.Background).pointerInput(Unit) {

@@ -124,6 +124,7 @@ actual fun AdicionarDescargaScreen(
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
     var erroMsg by remember { mutableStateOf<String?>(null) }
+    var mostrarPermissaoCameraNegada by remember { mutableStateOf(false) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     // Cores
@@ -222,7 +223,7 @@ actual fun AdicionarDescargaScreen(
         }
 
         if (CameraHelper.cameraSemPermissao()) {
-            mostrarMensagem("Câmera sem permissão. Vá em Ajustes → Câmera e ative para este app.", isErro = true)
+            mostrarPermissaoCameraNegada = true
             return
         }
 
@@ -418,6 +419,7 @@ actual fun AdicionarDescargaScreen(
     // Diálogos modais de erro e sucesso
     if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
     if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onSucesso() }
+    if (mostrarPermissaoCameraNegada) ui.CameraPermissaoNegadaDialog { mostrarPermissaoCameraNegada = false }
 
     // ========== FORMULÁRIO ==========
     Scaffold(

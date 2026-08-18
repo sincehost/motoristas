@@ -41,6 +41,19 @@ object CameraHelper {
     }
 
     /**
+     * Pula direto pra tela de configurações DESTE app dentro do Ajustes do
+     * iPhone (não o Ajustes geral) — o motorista não precisa procurar nada,
+     * só tocar em "Câmera" e ativar. Usado no botão do diálogo de permissão
+     * negada, pra não depender de instrução escrita ("vá em Ajustes...").
+     */
+    fun abrirConfiguracoesDoApp() {
+        val url = NSURL.URLWithString(UIApplicationOpenSettingsURLString)
+        if (url != null) {
+            UIApplication.sharedApplication.openURL(url)
+        }
+    }
+
+    /**
      * Converte UIImage para Base64 comprimido.
      * Delega para ImageCompressor que faz resize + JPEG compression.
      *
