@@ -71,24 +71,31 @@ fun BottomNavigationBar(
                     modifier = Modifier.fillMaxWidth()
                 )
             },
+            // Botões empilhados (um embaixo do outro) em vez de lado a lado —
+            // mesmo padrão do aviso "Nenhuma viagem em andamento".
             confirmButton = {
-                Button(
-                    onClick = {
-                        mostrarAvisoIniciarViagem = false
-                        onNavigate(Screen.INICIAR_VIAGEM)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
-                    shape = RoundedCornerShape(8.dp)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Iniciar Viagem", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = { mostrarAvisoIniciarViagem = false },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Entendido")
+                    Button(
+                        onClick = {
+                            mostrarAvisoIniciarViagem = false
+                            onNavigate(Screen.INICIAR_VIAGEM)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Iniciar Viagem", fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(
+                        onClick = { mostrarAvisoIniciarViagem = false },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Entendido")
+                    }
                 }
             }
         )
