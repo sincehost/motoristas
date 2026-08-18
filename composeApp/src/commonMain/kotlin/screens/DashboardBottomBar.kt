@@ -124,24 +124,31 @@ fun BottomNavigationBar(
                     modifier = Modifier.fillMaxWidth()
                 )
             },
+            // Botões empilhados (um embaixo do outro) em vez de lado a lado —
+            // fica mais organizado com os dois textos de tamanhos diferentes.
             confirmButton = {
-                Button(
-                    onClick = {
-                        mostrarAvisoSemViagem = false
-                        onNavigate(Screen.INICIAR_VIAGEM)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
-                    shape = RoundedCornerShape(8.dp)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Iniciar Viagem", fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = { mostrarAvisoSemViagem = false },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Entendido")
+                    Button(
+                        onClick = {
+                            mostrarAvisoSemViagem = false
+                            onNavigate(Screen.INICIAR_VIAGEM)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Iniciar Viagem", fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(
+                        onClick = { mostrarAvisoSemViagem = false },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Entendido")
+                    }
                 }
             }
         )
