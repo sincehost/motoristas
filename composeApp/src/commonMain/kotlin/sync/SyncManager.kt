@@ -455,7 +455,7 @@ class SyncManager(private val repository: AppRepository) {
                         val syncResp = ApiClient.syncDados(repository.getMotoristaLogado()?.motorista_id ?: "")
                         if (syncResp.status == "ok") {
                             repository.salvarDestinos(syncResp.destinos.map { it.id to it.nome })
-                            repository.salvarEquipamentos(syncResp.equipamentos.map { it.id to it.placa })
+                            repository.salvarEquipamentos(syncResp.equipamentos.map { Triple(it.id, it.placa, it.km) })
                             repository.salvarFormasPagamento(syncResp.formas_pagamento.map { Triple(it.id, it.nome, it.codigo) })
                             repository.salvarTiposDespesa(syncResp.tipos_despesa.map { TipoDespesaSync(it.id, it.nome, it.icone, it.cor) })
                             repository.salvarTiposCombustivel(syncResp.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) })
@@ -624,6 +624,7 @@ class SyncManager(private val repository: AppRepository) {
 
             if (resp.status == "ok") {
                 repository.marcarViagemSincronizada(viagem.id)
+                repository.marcarViagemErro(viagem.id, null)
                 val viagemIdServidor = resp.viagem_id?.toLong()
 
                 if (viagemIdServidor != null) {
@@ -641,6 +642,7 @@ class SyncManager(private val repository: AppRepository) {
             } else {
                 LogWriter.log("❌ VIAGEM REJEITADA: ${resp.mensagem}")
                 LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                repository.marcarViagemErro(viagem.id, resp.mensagem)
                 SyncItemResult(sucesso = false, erro = "Viagem: ${resp.mensagem}")
             }
         } catch (e: Exception) {
@@ -648,6 +650,7 @@ class SyncManager(private val repository: AppRepository) {
             LogWriter.log("   ${e::class.simpleName}: ${e.message}")
             e.printStackTrace()
             LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            repository.marcarViagemErro(viagem.id, e.message)
             SyncItemResult(sucesso = false, erro = "Viagem: ${e.message}")
         }
     }
@@ -729,14 +732,17 @@ class SyncManager(private val repository: AppRepository) {
 
             if (resp.status == "ok") {
                 repository.marcarAbastecimentoSincronizado(abastecimento.id)
+                repository.marcarAbastecimentoErro(abastecimento.id, null)
                 SyncItemResult(sucesso = true)
             } else {
+                repository.marcarAbastecimentoErro(abastecimento.id, resp.mensagem)
                 SyncItemResult(sucesso = false, erro = "Abastecimento: ${resp.mensagem}")
             }
         } catch (e: Exception) {
             LogWriter.log("❌ EXCEÇÃO SINCRONIZAR ABASTECIMENTO:")
             LogWriter.log("   ${e::class.simpleName}: ${e.message}")
             LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            repository.marcarAbastecimentoErro(abastecimento.id, e.message)
             SyncItemResult(sucesso = false, erro = "Abastecimento: ${e.message}")
         }
     }
@@ -783,9 +789,11 @@ class SyncManager(private val repository: AppRepository) {
 
             if (resp.status == "ok") {
                 repository.marcarArlaSincronizada(arla.id)
+                repository.marcarArlaErro(arla.id, null)
                 SyncItemResult(sucesso = true)
             } else {
                 LogWriter.log("❌ ARLA REJEITADA: ${resp.mensagem}")
+                repository.marcarArlaErro(arla.id, resp.mensagem)
                 SyncItemResult(sucesso = false, erro = "ARLA: ${resp.mensagem}")
             }
         } catch (e: Exception) {
@@ -793,6 +801,7 @@ class SyncManager(private val repository: AppRepository) {
             LogWriter.log("   ${e::class.simpleName}: ${e.message}")
             e.printStackTrace()
             LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            repository.marcarArlaErro(arla.id, e.message)
             SyncItemResult(sucesso = false, erro = "ARLA: ${e.message}")
         }
     }
@@ -824,11 +833,14 @@ class SyncManager(private val repository: AppRepository) {
 
             if (resp.status == "ok") {
                 repository.marcarDescargaSincronizada(descarga.id)
+                repository.marcarDescargaErro(descarga.id, null)
                 SyncItemResult(sucesso = true)
             } else {
+                repository.marcarDescargaErro(descarga.id, resp.mensagem)
                 SyncItemResult(sucesso = false, erro = "Descarga: ${resp.mensagem}")
             }
         } catch (e: Exception) {
+            repository.marcarDescargaErro(descarga.id, e.message)
             SyncItemResult(sucesso = false, erro = "Descarga: ${e.message}")
         }
     }
@@ -871,11 +883,14 @@ class SyncManager(private val repository: AppRepository) {
 
             if (resp.status == "ok") {
                 repository.marcarManutencaoSincronizada(manutencao.id)
+                repository.marcarManutencaoErro(manutencao.id, null)
                 SyncItemResult(sucesso = true)
             } else {
+                repository.marcarManutencaoErro(manutencao.id, resp.mensagem)
                 SyncItemResult(sucesso = false, erro = "Manutenção: ${resp.mensagem}")
             }
         } catch (e: Exception) {
+            repository.marcarManutencaoErro(manutencao.id, e.message)
             SyncItemResult(sucesso = false, erro = "Manutenção: ${e.message}")
         }
     }
@@ -933,6 +948,7 @@ class SyncManager(private val repository: AppRepository) {
 
             if (resp.status == "ok") {
                 repository.marcarFinalizacaoSincronizada(finalizacao.id)
+                repository.marcarFinalizacaoErro(finalizacao.id, null)
                 LogWriter.log("  ✅ Finalização sincronizada com sucesso!")
                 SyncItemResult(sucesso = true)
             } else {
@@ -944,16 +960,19 @@ class SyncManager(private val repository: AppRepository) {
                 if (msg.contains("já foi finalizada", ignoreCase = true)) {
                     LogWriter.log("  ⚠️ Viagem já finalizada no servidor — marcando como sincronizada")
                     repository.marcarFinalizacaoSincronizada(finalizacao.id)
+                    repository.marcarFinalizacaoErro(finalizacao.id, null)
                     SyncItemResult(sucesso = true)
                 } else {
                     // Para qualquer outro erro (incluindo "não encontrada"),
                     // NÃO marcar como sincronizado — tentar novamente no próximo ciclo
                     LogWriter.log("  ⏳ Erro não permanente, tentará novamente no próximo sync")
+                    repository.marcarFinalizacaoErro(finalizacao.id, msg)
                     SyncItemResult(sucesso = false, erro = "Finalização: $msg")
                 }
             }
         } catch (e: Exception) {
             LogWriter.log("  ❌ Exception na sync: ${e.message}")
+            repository.marcarFinalizacaoErro(finalizacao.id, e.message)
             SyncItemResult(sucesso = false, erro = "Finalização: ${e.message}")
         }
     }
@@ -989,15 +1008,19 @@ class SyncManager(private val repository: AppRepository) {
 
                 if (resp.status == "ok") {
                     repository.marcarOutraDespesaSincronizada(despesa.id)
+                    repository.marcarOutraDespesaErro(despesa.id, null)
                     SyncItemResult(sucesso = true)
                 } else {
+                    repository.marcarOutraDespesaErro(despesa.id, resp.mensagem)
                     SyncItemResult(sucesso = false, erro = "OutraDespesa: ${resp.mensagem}")
                 }
             } catch (e: Exception) {
                 LogWriter.log("⚠️ API de outras despesas não disponível, mantendo para próxima sync: ${e.message}")
+                repository.marcarOutraDespesaErro(despesa.id, "API não disponível ainda")
                 SyncItemResult(sucesso = false, erro = "OutraDespesa: API não disponível ainda")
             }
         } catch (e: Exception) {
+            repository.marcarOutraDespesaErro(despesa.id, e.message)
             SyncItemResult(sucesso = false, erro = "OutraDespesa: ${e.message}")
         }
     }
@@ -1037,11 +1060,14 @@ class SyncManager(private val repository: AppRepository) {
             )}
             if (resp.status == "ok") {
                 repository.marcarChecklistPreSincronizado(checklist.id)
+                repository.marcarChecklistPreErro(checklist.id, null)
                 SyncItemResult(sucesso = true)
             } else {
+                repository.marcarChecklistPreErro(checklist.id, resp.mensagem)
                 SyncItemResult(sucesso = false, erro = "ChecklistPré: ${resp.mensagem}")
             }
         } catch (e: Exception) {
+            repository.marcarChecklistPreErro(checklist.id, e.message)
             SyncItemResult(sucesso = false, erro = "ChecklistPré: ${e.message}")
         }
     }
@@ -1074,11 +1100,14 @@ class SyncManager(private val repository: AppRepository) {
             )}
             if (resp.status == "ok") {
                 repository.marcarChecklistPosSincronizado(checklist.id)
+                repository.marcarChecklistPosErro(checklist.id, null)
                 SyncItemResult(sucesso = true)
             } else {
+                repository.marcarChecklistPosErro(checklist.id, resp.mensagem)
                 SyncItemResult(sucesso = false, erro = "ChecklistPós: ${resp.mensagem}")
             }
         } catch (e: Exception) {
+            repository.marcarChecklistPosErro(checklist.id, e.message)
             SyncItemResult(sucesso = false, erro = "ChecklistPós: ${e.message}")
         }
     }

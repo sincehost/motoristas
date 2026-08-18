@@ -48,6 +48,7 @@ import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
+import util.kmParaDouble
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
@@ -559,6 +560,30 @@ actual fun IniciarViagemScreen(
                             color = AppColors.Primary,
                             modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                         )
+
+                        // Aviso (não bloqueia) se o KM digitado for menor que o último
+                        // conhecido do veículo — cache local (sincronizado junto com a
+                        // placa), funciona mesmo offline. Pode estar levemente
+                        // desatualizado se o veículo rodou noutro aparelho desde o
+                        // último sync, então é só aviso — mesma lógica do Android.
+                        val kmCadastrado = remember(placaSelecionada) {
+                            placaSelecionada?.let { repository.getKmEquipamentoPorPlaca(it) }
+                        }
+                        val kmMenorQueCadastrado = kmCadastrado != null && kmInicio.text.isNotBlank() &&
+                            kmParaDouble(kmInicio.text) < kmParaDouble(kmCadastrado)
+                        if (kmMenorQueCadastrado) {
+                            Spacer(Modifier.height(8.dp))
+                            Row(verticalAlignment = Alignment.Top) {
+                                Icon(Icons.Default.Warning, null, tint = AppColors.Orange, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "KM menor que o último registrado para esta placa (${util.formatarKmExibicao(kmParaDouble(kmCadastrado))}). " +
+                                        "Confira antes de salvar — se estiver errado, a viagem não vai sincronizar depois.",
+                                    fontSize = 12.sp,
+                                    color = AppColors.Orange
+                                )
+                            }
+                        }
 
                         Spacer(Modifier.height(16.dp))
 

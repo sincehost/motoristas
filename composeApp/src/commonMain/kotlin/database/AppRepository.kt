@@ -116,14 +116,26 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
             .map { it.servidor_id to it.placa }
     }
 
-    fun salvarEquipamentos(equipamentos: List<Pair<String, String>>) {
+    fun salvarEquipamentos(equipamentos: List<Triple<String, String, String>>) {
         queries.deleteAllEquipamentos()
-        equipamentos.forEach { (id, placa) ->
+        equipamentos.forEach { (id, placa, km) ->
             queries.insertEquipamento(
                 servidor_id = id.toLong(),
-                placa = placa
+                placa = placa,
+                km = km
             )
         }
+    }
+
+    /**
+     * KM cadastrado do veículo (cache local, atualizado a cada sync) — usado
+     * pra avisar offline se o KM de início digitado é menor que o último
+     * conhecido, sem depender de internet. Pode estar levemente desatualizado
+     * se o veículo rodou noutro aparelho desde o último sync; por isso é só
+     * referência pro aviso, o servidor continua sendo a validação definitiva.
+     */
+    fun getKmEquipamentoPorPlaca(placa: String): String? {
+        return queries.getKmEquipamentoPorPlaca(placa).executeAsOneOrNull()?.takeIf { it.isNotBlank() }
     }
 
     // ===============================
@@ -252,6 +264,35 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         queries.deleteViagemById(id)
     }
 
+    fun marcarViagemErro(id: Long, erro: String?) {
+        queries.marcarViagemErro(erro, id)
+    }
+
+    /**
+     * Descarta uma viagem pendente (ainda não sincronizada) e tudo que
+     * depende dela localmente — usado quando o motorista quer desistir de
+     * um lançamento travado (ex.: viagem com KM inválido que o servidor
+     * sempre rejeita) sem precisar desinstalar o app. Dependentes podem
+     * referenciar viagem_id = idLocal (positivo) OU = -idLocal (negativo,
+     * formato do fluxo ViagemAtual offline) — mesma dualidade tratada em
+     * atualizarViagemIdEmDependentes(), então limpa os dois formatos.
+     */
+    fun excluirViagemLocalComDependentes(idLocal: Long) {
+        database.transaction {
+            for (vid in listOf(idLocal, -idLocal)) {
+                queries.deletarArlasPorViagemId(vid)
+                queries.deletarAbastecimentosPorViagemId(vid)
+                queries.deletarManutencoesPorViagemId(vid)
+                queries.deletarFinalizacoesPorViagemId(vid)
+                queries.deletarDescargasPorViagemId(vid)
+                queries.deletarOutrasDespesasPorViagemId(vid)
+                queries.deletarChecklistsPrePorViagemId(vid)
+                queries.deletarChecklistsPosPorViagemId(vid)
+            }
+            queries.deleteViagemById(idLocal)
+        }
+    }
+
     // Guarda o último viagem_id retornado pelo servidor após sincronização
     fun salvarUltimaViagemServidor(viagemIdServidor: Long) {
         queries.salvarUltimaViagemServidor(viagemIdServidor)
@@ -372,6 +413,14 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         queries.marcarArlaSincronizada(id)
     }
 
+    fun marcarArlaErro(id: Long, erro: String?) {
+        queries.marcarArlaErro(erro, id)
+    }
+
+    fun excluirArlaLocal(id: Long) {
+        queries.deleteArlaById(id)
+    }
+
     fun limparArlasSincronizadas() {
         queries.deleteArlasSincronizadas()
     }
@@ -420,6 +469,14 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     fun marcarAbastecimentoSincronizado(id: Long) {
         queries.marcarAbastecimentoSincronizado(id)
+    }
+
+    fun marcarAbastecimentoErro(id: Long, erro: String?) {
+        queries.marcarAbastecimentoErro(erro, id)
+    }
+
+    fun excluirAbastecimentoLocal(id: Long) {
+        queries.deleteAbastecimentoById(id)
     }
 
     fun limparAbastecimentosSincronizados() {
@@ -496,6 +553,14 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         queries.marcarManutencaoSincronizada(id)
     }
 
+    fun marcarManutencaoErro(id: Long, erro: String?) {
+        queries.marcarManutencaoErro(erro, id)
+    }
+
+    fun excluirManutencaoLocal(id: Long) {
+        queries.deleteManutencaoById(id)
+    }
+
     fun limparManutencoesSincronizadas() {
         queries.deleteManutencoesSincronizadas()
     }
@@ -542,6 +607,14 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         queries.marcarFinalizacaoSincronizada(id)
     }
 
+    fun marcarFinalizacaoErro(id: Long, erro: String?) {
+        queries.marcarFinalizacaoErro(erro, id)
+    }
+
+    fun excluirFinalizacaoLocal(id: Long) {
+        queries.deleteFinalizacaoById(id)
+    }
+
     fun limparFinalizacoesSincronizadas() {
         queries.deleteFinalizacoesSincronizadas()
     }
@@ -576,6 +649,14 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     fun marcarDescargaSincronizada(id: Long) {
         queries.marcarDescargaSincronizada(id)
+    }
+
+    fun marcarDescargaErro(id: Long, erro: String?) {
+        queries.marcarDescargaErro(erro, id)
+    }
+
+    fun excluirDescargaLocal(id: Long) {
+        queries.deleteDescargaById(id)
     }
 
     fun limparDescargasSincronizadas() {
@@ -681,6 +762,14 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         queries.marcarOutraDespesaSincronizada(id)
     }
 
+    fun marcarOutraDespesaErro(id: Long, erro: String?) {
+        queries.marcarOutraDespesaErro(erro, id)
+    }
+
+    fun excluirOutraDespesaLocal(id: Long) {
+        queries.deleteOutraDespesaById(id)
+    }
+
     fun limparOutrasDespesasSincronizadas() {
         queries.deleteOutrasDespesasSincronizadas()
     }
@@ -737,6 +826,14 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         queries.marcarChecklistPreSincronizado(id)
     }
 
+    fun marcarChecklistPreErro(id: Long, erro: String?) {
+        queries.marcarChecklistPreErro(erro, id)
+    }
+
+    fun excluirChecklistPreLocal(id: Long) {
+        queries.deleteChecklistPreById(id)
+    }
+
     fun limparChecklistsPreSincronizados() {
         queries.deleteChecklistsPreSincronizados()
     }
@@ -786,6 +883,14 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     fun marcarChecklistPosSincronizado(id: Long) {
         queries.marcarChecklistPosSincronizado(id)
+    }
+
+    fun marcarChecklistPosErro(id: Long, erro: String?) {
+        queries.marcarChecklistPosErro(erro, id)
+    }
+
+    fun excluirChecklistPosLocal(id: Long) {
+        queries.deleteChecklistPosById(id)
     }
 
     fun limparChecklistsPosSincronizados() {

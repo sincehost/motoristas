@@ -39,6 +39,21 @@ actual class DatabaseDriverFactory(private val context: Context) {
                     try {
                         db.execSQL("ALTER TABLE Abastecimento ADD COLUMN valor_litro TEXT NOT NULL DEFAULT ''")
                     } catch (_: Exception) {}
+                    // Migração: KM do equipamento (cache local pra avisar offline se o
+                    // KM de início for menor que o último registrado) e ultimo_erro em
+                    // todas as tabelas sincronizáveis (pra descartar item travado sem
+                    // precisar desinstalar o app).
+                    try {
+                        db.execSQL("ALTER TABLE Equipamento ADD COLUMN km TEXT NOT NULL DEFAULT ''")
+                    } catch (_: Exception) {}
+                    for (tabela in listOf(
+                        "Viagem", "Arla", "Abastecimento", "Manutencao", "FinalizacaoViagem",
+                        "Descarga", "OutraDespesa", "ChecklistPreViagem", "ChecklistPosViagem"
+                    )) {
+                        try {
+                            db.execSQL("ALTER TABLE $tabela ADD COLUMN ultimo_erro TEXT")
+                        } catch (_: Exception) {}
+                    }
                 }
             }
         )

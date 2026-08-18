@@ -17,7 +17,21 @@ actual class DatabaseDriverFactory {
             "ALTER TABLE FinalizacaoViagem ADD COLUMN teve_retorno INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE FinalizacaoViagem ADD COLUMN local_carregou TEXT",
             "ALTER TABLE FinalizacaoViagem ADD COLUMN ordem_retorno TEXT",
-            "ALTER TABLE FinalizacaoViagem ADD COLUMN cte_retorno TEXT"
+            "ALTER TABLE FinalizacaoViagem ADD COLUMN cte_retorno TEXT",
+            // KM do equipamento (cache local pra avisar offline se o KM de início
+            // for menor que o último registrado) e ultimo_erro em todas as
+            // tabelas sincronizáveis (pra descartar item travado sem precisar
+            // desinstalar o app).
+            "ALTER TABLE Equipamento ADD COLUMN km TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE Viagem ADD COLUMN ultimo_erro TEXT",
+            "ALTER TABLE Arla ADD COLUMN ultimo_erro TEXT",
+            "ALTER TABLE Abastecimento ADD COLUMN ultimo_erro TEXT",
+            "ALTER TABLE Manutencao ADD COLUMN ultimo_erro TEXT",
+            "ALTER TABLE FinalizacaoViagem ADD COLUMN ultimo_erro TEXT",
+            "ALTER TABLE Descarga ADD COLUMN ultimo_erro TEXT",
+            "ALTER TABLE OutraDespesa ADD COLUMN ultimo_erro TEXT",
+            "ALTER TABLE ChecklistPreViagem ADD COLUMN ultimo_erro TEXT",
+            "ALTER TABLE ChecklistPosViagem ADD COLUMN ultimo_erro TEXT"
         )
         for (sql in migrações) {
             try {

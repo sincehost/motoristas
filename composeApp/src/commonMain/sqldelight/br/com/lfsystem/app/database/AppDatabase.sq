@@ -25,7 +25,8 @@ CREATE TABLE Destino (
 CREATE TABLE Equipamento (
     id INTEGER PRIMARY KEY,
     servidor_id INTEGER NOT NULL,
-    placa TEXT NOT NULL
+    placa TEXT NOT NULL,
+    km TEXT NOT NULL DEFAULT ''
 );
 
 -- ===============================
@@ -77,7 +78,8 @@ CREATE TABLE Viagem (
     valorfrete TEXT,
     foto_painel_saida TEXT,
     data_criacao TEXT NOT NULL,
-    sincronizado INTEGER NOT NULL DEFAULT 0
+    sincronizado INTEGER NOT NULL DEFAULT 0,
+    ultimo_erro TEXT
 );
 
 -- ===============================
@@ -116,11 +118,18 @@ getAllEquipamentos:
 SELECT * FROM Equipamento ORDER BY placa;
 
 insertEquipamento:
-INSERT OR REPLACE INTO Equipamento (servidor_id, placa)
-VALUES (?, ?);
+INSERT OR REPLACE INTO Equipamento (servidor_id, placa, km)
+VALUES (?, ?, ?);
 
 deleteAllEquipamentos:
 DELETE FROM Equipamento;
+
+-- Usado pra validar offline se o KM de início digitado é menor que o
+-- último KM conhecido do veículo (cache local, pode estar levemente
+-- desatualizado se o veículo rodou noutro aparelho desde o último sync —
+-- por isso é só aviso, o servidor continua sendo a validação definitiva).
+getKmEquipamentoPorPlaca:
+SELECT km FROM Equipamento WHERE placa = ? LIMIT 1;
 
 -- ===============================
 -- QUERIES DE FORMAS DE PAGAMENTO
@@ -186,6 +195,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
 marcarViagemSincronizada:
 UPDATE Viagem SET sincronizado = 1 WHERE id = ?;
 
+marcarViagemErro:
+UPDATE Viagem SET ultimo_erro = ? WHERE id = ?;
+
 deleteViagensSincronizadas:
 DELETE FROM Viagem WHERE sincronizado = 1;
 deleteViagemById:
@@ -209,7 +221,8 @@ CREATE TABLE Arla (
     posto TEXT NOT NULL,
     km_posto TEXT NOT NULL,
     foto TEXT,
-    sincronizado INTEGER NOT NULL DEFAULT 0
+    sincronizado INTEGER NOT NULL DEFAULT 0,
+    ultimo_erro TEXT
 );
 -- ===============================
 -- QUERIES DE ARLA
@@ -239,6 +252,15 @@ INSERT INTO Arla (
 marcarArlaSincronizada:
 UPDATE Arla SET sincronizado = 1 WHERE id = ?;
 
+marcarArlaErro:
+UPDATE Arla SET ultimo_erro = ? WHERE id = ?;
+
+deleteArlaById:
+DELETE FROM Arla WHERE id = ?;
+
+deletarArlasPorViagemId:
+DELETE FROM Arla WHERE viagem_id = ?;
+
 deleteArlasSincronizadas:
 DELETE FROM Arla WHERE sincronizado = 1;
 
@@ -262,7 +284,8 @@ CREATE TABLE Abastecimento (
     tipo_combustivel TEXT NOT NULL DEFAULT 'Diesel Caminhão',
     horas TEXT,
     sincronizado INTEGER DEFAULT 0,
-    data_criacao TEXT DEFAULT CURRENT_TIMESTAMP
+    data_criacao TEXT DEFAULT CURRENT_TIMESTAMP,
+    ultimo_erro TEXT
 );
 -- ===============================
 -- QUERIES DE ABASTECIMENTO
@@ -296,6 +319,15 @@ INSERT INTO Abastecimento (
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
 marcarAbastecimentoSincronizado:
 UPDATE Abastecimento SET sincronizado = 1 WHERE id = ?;
+
+marcarAbastecimentoErro:
+UPDATE Abastecimento SET ultimo_erro = ? WHERE id = ?;
+
+deleteAbastecimentoById:
+DELETE FROM Abastecimento WHERE id = ?;
+
+deletarAbastecimentosPorViagemId:
+DELETE FROM Abastecimento WHERE viagem_id = ?;
 
 deleteAbastecimentosSincronizados:
 DELETE FROM Abastecimento WHERE sincronizado = 1;
@@ -345,7 +377,8 @@ CREATE TABLE Manutencao (
     tipos_pneu TEXT,
     foto_comprovante1 TEXT,
     foto_comprovante2 TEXT,
-    sincronizado INTEGER NOT NULL DEFAULT 0
+    sincronizado INTEGER NOT NULL DEFAULT 0,
+    ultimo_erro TEXT
 );
 
 -- ===============================
@@ -382,6 +415,15 @@ INSERT INTO Manutencao (
 marcarManutencaoSincronizada:
 UPDATE Manutencao SET sincronizado = 1 WHERE id = ?;
 
+marcarManutencaoErro:
+UPDATE Manutencao SET ultimo_erro = ? WHERE id = ?;
+
+deleteManutencaoById:
+DELETE FROM Manutencao WHERE id = ?;
+
+deletarManutencoesPorViagemId:
+DELETE FROM Manutencao WHERE viagem_id = ?;
+
 deleteManutencoesSincronizadas:
 DELETE FROM Manutencao WHERE sincronizado = 1;
 
@@ -405,7 +447,8 @@ CREATE TABLE FinalizacaoViagem (
     local_carregou TEXT,
     ordem_retorno TEXT,
     cte_retorno TEXT,
-    sincronizado INTEGER NOT NULL DEFAULT 0
+    sincronizado INTEGER NOT NULL DEFAULT 0,
+    ultimo_erro TEXT
 );
 
 -- ===============================
@@ -440,6 +483,15 @@ INSERT INTO FinalizacaoViagem (
 marcarFinalizacaoSincronizada:
 UPDATE FinalizacaoViagem SET sincronizado = 1 WHERE id = ?;
 
+marcarFinalizacaoErro:
+UPDATE FinalizacaoViagem SET ultimo_erro = ? WHERE id = ?;
+
+deleteFinalizacaoById:
+DELETE FROM FinalizacaoViagem WHERE id = ?;
+
+deletarFinalizacoesPorViagemId:
+DELETE FROM FinalizacaoViagem WHERE viagem_id = ?;
+
 deleteFinalizacoesSincronizadas:
 DELETE FROM FinalizacaoViagem WHERE sincronizado = 1;
 
@@ -455,7 +507,8 @@ CREATE TABLE Descarga (
     ordem_descarga INTEGER NOT NULL,
     valor TEXT NOT NULL,
     foto TEXT,
-    sincronizado INTEGER NOT NULL DEFAULT 0
+    sincronizado INTEGER NOT NULL DEFAULT 0,
+    ultimo_erro TEXT
 );
 
 -- ===============================
@@ -529,6 +582,15 @@ INSERT INTO Descarga (
 marcarDescargaSincronizada:
 UPDATE Descarga SET sincronizado = 1 WHERE id = ?;
 
+marcarDescargaErro:
+UPDATE Descarga SET ultimo_erro = ? WHERE id = ?;
+
+deleteDescargaById:
+DELETE FROM Descarga WHERE id = ?;
+
+deletarDescargasPorViagemId:
+DELETE FROM Descarga WHERE viagem_id = ?;
+
 deleteDescargasSincronizadas:
 DELETE FROM Descarga WHERE sincronizado = 1;
 
@@ -589,7 +651,8 @@ CREATE TABLE OutraDespesa (
     data TEXT NOT NULL,
     local_ TEXT,
     foto_comprovante TEXT,
-    sincronizado INTEGER NOT NULL DEFAULT 0
+    sincronizado INTEGER NOT NULL DEFAULT 0,
+    ultimo_erro TEXT
 );
 
 -- ===============================
@@ -619,6 +682,15 @@ INSERT INTO OutraDespesa (
 
 marcarOutraDespesaSincronizada:
 UPDATE OutraDespesa SET sincronizado = 1 WHERE id = ?;
+
+marcarOutraDespesaErro:
+UPDATE OutraDespesa SET ultimo_erro = ? WHERE id = ?;
+
+deleteOutraDespesaById:
+DELETE FROM OutraDespesa WHERE id = ?;
+
+deletarOutrasDespesasPorViagemId:
+DELETE FROM OutraDespesa WHERE viagem_id = ?;
 
 deleteOutrasDespesasSincronizadas:
 DELETE FROM OutraDespesa WHERE sincronizado = 1;
@@ -683,7 +755,8 @@ CREATE TABLE ChecklistPreViagem (
     observacoes TEXT,
     -- Controle
     sincronizado INTEGER NOT NULL DEFAULT 0,
-    data_criacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    data_criacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ultimo_erro TEXT
 );
 
 -- ===============================
@@ -727,7 +800,8 @@ CREATE TABLE ChecklistPosViagem (
     observacoes TEXT,
     -- Controle
     sincronizado INTEGER NOT NULL DEFAULT 0,
-    data_criacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    data_criacao TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ultimo_erro TEXT
 );
 
 -- ===============================
@@ -768,6 +842,15 @@ INSERT INTO ChecklistPreViagem (
 marcarChecklistPreSincronizado:
 UPDATE ChecklistPreViagem SET sincronizado = 1 WHERE id = ?;
 
+marcarChecklistPreErro:
+UPDATE ChecklistPreViagem SET ultimo_erro = ? WHERE id = ?;
+
+deleteChecklistPreById:
+DELETE FROM ChecklistPreViagem WHERE id = ?;
+
+deletarChecklistsPrePorViagemId:
+DELETE FROM ChecklistPreViagem WHERE viagem_id = ?;
+
 deleteChecklistsPreSincronizados:
 DELETE FROM ChecklistPreViagem WHERE sincronizado = 1;
 
@@ -807,6 +890,15 @@ INSERT INTO ChecklistPosViagem (
 
 marcarChecklistPosSincronizado:
 UPDATE ChecklistPosViagem SET sincronizado = 1 WHERE id = ?;
+
+marcarChecklistPosErro:
+UPDATE ChecklistPosViagem SET ultimo_erro = ? WHERE id = ?;
+
+deleteChecklistPosById:
+DELETE FROM ChecklistPosViagem WHERE id = ?;
+
+deletarChecklistsPosPorViagemId:
+DELETE FROM ChecklistPosViagem WHERE viagem_id = ?;
 
 deleteChecklistsPosSincronizados:
 DELETE FROM ChecklistPosViagem WHERE sincronizado = 1;

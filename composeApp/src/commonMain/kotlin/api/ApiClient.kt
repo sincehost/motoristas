@@ -595,7 +595,8 @@ data class DestinoDto(
 @Serializable
 data class EquipamentoDto(
     val id: String,
-    val placa: String
+    val placa: String,
+    val km: String = ""
 )
 
 @Serializable

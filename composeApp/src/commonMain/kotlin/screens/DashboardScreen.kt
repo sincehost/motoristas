@@ -191,6 +191,10 @@ fun DashboardScreen(
                                 AppEvents.emitir(AppEvent.DadosPendentesAlterados)
                             }
                         )
+                        Screen.PENDENCIAS_SYNC -> PendenciasSyncScreen(
+                            repository = repository,
+                            onVoltar = { voltar() }
+                        )
                         else -> {}
                     }
                 }
@@ -599,7 +603,7 @@ private fun DashboardMenuItems(
             val sync = ApiClient.syncDados(repository.getMotoristaLogado()?.motorista_id ?: "")
             if (sync.status == "ok") {
                 repository.salvarDestinos(sync.destinos.map { it.id to it.nome })
-                repository.salvarEquipamentos(sync.equipamentos.map { it.id to it.placa })
+                repository.salvarEquipamentos(sync.equipamentos.map { Triple(it.id, it.placa, it.km) })
                 repository.salvarFormasPagamento(sync.formas_pagamento.map { Triple(it.id, it.nome, it.codigo) })
                 repository.salvarTiposDespesa(sync.tipos_despesa.map { TipoDespesaSync(it.id, it.nome, it.icone, it.cor) })
                 repository.salvarTiposCombustivel(sync.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) })
@@ -637,5 +641,9 @@ private fun DashboardMenuItems(
     Spacer(Modifier.height(12.dp))
     MenuButton(Icons.Default.FactCheck, "Checklist Pós-Viagem", Color(0xFF10B981)) {
         scope.launch { onMensagem(null); onNavigate(Screen.CHECKLIST_POS_VIAGEM) }
+    }
+    Spacer(Modifier.height(12.dp))
+    MenuButton(Icons.Default.SyncProblem, "Pendências de Sincronização", Color(0xFFEF6C00)) {
+        scope.launch { onMensagem(null); onNavigate(Screen.PENDENCIAS_SYNC) }
     }
 }
