@@ -604,6 +604,7 @@ data class ManutencaoCompleta(
     val data_manutencao: String,
     val placa: String,
     val servico: String,
+    val tipo_manutencao: String = "preventiva",
     val descricao_servico: String? = null,
     val local_manutencao: String? = null,
     val valor: String,
