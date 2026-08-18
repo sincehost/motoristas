@@ -34,6 +34,10 @@ import ui.GradientTopBar
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
 import util.formatarKmExibicao
+import kotlinx.cinterop.ExperimentalForeignApi
+import platform.UIKit.*
+import platform.CoreGraphics.*
+import platform.Foundation.*
 
 // Estados de navegação
 private sealed class TelaViagem {
@@ -884,7 +888,19 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         }
                     }
                 }
+                // Botão Exportar PDF — Android já tinha, iOS não.
                 Spacer(Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = { exportarResumoPdfIos(resumo!!, outrasDespesas, viagemId) },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.Primary)
+                ) {
+                    Icon(Icons.Default.PictureAsPdf, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Exportar PDF", fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.height(32.dp))
             }
         }
     }
@@ -1357,4 +1373,152 @@ private fun decimalParaMascaraBRViagem(valorServidor: String?): String {
     val centavos = centavosTotal % 100
     val reaisFormatado = reais.toString().reversed().chunked(3).joinToString(".").reversed()
     return (if (negativo) "-" else "") + "$reaisFormatado,${centavos.toString().padStart(2, '0')}"
+}
+
+// ===============================
+// EXPORTAR PDF (iOS) — Android já tinha isso via android.graphics.pdf.PdfDocument;
+// aqui o equivalente nativo é UIGraphicsPDFRenderer (CoreGraphics/UIKit),
+// desenhando o mesmo conteúdo, seção por seção, na mesma ordem do Android.
+// ===============================
+
+@OptIn(ExperimentalForeignApi::class)
+private fun corHexPdf(hex: String): UIColor {
+    val h = hex.removePrefix("#")
+    val r = h.substring(0, 2).toInt(16).toDouble() / 255.0
+    val g = h.substring(2, 4).toInt(16).toDouble() / 255.0
+    val b = h.substring(4, 6).toInt(16).toDouble() / 255.0
+    return UIColor(red = r, green = g, blue = b, alpha = 1.0)
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun exportarResumoPdfIos(res: ResumoViagem, outrasDespesas: List<OutraDespesaItem>, viagemId: Int) {
+    try {
+        val left = 40.0
+        val right = 555.0
+        var y = 50.0
+
+        val pageRect = CGRectMake(0.0, 0.0, 595.0, 842.0)
+        val renderer = UIGraphicsPDFRenderer(bounds = pageRect)
+
+        fun desenharTexto(texto: String, x: Double, tamanho: Double, negrito: Boolean, cor: UIColor) {
+            val fonte = if (negrito) UIFont.boldSystemFontOfSize(tamanho) else UIFont.systemFontOfSize(tamanho)
+            val atributos = mapOf<Any?, Any?>(
+                NSFontAttributeName to fonte,
+                NSForegroundColorAttributeName to cor
+            )
+            (texto as NSString).drawAtPoint(CGPointMake(x, y), withAttributes = atributos)
+        }
+
+        fun desenharLinha() {
+            val path = UIBezierPath()
+            path.moveToPoint(CGPointMake(left, y))
+            path.addLineToPoint(CGPointMake(right, y))
+            path.lineWidth = 1.0
+            corHexPdf("#CCCCCC").setStroke()
+            path.stroke()
+        }
+
+        fun drawItem(label: String, value: String) {
+            desenharTexto(label, left, 11.0, false, corHexPdf("#555555"))
+            desenharTexto(value, 300.0, 11.0, true, corHexPdf("#1A202C"))
+            y += 18.0
+        }
+
+        fun drawSection(title: String, cor: String) {
+            y += 6.0
+            desenharTexto(title, left, 13.0, true, corHexPdf(cor))
+            y += 20.0
+        }
+
+        val data = renderer.PDFDataWithActions { context ->
+            context?.beginPage()
+
+            desenharTexto("Resumo da Viagem", left, 20.0, true, corHexPdf("#07275A")); y += 28.0
+            desenharTexto("Motorista: ${res.motorista_nome}", left, 14.0, false, corHexPdf("#666666")); y += 18.0
+            desenharTexto("Rota: ${res.destino_nome}", left, 14.0, false, corHexPdf("#666666")); y += 18.0
+            desenharTexto("Ordem: ${res.numerobd}", left, 14.0, false, corHexPdf("#666666")); y += 12.0
+            y += 8.0
+            desenharLinha(); y += 16.0
+
+            drawSection("Dados da Viagem", "#07275A")
+            drawItem("Peso da Carga:", formatarPesoView(res.pesocarga.toDoubleOrNull()?.toLong()?.toString() ?: res.pesocarga.filter { it.isDigit() }) + " kg")
+            drawItem("KM Início:", formatarKmExibicao(res.km_inicio))
+            drawItem("KM Chegada:", formatarKmExibicao(res.km_chegada))
+            drawItem("KM da Rota:", "${formatarKmExibicao(res.km_da_rota)} km")
+            drawItem("KM Percorridos:", "${formatarKmExibicao(res.km_percorridos)} km")
+            drawItem("KM Ultrapassados:", "${formatarKmExibicao(res.km_ultrapassados)} km")
+
+            drawSection("Combustíveis", "#F59E0B")
+            drawItem("Diesel Caminhão:", "${formatarNumero(res.litros_diesel_caminhao)} L")
+            drawItem("Diesel Aparelho:", "${formatarNumero(res.litros_diesel_aparelho)} L")
+            drawItem("ARLA:", "${formatarNumero(res.litros_arla)} L")
+
+            drawSection("Médias", "#10B981")
+            drawItem("Média Real:", "${formatarNumero(res.media_consumo)} KM/L")
+            drawItem("Média Pedida:", "${formatarNumero(res.media_rota)} KM/L")
+            drawItem("Média ARLA:", "${formatarNumero(res.media_arla)} KM/L")
+            drawItem("Horas Aparelho:", "${formatarNumero(res.soma_horas)}h — ${formatarNumero(res.media_aparelho)} h/l")
+
+            drawSection("Valores", "#8B5CF6")
+            drawItem("Diesel Caminhão:", formatarMoeda(res.valor_diesel_caminhao))
+            drawItem("Diesel Aparelho:", formatarMoeda(res.valor_diesel_aparelho))
+            drawItem("ARLA:", formatarMoeda(res.valor_arla))
+            drawItem("Descarga:", formatarMoeda(res.valor_descarga))
+            drawItem("Comissão:", formatarMoeda(res.comissao))
+
+            if (outrasDespesas.isNotEmpty()) {
+                drawSection("Outras Despesas", "#FF6F00")
+                val porTipo = outrasDespesas.groupBy { it.tipo }
+                porTipo.forEach { (tipo, itens) ->
+                    drawItem("$tipo (${itens.size}x):", formatarMoeda(itens.sumOf { it.valor }))
+                }
+                drawItem("Total Outras:", formatarMoeda(outrasDespesas.sumOf { it.valor }))
+            }
+
+            y += 4.0
+            desenharLinha(); y += 16.0
+            drawItem("Total Despesas:", formatarMoeda(res.total_despesas + outrasDespesas.sumOf { it.valor }))
+
+            drawSection("Faturamento", "#07275A")
+            drawItem("Valor Frete:", formatarMoeda(res.valor_frete))
+            val temRetornoPdf = res.pesocarga_retorno.toDoubleOrNull()?.let { it > 0 } == true ||
+                res.ordem_retorno.isNotBlank() ||
+                res.cte_retorno.isNotBlank() ||
+                res.valor_frete_retorno > 0
+            if (temRetornoPdf) {
+                if (res.pesocarga_retorno.isNotBlank()) {
+                    drawItem("Peso Carga Retorno:", formatarPesoView(res.pesocarga_retorno.toDoubleOrNull()?.toLong()?.toString() ?: res.pesocarga_retorno.filter { it.isDigit() }) + " kg")
+                }
+                if (res.ordem_retorno.isNotBlank()) drawItem("Ordem de Retorno:", res.ordem_retorno)
+                if (res.cte_retorno.isNotBlank()) drawItem("CT-e de Retorno:", res.cte_retorno)
+                drawItem("Frete Retorno:", formatarMoeda(res.valor_frete_retorno))
+            }
+            drawItem("Total Frete:", formatarMoeda(res.saldo_frete))
+
+            y += 8.0
+            val corSaldo = if (res.saldo_viagem >= 0) "#10B981" else "#EF4444"
+            desenharTexto("SALDO: ${formatarMoeda(res.saldo_viagem)}", left, 16.0, true, corHexPdf(corSaldo))
+        }
+
+        val nomeArquivo = "resumo_viagem_${viagemId}_${res.destino_nome.replace(" ", "_").take(20)}.pdf"
+        val caminho = NSTemporaryDirectory() + nomeArquivo
+        val sucesso = data.writeToFile(caminho, atomically = true)
+        if (!sucesso) return
+
+        compartilharPdfIos(caminho)
+    } catch (e: Exception) {
+        // Falha silenciosa — mesmo espírito do catch do Android, que só mostra
+        // um Toast; aqui não temos acesso direto a mostrarMensagem() deste escopo.
+    }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun compartilharPdfIos(caminho: String) {
+    val viewController = UIApplication.sharedApplication.keyWindow?.rootViewController ?: return
+    val url = NSURL.fileURLWithPath(caminho)
+    val activityVC = UIActivityViewController(activityItems = listOf(url), applicationActivities = null)
+    // iPad exige sourceView/sourceRect no popover, senão crasha ao apresentar.
+    activityVC.popoverPresentationController?.sourceView = viewController.view
+    activityVC.popoverPresentationController?.sourceRect = CGRectMake(0.0, 0.0, 1.0, 1.0)
+    viewController.presentViewController(activityVC, true, null)
 }
