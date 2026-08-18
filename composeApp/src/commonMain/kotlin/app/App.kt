@@ -10,6 +10,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import database.AppRepository
+import screens.BiometricLockScreen
 import screens.DashboardScreen
 import screens.LoginScreen
 import screens.SplashScreen
@@ -30,6 +31,10 @@ fun App(
     var showSplash by remember { mutableStateOf(true) }
     var needsMiuiSetup by remember { mutableStateOf(showMiuiSetup) }
     var appError by remember { mutableStateOf<String?>(null) }
+    // Trava biométrica: só pede quando o app abre já logado (sessão local
+    // persistente) — login novo via LoginScreen não passa por aqui, porque
+    // o motorista acabou de confirmar a identidade digitando a senha.
+    var isLocked by remember { mutableStateOf(isLoggedIn) }
 
     // Se algum erro grave aconteceu, mostrar tela de erro
     if (appError != null) {
@@ -71,16 +76,23 @@ fun App(
             SplashScreen(onFinished = { showSplash = false })
         } else if (needsMiuiSetup && miuiSetupContent != null) {
             miuiSetupContent { needsMiuiSetup = false }
+        } else if (isLoggedIn && isLocked) {
+            BiometricLockScreen(
+                repository = repository,
+                onUnlocked = { isLocked = false },
+                onLogout = { isLoggedIn = false; isLocked = false }
+            )
         } else if (isLoggedIn) {
             DashboardScreen(
                 repository = repository,
-                onLogout = { isLoggedIn = false }
+                onLogout = { isLoggedIn = false; isLocked = false }
             )
         } else {
             LoginScreen(
                 repository = repository,
                 onLoginSuccess = {
                     isLoggedIn = true
+                    isLocked = false
                     if (showMiuiSetup) {
                         needsMiuiSetup = true
                     }

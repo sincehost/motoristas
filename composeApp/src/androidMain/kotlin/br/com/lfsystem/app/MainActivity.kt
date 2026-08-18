@@ -22,6 +22,7 @@ import app.App
 import database.AppRepository
 import database.DatabaseDriverFactory
 import screens.NetworkMonitor
+import util.BiometricAuth
 import util.SyncNotificationHelper
 
 class MainActivity : ComponentActivity() {
@@ -73,6 +74,11 @@ class MainActivity : ComponentActivity() {
                 return
             }
         }
+
+        // Registra a Activity pra BiometricAuth poder abrir o prompt do
+        // sistema — sem isso, BiometricAuth.isAvailable()/authenticate()
+        // falham silenciosamente (activity == null).
+        BiometricAuth.init(this)
 
         // Inicia monitoramento de rede
         NetworkMonitor.iniciar(applicationContext)

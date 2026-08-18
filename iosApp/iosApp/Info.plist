@@ -16,5 +16,7 @@
 <string>Precisamos da câmera para fotografar o painel do veículo</string>
 <key>NSPhotoLibraryUsageDescription</key>
 <string>Precisamos acessar suas fotos para selecionar imagens</string>
+<key>NSFaceIDUsageDescription</key>
+<string>Usamos Face ID para proteger o acesso ao app com sua sessão já conectada</string>
 </dict>
 </plist>
