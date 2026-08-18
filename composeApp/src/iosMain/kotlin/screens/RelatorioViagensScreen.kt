@@ -293,7 +293,7 @@ actual fun RelatorioViagensScreen(
                         }
 
                         val totalFrete = rel.total_valor_frete + rel.total_valor_frete_retorno
-                        val imposto = totalFrete * (rel.percentual_imposto / 100.0)
+                        val imposto = rel.valor_imposto
                         val saldo = totalFrete - rel.total_valor_arla - rel.total_valor_diesel - rel.total_valor_descarga - rel.total_outras_despesas - imposto - rel.comissao_periodo
 
                         Divider(modifier = Modifier.padding(vertical = 12.dp))
