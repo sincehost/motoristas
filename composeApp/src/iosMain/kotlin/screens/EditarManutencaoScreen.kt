@@ -151,6 +151,7 @@ actual fun EditarManutencaoScreen(
     val equipamentos = remember { repository.getEquipamentosParaDropdown() }
     var carregando by remember { mutableStateOf(true) }
     var salvando by remember { mutableStateOf(false) }
+    var modoOffline by remember { mutableStateOf(false) }
 
     var dataManutencao by remember { mutableStateOf(dataAtualFormatada()) }
     var placa by remember { mutableStateOf("") }
@@ -260,10 +261,12 @@ actual fun EditarManutencaoScreen(
                 }
                 fotoComprovante1Base64 = manutencao.foto_comprovante1
                 fotoComprovante2Base64 = manutencao.foto_comprovante2
+                modoOffline = false
             } else {
                 mostrarMensagem(response.mensagem ?: "Manutenção não encontrada", isErro = true)
             }
         } catch (e: Exception) {
+            modoOffline = true
             mostrarMensagem("Erro ao carregar dados: ${e.message}", isErro = true)
         }
         carregando = false
@@ -293,6 +296,18 @@ actual fun EditarManutencaoScreen(
                     })
                 }.verticalScroll(scrollState).padding(16.dp)
             ) {
+                // Aviso offline — Editar Combustível/ARLA/Descarga já tinham, Manutenção não.
+                if (modoOffline) {
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.Orange.copy(alpha = 0.1f))) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CloudOff, null, tint = AppColors.Orange)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Sem conexão. Conecte para editar manutenção.", color = AppColors.Orange, fontSize = 14.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground),
@@ -540,7 +555,7 @@ actual fun EditarManutencaoScreen(
                                     salvando = false
                                 }
                             },
-                            enabled = !salvando,
+                            enabled = !salvando && !modoOffline,
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF06B6D4))

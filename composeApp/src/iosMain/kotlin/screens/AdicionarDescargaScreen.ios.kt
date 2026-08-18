@@ -236,6 +236,23 @@ actual fun AdicionarDescargaScreen(
         viewController.presentViewController(picker, true, null)
     }
 
+    // Escolher da galeria — Android já oferece essa opção aqui, iOS só tinha câmera.
+    fun escolherDaGaleria() {
+        val viewController = UIApplication.sharedApplication.keyWindow?.rootViewController
+        if (viewController == null) {
+            mostrarMensagem("Não foi possível abrir a galeria", isErro = true)
+            return
+        }
+
+        val picker = UIImagePickerController().apply {
+            sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypePhotoLibrary
+            allowsEditing = false
+            delegate = cameraDelegate
+        }
+
+        viewController.presentViewController(picker, true, null)
+    }
+
     fun salvarDescarga() {
         val viagem = viagemAtual
         val mot = motorista
@@ -597,49 +614,100 @@ actual fun AdicionarDescargaScreen(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-                            IconButton(
-                                onClick = { abrirCamera() },
+                            Row(
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
-                                    .padding(8.dp)
-                                    .size(36.dp)
-                                    .background(primaryColor, RoundedCornerShape(50))
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    Icons.Default.CameraAlt,
-                                    "Nova foto",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                IconButton(
+                                    onClick = { escolherDaGaleria() },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(Color(0xFF1976D2), RoundedCornerShape(50))
+                                ) {
+                                    Icon(
+                                        Icons.Default.PhotoLibrary,
+                                        "Da galeria",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { abrirCamera() },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(primaryColor, RoundedCornerShape(50))
+                                ) {
+                                    Icon(
+                                        Icons.Default.CameraAlt,
+                                        "Nova foto",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     } else {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
-                                .clickable { abrirCamera() },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = inputBackground),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                            Card(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(120.dp)
+                                    .clickable { abrirCamera() },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = inputBackground),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
                             ) {
-                                Icon(
-                                    Icons.Default.CameraAlt,
-                                    null,
-                                    tint = placeholderColor,
-                                    modifier = Modifier.size(32.dp)
-                                )
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    "Toque para tirar foto",
-                                    fontSize = 14.sp,
-                                    color = placeholderColor
-                                )
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.CameraAlt,
+                                        null,
+                                        tint = placeholderColor,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "Tirar foto",
+                                        fontSize = 14.sp,
+                                        color = placeholderColor
+                                    )
+                                }
+                            }
+                            Card(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(120.dp)
+                                    .clickable { escolherDaGaleria() },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = inputBackground),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.PhotoLibrary,
+                                        null,
+                                        tint = placeholderColor,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "Da galeria",
+                                        fontSize = 14.sp,
+                                        color = placeholderColor
+                                    )
+                                }
                             }
                         }
                     }
