@@ -105,7 +105,9 @@ private class CameraDelegate(
     }
 
     override fun imagePickerControllerDidCancel(picker: UIImagePickerController) {
-        onMessage("Captura cancelada", false)
+        // Sem mensagem: cancelar a foto é ação normal do motorista, não precisa
+        // de aviso — e "Captura cancelada" ia pelo caminho de SUCESSO (sucessoMsg),
+        // cujo dismiss chama onSucesso()/onVoltar() e navegava pra fora da tela.
         picker.dismissViewControllerAnimated(true, null)
     }
 }
