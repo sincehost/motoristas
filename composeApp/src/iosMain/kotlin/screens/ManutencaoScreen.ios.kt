@@ -146,6 +146,9 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
     fun abrirCamera(fotoIndex: Int) {
         focusManager.clearFocus()
         val vc = UIApplication.sharedApplication.keyWindow?.rootViewController ?: return
+        if (CameraHelper.cameraSemPermissao()) {
+            fotoMsg = "Câmera sem permissão. Vá em Ajustes → Câmera e ative para este app."; fotoMsgIsError = true; return
+        }
         if (!UIImagePickerController.isSourceTypeAvailable(UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)) {
             fotoMsg = "Câmera não disponível"; fotoMsgIsError = true; return
         }

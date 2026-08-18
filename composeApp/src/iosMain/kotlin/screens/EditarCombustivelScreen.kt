@@ -233,6 +233,11 @@ actual fun EditarCombustivelScreen(
             erroMsg = "Não foi possível abrir a câmera"
             return
         }
+        if (CameraHelper.cameraSemPermissao()) {
+            erroMsg = "Câmera sem permissão. Vá em Ajustes → Câmera e ative para este app."
+            return
+        }
+
         if (!UIImagePickerController.isSourceTypeAvailable(
                 UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)) {
             erroMsg = "Câmera não disponível neste dispositivo"

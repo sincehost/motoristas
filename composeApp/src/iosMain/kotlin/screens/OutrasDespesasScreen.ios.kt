@@ -108,6 +108,10 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
 
     fun abrirCamera() {
         val vc = UIApplication.sharedApplication.keyWindow?.rootViewController ?: return
+        if (CameraHelper.cameraSemPermissao()) {
+            erroMsg = "Câmera sem permissão. Vá em Ajustes → Câmera e ative para este app."
+            return
+        }
         if (!UIImagePickerController.isSourceTypeAvailable(UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)) return
         val picker = UIImagePickerController().apply {
             sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera

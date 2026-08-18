@@ -221,6 +221,11 @@ actual fun AdicionarDescargaScreen(
             return
         }
 
+        if (CameraHelper.cameraSemPermissao()) {
+            mostrarMensagem("Câmera sem permissão. Vá em Ajustes → Câmera e ative para este app.", isErro = true)
+            return
+        }
+
         if (!UIImagePickerController.isSourceTypeAvailable(
                 UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)) {
             mostrarMensagem("Câmera não disponível neste dispositivo", isErro = true)

@@ -2,6 +2,10 @@ package util
 
 import platform.Foundation.*
 import platform.UIKit.*
+import platform.AVFoundation.AVAuthorizationStatus
+import platform.AVFoundation.AVCaptureDevice
+import platform.AVFoundation.AVMediaTypeVideo
+import platform.AVFoundation.authorizationStatusForMediaType
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
@@ -18,6 +22,23 @@ import org.jetbrains.skia.Image as SkiaImage
  * - Resultado: ~200-400KB em vez de 5-7MB
  */
 object CameraHelper {
+
+    /**
+     * Verdadeiro se a permissão de câmera já foi negada (usuário tocou "Não
+     * Permitir" alguma vez, ou é MDM/restrição) — nesse estado o iOS NÃO
+     * mostra o pedido de permissão de novo, e abrir o UIImagePickerController
+     * mesmo assim resulta em tela preta que se auto-cancela sozinha, sem
+     * nenhuma mensagem clara pro motorista. Chamar isso ANTES de abrir a
+     * câmera evita essa experiência confusa — se negado, mostra direto
+     * "vá em Ajustes" em vez de tentar abrir e falhar silenciosamente.
+     * Se o status for "ainda não perguntado", retorna false: o próprio
+     * UIImagePickerController dispara o pedido de permissão normalmente.
+     */
+    fun cameraSemPermissao(): Boolean {
+        val status = AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)
+        return status == AVAuthorizationStatus.AVAuthorizationStatusDenied ||
+            status == AVAuthorizationStatus.AVAuthorizationStatusRestricted
+    }
 
     /**
      * Converte UIImage para Base64 comprimido.
