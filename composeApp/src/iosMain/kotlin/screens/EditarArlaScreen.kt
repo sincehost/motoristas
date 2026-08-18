@@ -87,6 +87,7 @@ actual fun EditarArlaScreen(
 
     var carregando by remember { mutableStateOf(true) }
     var salvando by remember { mutableStateOf(false) }
+    var modoOffline by remember { mutableStateOf(false) }
 
     var data by remember { mutableStateOf(dataAtualFormatada()) }
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
@@ -164,10 +165,12 @@ actual fun EditarArlaScreen(
                 val kmPostoTexto = arla.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: arla.km_posto
                 kmPosto = TextFieldValue(kmPostoTexto, selection = TextRange(0, kmPostoTexto.length))
                 fotoBase64 = arla.foto
+                modoOffline = false
             } else {
                 mostrarMensagem(response.mensagem ?: "ARLA não encontrado", isErro = true)
             }
         } catch (e: Exception) {
+            modoOffline = true
             mostrarMensagem("Erro ao carregar dados: ${e.message}", isErro = true)
         }
         carregando = false
@@ -202,6 +205,18 @@ actual fun EditarArlaScreen(
                     .verticalScroll(scrollState)
                     .padding(16.dp)
             ) {
+                // Aviso offline — Android já tinha, iOS não.
+                if (modoOffline) {
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.Orange.copy(alpha = 0.1f))) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CloudOff, null, tint = AppColors.Orange)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Sem conexão. Conecte para editar ARLA.", color = AppColors.Orange, fontSize = 14.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground),
@@ -409,7 +424,7 @@ actual fun EditarArlaScreen(
                                     salvando = false
                                 }
                             },
-                            enabled = !salvando,
+                            enabled = !salvando && !modoOffline,
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF06B6D4))

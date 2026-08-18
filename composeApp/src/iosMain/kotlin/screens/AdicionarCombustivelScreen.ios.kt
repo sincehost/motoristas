@@ -321,6 +321,26 @@ actual fun AdicionarCombustivelScreen(
         viewController.presentViewController(picker, true, null)
     }
 
+    // Escolher da galeria — Android já oferece essa opção aqui, iOS só tinha câmera.
+    // (O botão "Scanear Nota" continua só câmera, não passa por aqui.)
+    fun escolherDaGaleria(tipo: String) {
+        val viewController = UIApplication.sharedApplication.keyWindow?.rootViewController
+        if (viewController == null) {
+            mostrarMensagem("Não foi possível abrir a galeria", isErro = true)
+            return
+        }
+
+        val delegate = if (tipo == "marcador") cameraDelegateMarcador else cameraDelegateCupom
+
+        val picker = UIImagePickerController().apply {
+            sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypePhotoLibrary
+            allowsEditing = false
+            this.delegate = delegate
+        }
+
+        viewController.presentViewController(picker, true, null)
+    }
+
     // Função salvar OFFLINE
     fun salvarLocal() {
         // Validação
@@ -644,6 +664,7 @@ actual fun AdicionarCombustivelScreen(
                             FotoCapturaAbastecimento(
                                 foto = fotoMarcador,
                                 onClick = { abrirCamera("marcador") },
+                                onEscolherGaleria = { escolherDaGaleria("marcador") },
                                 onRemover = {
                                     fotoMarcador = null
                                     fotoMarcadorBase64 = null
@@ -885,6 +906,7 @@ actual fun AdicionarCombustivelScreen(
                             FotoCapturaAbastecimento(
                                 foto = fotoCupom,
                                 onClick = { abrirCamera("cupom") },
+                                onEscolherGaleria = { escolherDaGaleria("cupom") },
                                 onRemover = {
                                     fotoCupom = null
                                     fotoCupomBase64 = null
@@ -934,6 +956,7 @@ actual fun AdicionarCombustivelScreen(
 private fun FotoCapturaAbastecimento(
     foto: ImageBitmap?,
     onClick: () -> Unit,
+    onEscolherGaleria: () -> Unit,
     onRemover: () -> Unit
 ) {
     if (foto != null) {
@@ -964,36 +987,47 @@ private fun FotoCapturaAbastecimento(
             }
         }
     } else {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .border(
-                    2.dp,
-                    AppColors.Primary.copy(alpha = 0.3f),
-                    RoundedCornerShape(12.dp)
-                )
-                .clickable { onClick() },
-            color = AppColors.Primary.copy(alpha = 0.05f)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(
-                Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(100.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(2.dp, AppColors.Primary.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    .clickable { onClick() },
+                color = AppColors.Primary.copy(alpha = 0.05f)
             ) {
-                Icon(
-                    Icons.Default.CameraAlt,
-                    null,
-                    tint = AppColors.Primary,
-                    modifier = Modifier.size(40.dp)
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Tirar Foto",
-                    color = AppColors.Primary,
-                    fontWeight = FontWeight.Medium
-                )
+                Column(
+                    Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.CameraAlt, null, tint = AppColors.Primary, modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text("Tirar Foto", color = AppColors.Primary, fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                }
+            }
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(100.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(2.dp, Color(0xFF1976D2).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    .clickable { onEscolherGaleria() },
+                color = Color(0xFF1976D2).copy(alpha = 0.05f)
+            ) {
+                Column(
+                    Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.PhotoLibrary, null, tint = Color(0xFF1976D2), modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text("Da Galeria", color = Color(0xFF1976D2), fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                }
             }
         }
     }

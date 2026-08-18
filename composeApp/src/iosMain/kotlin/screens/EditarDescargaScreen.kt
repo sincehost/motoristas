@@ -81,11 +81,14 @@ actual fun EditarDescargaScreen(
     onVoltar: () -> Unit
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
+    val equipamentos = remember { repository.getEquipamentosParaDropdown() }
     var carregando by remember { mutableStateOf(true) }
     var salvando by remember { mutableStateOf(false) }
+    var modoOffline by remember { mutableStateOf(false) }
 
     var data by remember { mutableStateOf(dataAtualFormatada()) }
     var placa by remember { mutableStateOf("") }
+    var placaExpanded by remember { mutableStateOf(false) }
     var ordemDescarga by remember { mutableStateOf("") }
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var fotoBase64 by remember { mutableStateOf<String?>(null) }
@@ -150,10 +153,12 @@ actual fun EditarDescargaScreen(
                 val valorFormatado = formatarValor(((descarga.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
                 valor = TextFieldValue(valorFormatado, selection = TextRange(valorFormatado.length))
                 fotoBase64 = descarga.foto
+                modoOffline = false
             } else {
                 mostrarMensagem(response.mensagem ?: "Descarga não encontrada", isErro = true)
             }
         } catch (e: Exception) {
+            modoOffline = true
             mostrarMensagem("Erro ao carregar dados: ${e.message}", isErro = true)
         }
         carregando = false
@@ -183,6 +188,18 @@ actual fun EditarDescargaScreen(
                     })
                 }.verticalScroll(scrollState).padding(16.dp)
             ) {
+                // Aviso offline — Android já tinha, iOS não.
+                if (modoOffline) {
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.Orange.copy(alpha = 0.1f))) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CloudOff, null, tint = AppColors.Orange)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Sem conexão. Conecte para editar descarga.", color = AppColors.Orange, fontSize = 14.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground),
@@ -202,16 +219,19 @@ actual fun EditarDescargaScreen(
                         )
                         Spacer(Modifier.height(12.dp))
 
-                        OutlinedTextField(
-                            value = placa,
-                            onValueChange = { placa = it },
-                            label = { Text("Placa *") },
+                        // Antes travada (enabled = false) — Android sempre permitiu trocar a placa aqui.
+                        ui.AppDropdownField(
+                            label = "Placa *",
+                            selectedText = placa,
+                            expanded = placaExpanded,
+                            onExpandedChange = { placaExpanded = it },
                             leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF06B6D4)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            singleLine = true,
-                            enabled = false
-                        )
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            equipamentos.forEach { (_, p) ->
+                                ui.AppDropdownMenuItem(text = { Text(p) }, onClick = { placa = p; placaExpanded = false })
+                            }
+                        }
                         Spacer(Modifier.height(12.dp))
 
                         OutlinedTextField(
@@ -321,6 +341,7 @@ actual fun EditarDescargaScreen(
                         Button(
                             onClick = {
                                 scope.launch {
+                                    if (placa.isBlank()) { mostrarMensagem("Selecione a placa", isErro = true); return@launch }
                                     if (data.isBlank()) { mostrarMensagem("Informe a data", isErro = true); return@launch }
                                     if (ordemDescarga.isBlank()) { mostrarMensagem("Informe a ordem de descarga", isErro = true); return@launch }
                                     val ordemDescargaInt = ordemDescarga.toIntOrNull()
@@ -329,6 +350,8 @@ actual fun EditarDescargaScreen(
                                         return@launch
                                     }
                                     if (valor.text.isBlank()) { mostrarMensagem("Informe o valor", isErro = true); return@launch }
+                                    // Antes não validava — Android sempre exigiu a foto pra salvar a edição.
+                                    if (fotoBase64.isNullOrBlank()) { mostrarMensagem("Tire a foto do comprovante", isErro = true); return@launch }
 
                                     salvando = true
                                     try {
@@ -360,7 +383,7 @@ actual fun EditarDescargaScreen(
                                     salvando = false
                                 }
                             },
-                            enabled = !salvando,
+                            enabled = !salvando && !modoOffline,
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF06B6D4))

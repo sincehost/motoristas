@@ -745,6 +745,14 @@ actual fun IniciarViagemScreen(
                                         mostrarMensagem("Tire a foto do painel de saída", isErro = true)
                                         return@launch
                                     }
+                                    // Mesma validação do Android: sem isso, o iOS enviava o valor do
+                                    // frete vazio (null) silenciosamente quando o motorista deixava
+                                    // "0,00" ou em branco, sem avisar nem bloquear.
+                                    val freteDigits = valorFrete.text.replace(".", "").replace(",", "").replace(" ", "")
+                                    if (valorFrete.text.isBlank() || freteDigits.toLongOrNull() == 0L || freteDigits.isEmpty()) {
+                                        mostrarMensagem("O valor do frete não pode ser R$ 0,00. Informe um valor válido.", isErro = true)
+                                        return@launch
+                                    }
 
                                     loading = true
 

@@ -140,6 +140,7 @@ actual fun EditarCombustivelScreen(
     onVoltar: () -> Unit
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
+    val equipamentos = remember { repository.getEquipamentosParaDropdown() }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
@@ -149,6 +150,7 @@ actual fun EditarCombustivelScreen(
 
     var carregando by remember { mutableStateOf(true) }
     var salvando by remember { mutableStateOf(false) }
+    var modoOffline by remember { mutableStateOf(false) }
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
@@ -173,6 +175,7 @@ actual fun EditarCombustivelScreen(
     val fotoCupomBitmap = remember(fotoCupomBase64) { fotoCupomBase64?.let { CameraHelper.base64ToImageBitmap(it) } }
 
     var combustivelExpanded by remember { mutableStateOf(false) }
+    var placaExpanded by remember { mutableStateOf(false) }
 
     // Carrega dados da API
     LaunchedEffect(Unit) {
@@ -196,10 +199,12 @@ actual fun EditarCombustivelScreen(
                 valorTotal = TextFieldValue(valorTotalTexto, selection = TextRange(valorTotalTexto.length))
                 tipoPagamento = a.forma_pagamento.lowercase()
                 fotoMarcadorBase64 = a.foto_marcador; fotoCupomBase64 = a.foto_cupom
+                modoOffline = false
             } else {
                 erroMsg = "Abastecimento não encontrado"
             }
         } catch (e: Exception) {
+            modoOffline = true
             erroMsg = "Erro ao carregar: ${e.message}"
         }
         carregando = false
@@ -243,12 +248,18 @@ actual fun EditarCombustivelScreen(
     }
 
     fun salvar() {
+        if (placa.isBlank()) { erroMsg = "Selecione uma placa"; return }
         if (nomePosto.isBlank()) { erroMsg = "Informe o posto"; return }
         if (kmPosto.text.isBlank()) { erroMsg = "Informe o KM"; return }
         if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L && horas.isBlank()) { erroMsg = "Informe as horas"; return }
         if (litros.text.isBlank()) { erroMsg = "Informe os litros"; return }
         if (valorLitro.text.isBlank()) { erroMsg = "Informe o valor do litro"; return }
         if (valorTotal.text.isBlank()) { erroMsg = "Informe o valor total"; return }
+        // Antes não validava nada disso — Android sempre exigiu forma de
+        // pagamento e as duas fotos pra salvar a edição.
+        if (tipoPagamento.isBlank()) { erroMsg = "Selecione a forma de pagamento"; return }
+        if (fotoMarcadorBase64 == null) { erroMsg = "Tire a foto da quilometragem"; return }
+        if (fotoCupomBase64 == null) { erroMsg = "Tire a foto do cupom fiscal"; return }
 
         scope.launch {
             salvando = true
@@ -289,6 +300,18 @@ actual fun EditarCombustivelScreen(
                     focusManager.clearFocus()
                 })
             }.verticalScroll(rememberScrollState()).padding(16.dp)) {
+                // Aviso offline — Android já tinha, iOS não.
+                if (modoOffline) {
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.Orange.copy(alpha = 0.1f))) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CloudOff, null, tint = AppColors.Orange)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Sem conexão. Conecte para editar abastecimento.", color = AppColors.Orange, fontSize = 14.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+
                 // Info da viagem
                 if (destino.isNotBlank()) {
                     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD)), shape = RoundedCornerShape(12.dp)) {
@@ -303,8 +326,19 @@ actual fun EditarCombustivelScreen(
 
                 Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground), shape = RoundedCornerShape(16.dp)) {
                     Column(Modifier.padding(20.dp)) {
-                        OutlinedTextField(placa, {}, readOnly = true, label = { Text("Placa") },
-                            leadingIcon = { Icon(Icons.Default.DirectionsCar, null) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+                        // Antes travada (readOnly) — Android sempre permitiu trocar a placa aqui.
+                        ui.AppDropdownField(
+                            label = "Placa *",
+                            selectedText = placa,
+                            expanded = placaExpanded,
+                            onExpandedChange = { placaExpanded = it },
+                            leadingIcon = { Icon(Icons.Default.DirectionsCar, null) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            equipamentos.forEach { (_, p) ->
+                                ui.AppDropdownMenuItem(text = { Text(p) }, onClick = { placa = p; placaExpanded = false })
+                            }
+                        }
                         Spacer(Modifier.height(12.dp))
 
                         OutlinedTextField(data, { data = it }, label = { Text("Data") },
@@ -417,7 +451,7 @@ actual fun EditarCombustivelScreen(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
-                Button(onClick = { salvar() }, enabled = !salvando, modifier = Modifier.fillMaxWidth().height(56.dp),
+                Button(onClick = { salvar() }, enabled = !salvando && !modoOffline, modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)) {
                     if (salvando) CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
                     else { Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text("Salvar Alterações", fontWeight = FontWeight.Bold, fontSize = 16.sp) }

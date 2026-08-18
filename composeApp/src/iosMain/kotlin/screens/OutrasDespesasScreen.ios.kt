@@ -116,6 +116,16 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
         vc.presentViewController(picker, true, null)
     }
 
+    // Escolher da galeria — Android já oferece essa opção aqui, iOS só tinha câmera.
+    fun escolherDaGaleria() {
+        val vc = UIApplication.sharedApplication.keyWindow?.rootViewController ?: return
+        val picker = UIImagePickerController().apply {
+            sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypePhotoLibrary
+            delegate = cameraDelegate
+        }
+        vc.presentViewController(picker, true, null)
+    }
+
     fun salvar() {
         if (tipoDespesa.isBlank()) { erroMsg = "Selecione o tipo de despesa"; return }
         if (valor.text.isBlank()) { erroMsg = "Informe o valor"; return }
@@ -208,11 +218,19 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
                             }
                         }
                     } else {
-                        OutlinedButton(onClick = { abrirCamera() }, modifier = Modifier.fillMaxWidth().height(56.dp),
-                            shape = RoundedCornerShape(12.dp)) {
-                            Icon(Icons.Default.CameraAlt, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Tirar Foto do Comprovante")
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedButton(onClick = { abrirCamera() }, modifier = Modifier.weight(1f).height(56.dp),
+                                shape = RoundedCornerShape(12.dp)) {
+                                Icon(Icons.Default.CameraAlt, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Tirar Foto")
+                            }
+                            OutlinedButton(onClick = { escolherDaGaleria() }, modifier = Modifier.weight(1f).height(56.dp),
+                                shape = RoundedCornerShape(12.dp)) {
+                                Icon(Icons.Default.PhotoLibrary, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Galeria")
+                            }
                         }
                     }
                 }

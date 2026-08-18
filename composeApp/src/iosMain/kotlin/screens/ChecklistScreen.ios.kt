@@ -72,7 +72,18 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
         fluidoOleoMotor, fluidoAguaRadiador, fluidoFluidoFreio, fluidoArla32, fluidoCombustivel,
         segExtintorValidade, segTriangulo, segMacacoChaveRoda, segConesFaixa, segEpiCompleto,
         carrLonasCordas, carrPortasBau, carrAssoalhoEstado, carrTravasLacres,
-        cabBancosCintos, cabEspelhosRetrovisores, cabLimpadorParabrisa, cabArCondicionado).count { it }
+        cabBancosCintos, cabEspelhosRetrovisores, cabLimpadorParabrisa, cabArCondicionado, cabFreioEstacionamento).count { it }
+
+    // Botão "Marcar/Desmarcar Todos" — Android já tinha, iOS não.
+    fun marcarTodos(valor: Boolean) {
+        docCnhValida = valor; docCrlvVeiculo = valor; docAnttValida = valor; docSeguroCarga = valor; docOrdemColeta = valor
+        eletFarolDianteiro = valor; eletFarolTraseiro = valor; eletLuzFreio = valor; eletSetaDireita = valor; eletSetaEsquerda = valor; eletLuzRe = valor; eletPainelFuncionando = valor
+        pneuCalibragemOk = valor; pneuEstadoConservacao = valor; pneuEstepeOk = valor; pneuFerramentasTroca = valor
+        fluidoOleoMotor = valor; fluidoAguaRadiador = valor; fluidoFluidoFreio = valor; fluidoArla32 = valor; fluidoCombustivel = valor
+        segExtintorValidade = valor; segTriangulo = valor; segMacacoChaveRoda = valor; segConesFaixa = valor; segEpiCompleto = valor
+        carrLonasCordas = valor; carrPortasBau = valor; carrAssoalhoEstado = valor; carrTravasLacres = valor
+        cabBancosCintos = valor; cabEspelhosRetrovisores = valor; cabLimpadorParabrisa = valor; cabArCondicionado = valor; cabFreioEstacionamento = valor
+    }
 
     fun salvar() { if (viagemAtual == null) return; val d = converterDataParaAPI(dataAtualFormatada()); scope.launch {
         salvando = true; try { repository.salvarChecklistPre(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id, d, "",
@@ -105,7 +116,22 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
         if (carregando) { Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AppColors.Primary) } }
         else if (semViagem) { SemViagemCard(onVoltar, padding) }
         else { Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp)) {
-            ProgressCard(itensOk, 34)
+            ProgressCard(itensOk, 35)
+            Spacer(Modifier.height(8.dp))
+            run {
+                val todosOk = itensOk == 35
+                OutlinedButton(
+                    onClick = { marcarTodos(!todosOk) },
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (todosOk) AppColors.Error else AppColors.Secondary),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (todosOk) AppColors.Error.copy(alpha = 0.5f) else AppColors.Secondary.copy(alpha = 0.5f))
+                ) {
+                    Icon(if (todosOk) Icons.Default.RemoveDone else Icons.Default.DoneAll, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (todosOk) "Desmarcar Todos" else "Marcar Todos", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                }
+            }
             Spacer(Modifier.height(12.dp))
             SecaoChecklist("Documentação", Icons.Default.Description) {
                 CheckItem("CNH válida", docCnhValida) { docCnhValida = it }; CheckItem("CRLV do veículo", docCrlvVeiculo) { docCrlvVeiculo = it }
@@ -171,6 +197,20 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
     var pendAbastecimentoNecessario by remember { mutableStateOf(false) }; var pendTrocaOleoProxima by remember { mutableStateOf(false) }
     var pendKmAtual by remember { mutableStateOf("") }; var observacoes by remember { mutableStateOf("") }
 
+    // Botão "Marcar/Desmarcar Itens OK" — Android já tinha, iOS não. Só marca
+    // os itens "positivos" (Níveis+Limpeza+Funcionamento); avarias e
+    // pendências são flags de problema, não entram no marcar-tudo.
+    val itensPositivosOk = listOf(
+        posNivelOleo, posNivelAgua, posNivelCombustivel, posNivelArla,
+        limpCabineLimpa, limpCarroceriaLimpa, limpBauVazio,
+        funcFreiosOk, funcDirecaoOk, funcSuspensaoOk, funcMotorRuido, funcCambioOk
+    ).count { it }
+    fun marcarItensOk(valor: Boolean) {
+        posNivelOleo = valor; posNivelAgua = valor; posNivelCombustivel = valor; posNivelArla = valor
+        limpCabineLimpa = valor; limpCarroceriaLimpa = valor; limpBauVazio = valor
+        funcFreiosOk = valor; funcDirecaoOk = valor; funcSuspensaoOk = valor; funcMotorRuido = valor; funcCambioOk = valor
+    }
+
     fun salvar() { if (viagemAtual == null) return; val d = converterDataParaAPI(dataAtualFormatada()); val pendKmAtualNormalizado = if (pendKmAtual.isNotBlank()) normalizarKmParaEnvio(pendKmAtual) else null; scope.launch {
         salvando = true; try { repository.salvarChecklistPos(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id, d, "",
             avariaCarroceria, avariaCabine, avariaPneus, avariaEspelhos, avariaFarois, avariaDescricao.ifEmpty { null },
@@ -198,6 +238,22 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
         if (carregando) { Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AppColors.Primary) } }
         else if (semViagem) { SemViagemCard(onVoltar, padding) }
         else { Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp)) {
+            run {
+                val todosPositivosOk = itensPositivosOk == 12
+                OutlinedButton(
+                    onClick = { marcarItensOk(!todosPositivosOk) },
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (todosPositivosOk) AppColors.Error else Color(0xFF10B981)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (todosPositivosOk) AppColors.Error.copy(alpha = 0.5f) else Color(0xFF10B981).copy(alpha = 0.5f))
+                ) {
+                    Icon(if (todosPositivosOk) Icons.Default.RemoveDone else Icons.Default.DoneAll, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (todosPositivosOk) "Desmarcar Itens OK" else "Marcar Itens OK", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                }
+                Text("Avarias e pendências devem ser marcadas individualmente", fontSize = 10.sp, color = AppColors.TextSecondary, modifier = Modifier.padding(top = 4.dp))
+            }
+            Spacer(Modifier.height(12.dp))
             SecaoChecklist("Avarias e Danos", Icons.Default.ReportProblem) {
                 CheckItem("Carroceria", avariaCarroceria) { avariaCarroceria = it }; CheckItem("Cabine", avariaCabine) { avariaCabine = it }
                 CheckItem("Pneus", avariaPneus) { avariaPneus = it }; CheckItem("Espelhos", avariaEspelhos) { avariaEspelhos = it }

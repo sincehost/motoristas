@@ -46,6 +46,10 @@ import util.normalizarKmParaEnvio
 import util.formatarKmExibicao
 import kotlin.math.roundToLong
 
+// Mesma lista do Android (EditarManutencaoScreen.android.kt / ManutencaoScreen.ios.kt).
+private val SERVICOS_EDIT = listOf("Troca de Óleo", "Troca de Pneu", "Borracharia (Remendo)", "Elétrica", "Mecânica", "Suspensão", "Aparelhos", "Outros")
+private val TIPOS_PNEU_OPCOES_EDIT = listOf("Novo", "Recapado", "Usado")
+
 // Delegate da câmera nativa iOS - fora do @Composable - suporta os dois comprovantes
 private class EditarManutencaoCameraDelegate(
     private val tipoFoto: String,
@@ -144,6 +148,7 @@ actual fun EditarManutencaoScreen(
     onVoltar: () -> Unit
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
+    val equipamentos = remember { repository.getEquipamentosParaDropdown() }
     var carregando by remember { mutableStateOf(true) }
     var salvando by remember { mutableStateOf(false) }
 
@@ -155,8 +160,13 @@ actual fun EditarManutencaoScreen(
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var kmTrocaOleo by remember { mutableStateOf(TextFieldValue("")) }
     var kmTrocaPneu by remember { mutableStateOf(TextFieldValue("")) }
-    var pneus by remember { mutableStateOf("") }
-    var tiposPneu by remember { mutableStateOf("") }
+    // Antes eram String livre (placa não editável, serviço texto livre, sem UI
+    // de pneus) — agora os mesmos tipos usados em ManutencaoScreen.ios.kt e no
+    // Android, pra ter a mesma edição completa nas duas plataformas.
+    var pneusSelecionados by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    var tiposPneu by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    var placaExpanded by remember { mutableStateOf(false) }
+    var servicoExpanded by remember { mutableStateOf(false) }
     var fotoComprovante1Base64 by remember { mutableStateOf<String?>(null) }
     var fotoComprovante2Base64 by remember { mutableStateOf<String?>(null) }
     val fotoComprovante1Bitmap = remember(fotoComprovante1Base64) { fotoComprovante1Base64?.let { CameraHelper.base64ToImageBitmap(it) } }
@@ -237,8 +247,17 @@ actual fun EditarManutencaoScreen(
                 val kmTrocaPneuRaw = manutencao.km_troca_pneu ?: ""
                 val kmTrocaPneuTexto = kmTrocaPneuRaw.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmTrocaPneuRaw
                 kmTrocaPneu = TextFieldValue(kmTrocaPneuTexto, selection = TextRange(0, kmTrocaPneuTexto.length))
-                pneus = manutencao.pneus ?: ""
-                tiposPneu = manutencao.tipos_pneu ?: ""
+                // Pneus e tipos vêm como string ("1,2,3" e "1:Novo;2:Recapado") —
+                // mesmo parsing usado no Android (EditarManutencaoScreen.android.kt).
+                if (!manutencao.pneus.isNullOrEmpty()) {
+                    pneusSelecionados = manutencao.pneus.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
+                }
+                if (!manutencao.tipos_pneu.isNullOrEmpty()) {
+                    tiposPneu = manutencao.tipos_pneu.split(";").mapNotNull { parte ->
+                        val partes = parte.split(":")
+                        if (partes.size == 2) partes[0].trim().toIntOrNull()?.let { it to partes[1].trim() } else null
+                    }.toMap()
+                }
                 fotoComprovante1Base64 = manutencao.foto_comprovante1
                 fotoComprovante2Base64 = manutencao.foto_comprovante2
             } else {
@@ -293,27 +312,42 @@ actual fun EditarManutencaoScreen(
                         )
                         Spacer(Modifier.height(12.dp))
 
-                        OutlinedTextField(
-                            value = placa,
-                            onValueChange = { placa = it },
-                            label = { Text("Placa *") },
+                        // Antes travada (enabled = false) — Android sempre permitiu trocar a placa aqui.
+                        ui.AppDropdownField(
+                            label = "Placa *",
+                            selectedText = placa,
+                            expanded = placaExpanded,
+                            onExpandedChange = { placaExpanded = it },
                             leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF06B6D4)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            singleLine = true,
-                            enabled = false
-                        )
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            equipamentos.forEach { (_, p) ->
+                                ui.AppDropdownMenuItem(text = { Text(p) }, onClick = { placa = p; placaExpanded = false })
+                            }
+                        }
                         Spacer(Modifier.height(12.dp))
 
-                        OutlinedTextField(
-                            value = servico,
-                            onValueChange = { servico = it },
-                            label = { Text("Serviço *") },
+                        // Antes era texto livre — Android sempre usou uma lista fechada (mesmas
+                        // 8 opções de Adicionar Manutenção), permitindo qualquer string aqui.
+                        ui.AppDropdownField(
+                            label = "Serviço *",
+                            selectedText = servico,
+                            expanded = servicoExpanded,
+                            onExpandedChange = { servicoExpanded = it },
                             leadingIcon = { Icon(Icons.Default.Build, null, tint = Color(0xFF06B6D4)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            singleLine = true
-                        )
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            SERVICOS_EDIT.forEach { s ->
+                                ui.AppDropdownMenuItem(text = { Text(s) }, onClick = {
+                                    servico = s
+                                    servicoExpanded = false
+                                    if (s != "Troca de Pneu") {
+                                        pneusSelecionados = emptySet()
+                                        tiposPneu = emptyMap()
+                                    }
+                                })
+                            }
+                        }
                         Spacer(Modifier.height(12.dp))
 
                         OutlinedTextField(
@@ -355,54 +389,87 @@ actual fun EditarManutencaoScreen(
                         )
                         Spacer(Modifier.height(12.dp))
 
-                        OutlinedTextField(
-                            value = kmTrocaOleo,
-                            onValueChange = { newValue ->
-                                val formatted = formatarKmInput(newValue.text)
-                                kmTrocaOleo = TextFieldValue(
-                                    text = formatted,
-                                    selection = TextRange(formatted.length)
-                                )
-                            },
-                            label = { Text("KM Troca de Óleo") },
-                            placeholder = { Text("Ex.: 115670.5") },
-                            leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF06B6D4)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true
-                        )
-                        Text(
-                            "Digite como aparece no painel. Ex.: 115670.5",
-                            fontSize = 12.sp,
-                            color = AppColors.Primary,
-                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
-                        )
-                        Spacer(Modifier.height(12.dp))
+                        if (servico == "Troca de Óleo") {
+                            OutlinedTextField(
+                                value = kmTrocaOleo,
+                                onValueChange = { newValue ->
+                                    val formatted = formatarKmInput(newValue.text)
+                                    kmTrocaOleo = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(formatted.length)
+                                    )
+                                },
+                                label = { Text("KM Troca de Óleo *") },
+                                placeholder = { Text("Ex.: 115670.5") },
+                                leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF06B6D4)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true
+                            )
+                            Text(
+                                "Digite como aparece no painel. Ex.: 115670.5",
+                                fontSize = 12.sp,
+                                color = AppColors.Primary,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                            )
+                            Spacer(Modifier.height(12.dp))
+                        }
 
-                        OutlinedTextField(
-                            value = kmTrocaPneu,
-                            onValueChange = { newValue ->
-                                val formatted = formatarKmInput(newValue.text)
-                                kmTrocaPneu = TextFieldValue(
-                                    text = formatted,
-                                    selection = TextRange(formatted.length)
-                                )
-                            },
-                            label = { Text("KM Troca de Pneu") },
-                            placeholder = { Text("Ex.: 115670.5") },
-                            leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF06B6D4)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true
-                        )
-                        Text(
-                            "Digite como aparece no painel. Ex.: 115670.5",
-                            fontSize = 12.sp,
-                            color = AppColors.Primary,
-                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
-                        )
+                        if (servico == "Troca de Pneu") {
+                            OutlinedTextField(
+                                value = kmTrocaPneu,
+                                onValueChange = { newValue ->
+                                    val formatted = formatarKmInput(newValue.text)
+                                    kmTrocaPneu = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(formatted.length)
+                                    )
+                                },
+                                label = { Text("KM Troca de Pneu *") },
+                                placeholder = { Text("Ex.: 115670.5") },
+                                leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF06B6D4)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true
+                            )
+                            Text(
+                                "Digite como aparece no painel. Ex.: 115670.5",
+                                fontSize = 12.sp,
+                                color = AppColors.Primary,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                            )
+
+                            Spacer(Modifier.height(20.dp))
+                            HorizontalDivider(color = AppColors.Background)
+                            Spacer(Modifier.height(16.dp))
+                            Text("Selecione os Pneus", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppColors.TextPrimary)
+                            Spacer(Modifier.height(16.dp))
+                            ChassiPneusEditIos(
+                                pneusSelecionados = pneusSelecionados,
+                                onPneuToggle = { pneu ->
+                                    pneusSelecionados = if (pneu in pneusSelecionados) pneusSelecionados - pneu else pneusSelecionados + pneu
+                                }
+                            )
+                            if (pneusSelecionados.isNotEmpty()) {
+                                Spacer(Modifier.height(20.dp))
+                                HorizontalDivider(color = AppColors.Background)
+                                Spacer(Modifier.height(16.dp))
+                                Text("Tipo de cada Pneu", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                                Spacer(Modifier.height(12.dp))
+                                pneusSelecionados.sorted().forEach { pneu ->
+                                    TipoPneuSelectorEditIos(
+                                        pneuNumero = pneu,
+                                        tipoSelecionado = tiposPneu[pneu] ?: "",
+                                        opcoes = TIPOS_PNEU_OPCOES_EDIT,
+                                        onTipoChange = { tipo -> tiposPneu = tiposPneu + (pneu to tipo) }
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                        }
 
                         Spacer(Modifier.height(16.dp))
 
@@ -433,7 +500,13 @@ actual fun EditarManutencaoScreen(
                                     if (servico.isBlank()) { mostrarMensagem("Informe o serviço", isErro = true); return@launch }
                                     if (valor.text.isBlank()) { mostrarMensagem("Informe o valor", isErro = true); return@launch }
                                     if (servico == "Troca de Óleo" && kmTrocaOleo.text.isBlank()) { mostrarMensagem("Informe o KM da troca de óleo", isErro = true); return@launch }
-                                    if (servico == "Troca de Pneu" && kmTrocaPneu.text.isBlank()) { mostrarMensagem("Informe o KM da troca de pneu", isErro = true); return@launch }
+                                    if (servico == "Troca de Pneu") {
+                                        if (kmTrocaPneu.text.isBlank()) { mostrarMensagem("Informe o KM da troca de pneu", isErro = true); return@launch }
+                                        if (pneusSelecionados.isEmpty()) { mostrarMensagem("Selecione pelo menos um pneu", isErro = true); return@launch }
+                                        for (pneu in pneusSelecionados) {
+                                            if (tiposPneu[pneu].isNullOrBlank()) { mostrarMensagem("Selecione o tipo para o pneu $pneu", isErro = true); return@launch }
+                                        }
+                                    }
 
                                     salvando = true
                                     try {
@@ -450,11 +523,8 @@ actual fun EditarManutencaoScreen(
                                                 valor = valor.text,
                                                 km_troca_oleo = kmTrocaOleo.text.ifBlank { null }?.let { normalizarKmParaEnvio(it) },
                                                 km_troca_pneu = kmTrocaPneu.text.ifBlank { null }?.let { normalizarKmParaEnvio(it) },
-                                                pneus = pneus.ifBlank { null }?.split(",")?.mapNotNull { it.trim().toIntOrNull() },
-                                                tipos_pneu = tiposPneu.ifBlank { null }?.split(";")?.mapNotNull {
-                                                    val parts = it.split(":")
-                                                    if (parts.size == 2) parts[0].trim().toIntOrNull()?.let { k -> k to parts[1].trim() } else null
-                                                }?.toMap(),
+                                                pneus = pneusSelecionados.toList(),
+                                                tipos_pneu = tiposPneu,
                                                 foto_comprovante1 = fotoComprovante1Base64,
                                                 foto_comprovante2 = fotoComprovante2Base64
                                             )
@@ -486,6 +556,116 @@ actual fun EditarManutencaoScreen(
                     }
                 }
                 Spacer(Modifier.height(80.dp))
+            }
+        }
+    }
+}
+
+// ===============================
+// CHASSI DE PNEUS (mesmo componente de ManutencaoScreen.ios.kt / Android,
+// duplicado aqui — cada tela mantém sua própria cópia, mesmo padrão já usado
+// no Android entre ManutencaoScreen e EditarManutencaoScreen).
+// ===============================
+@Composable
+private fun ChassiPneusEditIos(pneusSelecionados: Set<Int>, onPneuToggle: (Int) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(modifier = Modifier.width(8.dp).height(4.dp).background(Color(0xFF374151), RoundedCornerShape(4.dp)))
+
+        Text("Eixo Dianteiro", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusEditIos(listOf(1, 2), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+        Text("Eixo 2", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusEditIos(listOf(3, 4), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+        Text("Eixo 3 (Tração)", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusDuploEditIos(listOf(5, 6, 7, 8), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+        Text("Eixo 4 (Tração)", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusDuploEditIos(listOf(9, 10, 11, 12), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(4.dp).height(30.dp).background(Color(0xFF9CA3AF)))
+        Text("── Carreta ──", fontSize = 10.sp, color = AppColors.TextSecondary)
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+
+        Text("Eixo 5", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusDuploEditIos(listOf(13, 14, 15, 16), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+        Text("Eixo 6", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusDuploEditIos(listOf(17, 18, 19, 20), pneusSelecionados, onPneuToggle)
+
+        Box(modifier = Modifier.width(8.dp).height(20.dp).background(Color(0xFF374151)))
+        Text("Eixo 7", fontSize = 12.sp, color = AppColors.TextSecondary)
+        Spacer(Modifier.height(4.dp))
+        EixoPneusDuploEditIos(listOf(21, 22, 23, 24), pneusSelecionados, onPneuToggle)
+    }
+}
+
+@Composable
+private fun EixoPneusEditIos(pneus: List<Int>, pneusSelecionados: Set<Int>, onPneuToggle: (Int) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Box(modifier = Modifier.width(100.dp).padding(start = 16.dp), contentAlignment = Alignment.CenterStart) {
+            PneuCheckboxEditIos(pneus[0], pneus[0] in pneusSelecionados) { onPneuToggle(pneus[0]) }
+        }
+        Box(modifier = Modifier.weight(1f).height(12.dp).background(Color(0xFF4B5563), RoundedCornerShape(6.dp)))
+        Box(modifier = Modifier.width(100.dp).padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
+            PneuCheckboxEditIos(pneus[1], pneus[1] in pneusSelecionados) { onPneuToggle(pneus[1]) }
+        }
+    }
+}
+
+@Composable
+private fun EixoPneusDuploEditIos(pneus: List<Int>, pneusSelecionados: Set<Int>, onPneuToggle: (Int) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(start = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            PneuCheckboxEditIos(pneus[0], pneus[0] in pneusSelecionados) { onPneuToggle(pneus[0]) }
+            PneuCheckboxEditIos(pneus[1], pneus[1] in pneusSelecionados) { onPneuToggle(pneus[1]) }
+        }
+        Box(modifier = Modifier.weight(1f).height(12.dp).background(Color(0xFF4B5563), RoundedCornerShape(6.dp)))
+        Row(modifier = Modifier.padding(end = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            PneuCheckboxEditIos(pneus[2], pneus[2] in pneusSelecionados) { onPneuToggle(pneus[2]) }
+            PneuCheckboxEditIos(pneus[3], pneus[3] in pneusSelecionados) { onPneuToggle(pneus[3]) }
+        }
+    }
+}
+
+@Composable
+private fun PneuCheckboxEditIos(numero: Int, selecionado: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.width(32.dp).height(52.dp).clip(RoundedCornerShape(8.dp))
+            .background(if (selecionado) Color(0xFF3B82F6) else Color(0xFF1F2937))
+            .border(2.dp, if (selecionado) Color(0xFF1D4ED8) else Color(0xFF374151), RoundedCornerShape(8.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(numero.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TipoPneuSelectorEditIos(pneuNumero: Int, tipoSelecionado: String, opcoes: List<String>, onTipoChange: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text("Pneu $pneuNumero:", modifier = Modifier.width(70.dp), fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+        ui.AppDropdownField(
+            label = "",
+            selectedText = if (tipoSelecionado.isBlank()) "Selecione..." else tipoSelecionado,
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+            modifier = Modifier.weight(1f)
+        ) {
+            opcoes.forEach { opcao ->
+                ui.AppDropdownMenuItem(text = { Text(opcao) }, onClick = { onTipoChange(opcao); expanded = false })
             }
         }
     }

@@ -238,6 +238,23 @@ actual fun AdicionarArlaScreen(
         viewController.presentViewController(picker, true, null)
     }
 
+    // Escolher da galeria — Android já oferece essa opção aqui, iOS só tinha câmera.
+    fun escolherDaGaleria() {
+        val viewController = UIApplication.sharedApplication.keyWindow?.rootViewController
+        if (viewController == null) {
+            mostrarMensagem("Não foi possível abrir a galeria", isErro = true)
+            return
+        }
+
+        val picker = UIImagePickerController().apply {
+            sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypePhotoLibrary
+            allowsEditing = false
+            delegate = cameraDelegate
+        }
+
+        viewController.presentViewController(picker, true, null)
+    }
+
     // Função salvar OFFLINE
     fun salvarLocal() {
         if (viagemEmAndamento == null) {
@@ -625,36 +642,47 @@ actual fun AdicionarArlaScreen(
                                     }
                                 }
                             } else {
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(120.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .border(
-                                            2.dp,
-                                            Color(0xFF06B6D4).copy(alpha = 0.3f),
-                                            RoundedCornerShape(12.dp)
-                                        )
-                                        .clickable { abrirCamera() },
-                                    color = Color(0xFF06B6D4).copy(alpha = 0.05f)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Column(
-                                        Modifier.fillMaxSize(),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(100.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .border(2.dp, Color(0xFF06B6D4).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                            .clickable { abrirCamera() },
+                                        color = Color(0xFF06B6D4).copy(alpha = 0.05f)
                                     ) {
-                                        Icon(
-                                            Icons.Default.CameraAlt,
-                                            null,
-                                            tint = Color(0xFF06B6D4),
-                                            modifier = Modifier.size(40.dp)
-                                        )
-                                        Spacer(Modifier.height(8.dp))
-                                        Text(
-                                            "Tirar Foto",
-                                            color = Color(0xFF06B6D4),
-                                            fontWeight = FontWeight.Medium
-                                        )
+                                        Column(
+                                            Modifier.fillMaxSize(),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(Icons.Default.CameraAlt, null, tint = Color(0xFF06B6D4), modifier = Modifier.size(32.dp))
+                                            Spacer(Modifier.height(6.dp))
+                                            Text("Tirar Foto", color = Color(0xFF06B6D4), fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                        }
+                                    }
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(100.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .border(2.dp, Color(0xFF1976D2).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                            .clickable { escolherDaGaleria() },
+                                        color = Color(0xFF1976D2).copy(alpha = 0.05f)
+                                    ) {
+                                        Column(
+                                            Modifier.fillMaxSize(),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(Icons.Default.PhotoLibrary, null, tint = Color(0xFF1976D2), modifier = Modifier.size(32.dp))
+                                            Spacer(Modifier.height(6.dp))
+                                            Text("Da Galeria", color = Color(0xFF1976D2), fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                        }
                                     }
                                 }
                             }

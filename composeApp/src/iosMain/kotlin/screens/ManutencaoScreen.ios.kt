@@ -45,7 +45,9 @@ import util.normalizarKmParaEnvio
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
 
-private val SERVICOS = listOf("Troca de Óleo", "Troca de Pneu", "Freios", "Suspensão", "Elétrica", "Funilaria", "Outros")
+// Mesma lista do Android (ManutencaoScreen.android.kt) — antes divergiam
+// (iOS tinha Freios/Funilaria e não tinha Borracharia/Mecânica/Aparelhos).
+private val SERVICOS = listOf("Troca de Óleo", "Troca de Pneu", "Borracharia (Remendo)", "Elétrica", "Mecânica", "Suspensão", "Aparelhos", "Outros")
 private val TIPOS_PNEU_OPCOES = listOf("Novo", "Recapado", "Usado")
 
 // ===============================
@@ -149,6 +151,17 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
         }
         val picker = UIImagePickerController().apply {
             sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera
+            delegate = if (fotoIndex == 1) cameraDelegate1 else cameraDelegate2
+        }
+        vc.presentViewController(picker, true, null)
+    }
+
+    // Escolher da galeria — Android já oferece essa opção aqui, iOS só tinha câmera.
+    fun escolherDaGaleria(fotoIndex: Int) {
+        focusManager.clearFocus()
+        val vc = UIApplication.sharedApplication.keyWindow?.rootViewController ?: return
+        val picker = UIImagePickerController().apply {
+            sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypePhotoLibrary
             delegate = if (fotoIndex == 1) cameraDelegate1 else cameraDelegate2
         }
         vc.presentViewController(picker, true, null)
@@ -350,8 +363,8 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        FotoSlotManutencao("Foto 1", foto1Bitmap, { abrirCamera(1) }, { foto1Base64 = null; foto1Bitmap = null }, Modifier.weight(1f))
-                        FotoSlotManutencao("Foto 2", foto2Bitmap, { abrirCamera(2) }, { foto2Base64 = null; foto2Bitmap = null }, Modifier.weight(1f))
+                        FotoSlotManutencao("Foto 1", foto1Bitmap, { abrirCamera(1) }, { escolherDaGaleria(1) }, { foto1Base64 = null; foto1Bitmap = null }, Modifier.weight(1f))
+                        FotoSlotManutencao("Foto 2", foto2Bitmap, { abrirCamera(2) }, { escolherDaGaleria(2) }, { foto2Base64 = null; foto2Bitmap = null }, Modifier.weight(1f))
                     }
 
                     if (fotoMsg != null) {
@@ -377,7 +390,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
 }
 
 @Composable
-private fun FotoSlotManutencao(label: String, bitmap: ImageBitmap?, onClick: () -> Unit, onRemover: () -> Unit, modifier: Modifier = Modifier) {
+private fun FotoSlotManutencao(label: String, bitmap: ImageBitmap?, onClick: () -> Unit, onEscolherGaleria: () -> Unit, onRemover: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         if (bitmap != null) {
             Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
@@ -395,6 +408,11 @@ private fun FotoSlotManutencao(label: String, bitmap: ImageBitmap?, onClick: () 
                     Icon(Icons.Default.CameraAlt, null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(32.dp))
                     Spacer(Modifier.height(4.dp))
                     Text(label, fontSize = 12.sp, color = AppColors.TextSecondary)
+                }
+                // Botão pequeno de galeria — Android já oferece essa opção aqui.
+                IconButton(onClick = onEscolherGaleria, modifier = Modifier.align(Alignment.BottomEnd).size(28.dp)
+                    .background(Color(0xFF1976D2), RoundedCornerShape(14.dp))) {
+                    Icon(Icons.Default.PhotoLibrary, "Da galeria", tint = Color.White, modifier = Modifier.size(16.dp))
                 }
             }
         }
