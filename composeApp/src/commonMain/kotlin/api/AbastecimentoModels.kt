@@ -121,6 +121,7 @@ data class SalvarManutencaoRequest(
     val data_manutencao: String,
     val placa: String,
     val servico: String,
+    val tipo_manutencao: String = "preventiva",
     val descricao_servico: String? = null,
     val local_manutencao: String? = null,
     val valor: String,
@@ -139,6 +140,27 @@ data class SalvarManutencaoResponse(
     val manutencao_id: Int? = null
 )
 
+/** Item do plano de manutenção preventiva por data (correia, bateria, revisão...).
+ * Cadastro é só do admin — o motorista só lê, pra saber que precisa levar o
+ * veículo pra manutenção. */
+@Serializable
+data class PlanoManutencaoItem(
+    val id: Int,
+    val placa: String,
+    val item: String,
+    val data_prevista: String,
+    val observacoes: String? = null,
+    val dias: Int = 0,
+    val vencido: Boolean = false
+)
+
+@Serializable
+data class PlanoPendenteResponse(
+    val status: String,
+    val mensagem: String? = null,
+    val itens: List<PlanoManutencaoItem> = emptyList()
+)
+
 // ===============================
 // LISTAGEM DE MANUTENÇÕES - ATUALIZADO COM PAGINAÇÃO
 // ===============================
@@ -149,6 +171,7 @@ data class ManutencaoItem(
     val data_manutencao: String = "",
     val placa: String = "",
     val servico: String = "",
+    val tipo_manutencao: String = "preventiva",
     val descricao_servico: String = "",
     val local_manutencao: String = "",
     val valor: String = "0"

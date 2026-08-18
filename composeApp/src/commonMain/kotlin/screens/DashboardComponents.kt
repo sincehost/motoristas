@@ -88,6 +88,47 @@ fun SyncStatusCard(status: SyncStatus) {
 }
 
 // ===============================
+// CARD DE ALERTA — PLANO DE MANUTENÇÃO (itens vencidos/vencendo por data,
+// cadastrados pelo admin — mesmo alerta que aparece no painel).
+// ===============================
+@Composable
+fun PlanoManutencaoAlertCard(itens: List<api.PlanoManutencaoItem>) {
+    if (itens.isEmpty()) return
+    val isDarkMode = isDark()
+    val backgroundColor = if (isDarkMode) Color(0xFF3D2E1A) else Color(0xFFFFF3E0)
+    val iconColor = if (isDarkMode) Color(0xFFFFB74D) else Color(0xFFFF6F00)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Build, null, tint = iconColor, modifier = Modifier.size(24.dp))
+                Text(
+                    "Manutenção programada (${itens.size})",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = iconColor
+                )
+            }
+            itens.take(4).forEach { item ->
+                val prazo = if (item.vencido) "Vencido" else "Vence em ${item.dias} dia(s)"
+                Text(
+                    "${item.placa} — ${item.item} ($prazo)",
+                    fontSize = 12.sp,
+                    color = AppColors.TextSecondary
+                )
+            }
+            if (itens.size > 4) {
+                Text("+ ${itens.size - 4} outro(s) item(ns)", fontSize = 11.sp, color = AppColors.TextSecondary)
+            }
+        }
+    }
+}
+
+// ===============================
 // CARD DE VIAGEM EM ANDAMENTO
 // ===============================
 @Composable

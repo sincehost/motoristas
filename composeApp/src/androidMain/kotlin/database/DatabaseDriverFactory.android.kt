@@ -54,6 +54,10 @@ actual class DatabaseDriverFactory(private val context: Context) {
                             db.execSQL("ALTER TABLE $tabela ADD COLUMN ultimo_erro TEXT")
                         } catch (_: Exception) {}
                     }
+                    // Manutenção Preventiva: classificação preventiva/corretiva.
+                    try {
+                        db.execSQL("ALTER TABLE Manutencao ADD COLUMN tipo_manutencao TEXT NOT NULL DEFAULT 'preventiva'")
+                    } catch (_: Exception) {}
                 }
             }
         )

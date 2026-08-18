@@ -864,6 +864,7 @@ class SyncManager(private val repository: AppRepository) {
                     data_manutencao = manutencao.data_manutencao,
                     placa = manutencao.placa,
                     servico = manutencao.servico,
+                    tipo_manutencao = manutencao.tipo_manutencao,
                     descricao_servico = manutencao.descricao_servico,
                     local_manutencao = manutencao.local_manutencao,
                     valor = manutencao.valor,

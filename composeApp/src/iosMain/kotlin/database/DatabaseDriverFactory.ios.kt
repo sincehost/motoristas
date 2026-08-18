@@ -31,7 +31,9 @@ actual class DatabaseDriverFactory {
             "ALTER TABLE Descarga ADD COLUMN ultimo_erro TEXT",
             "ALTER TABLE OutraDespesa ADD COLUMN ultimo_erro TEXT",
             "ALTER TABLE ChecklistPreViagem ADD COLUMN ultimo_erro TEXT",
-            "ALTER TABLE ChecklistPosViagem ADD COLUMN ultimo_erro TEXT"
+            "ALTER TABLE ChecklistPosViagem ADD COLUMN ultimo_erro TEXT",
+            // Manutenção Preventiva: classificação preventiva/corretiva.
+            "ALTER TABLE Manutencao ADD COLUMN tipo_manutencao TEXT NOT NULL DEFAULT 'preventiva'"
         )
         for (sql in migrações) {
             try {

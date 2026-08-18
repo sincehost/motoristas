@@ -503,6 +503,16 @@ object ApiClient {
             setBody(request)
         }.body()
     }
+
+    // Plano de manutenção — itens vencidos/vencendo (30 dias), cadastrados
+    // só pelo admin; o motorista só lê. Mesmo alerta que aparece no painel.
+    suspend fun planoManutencaoPendente(motoristaId: String): PlanoPendenteResponse {
+        return client.post("${getBaseUrl()}/manutencao/plano_pendente.php") {
+            contentType(ContentType.Application.Json)
+            withAuth()
+            setBody(mapOf("motorista_id" to motoristaId))
+        }.body()
+    }
     // ===============================
     // RELATÓRIO DE VIAGENS
     // ===============================

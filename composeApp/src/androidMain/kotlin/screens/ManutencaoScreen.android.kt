@@ -69,6 +69,7 @@ actual fun ManutencaoScreen(
     var dataManutencao by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
     var placaSelecionada by rememberSaveable { mutableStateOf("") }
     var servicoSelecionado by rememberSaveable { mutableStateOf("Troca de Óleo") }
+    var tipoManutencaoSelecionado by rememberSaveable { mutableStateOf("preventiva") }
     var descricaoServico by rememberSaveable { mutableStateOf("") }
     var localManutencao by rememberSaveable { mutableStateOf("") }
     var valor by rememberSaveableTextField("")
@@ -229,6 +230,7 @@ actual fun ManutencaoScreen(
                             data_manutencao = dataManutencaoAPI,
                             placa = placaSelecionada,
                             servico = servicoSelecionado,
+                            tipo_manutencao = tipoManutencaoSelecionado,
                             descricao_servico = descricaoServico,
                             local_manutencao = localManutencao,
                             valor = valor.text,
@@ -252,6 +254,7 @@ actual fun ManutencaoScreen(
                         dataManutencao = dataManutencaoAPI,
                         placa = placaSelecionada,
                         servico = servicoSelecionado,
+                        tipoManutencao = tipoManutencaoSelecionado,
                         descricaoServico = descricaoServico,
                         localManutencao = localManutencao,
                         valor = valor.text,
@@ -382,6 +385,60 @@ actual fun ManutencaoScreen(
                             }
                         }
                     }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Preventiva x Corretiva — planejada ou reparo/quebra.
+                    Text("Tipo *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                    Spacer(Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = { tipoManutencaoSelecionado = "preventiva" },
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (tipoManutencaoSelecionado == "preventiva") Color(0xFF10B981) else Color(0xFFE5E7EB)
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.EventAvailable,
+                                null,
+                                tint = if (tipoManutencaoSelecionado == "preventiva") Color.White else AppColors.TextSecondary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Preventiva",
+                                color = if (tipoManutencaoSelecionado == "preventiva") Color.White else AppColors.TextSecondary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Button(
+                            onClick = { tipoManutencaoSelecionado = "corretiva" },
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (tipoManutencaoSelecionado == "corretiva") Color(0xFFEF4444) else Color(0xFFE5E7EB)
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                null,
+                                tint = if (tipoManutencaoSelecionado == "corretiva") Color.White else AppColors.TextSecondary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Corretiva",
+                                color = if (tipoManutencaoSelecionado == "corretiva") Color.White else AppColors.TextSecondary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    Text(
+                        "Preventiva: manutenção planejada. Corretiva: reparo de algo que quebrou.",
+                        fontSize = 12.sp,
+                        color = AppColors.TextSecondary,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
 
                     // Campo KM Troca Óleo (condicional)
                     if (servicoSelecionado == "Troca de Óleo") {

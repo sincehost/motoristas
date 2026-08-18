@@ -111,6 +111,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
     var dataManutencao by remember { mutableStateOf(dataAtualFormatada()) }
     var placaSelecionada by remember { mutableStateOf("") }
     var servicoSelecionado by remember { mutableStateOf("Troca de Óleo") }
+    var tipoManutencaoSelecionado by remember { mutableStateOf("preventiva") }
     var descricaoServico by remember { mutableStateOf("") }
     var localManutencao by remember { mutableStateOf("") }
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
@@ -198,6 +199,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                     val resp = ApiClient.salvarManutencao(SalvarManutencaoRequest(
                         motorista_id = motorista?.motorista_id ?: "", viagem_id = viagemId.toInt(),
                         data_manutencao = dataApi, placa = placaSelecionada, servico = servicoSelecionado,
+                        tipo_manutencao = tipoManutencaoSelecionado,
                         descricao_servico = descricaoServico, local_manutencao = localManutencao, valor = valor.text,
                         km_troca_oleo = kmTrocaOleoNormalizado,
                         km_troca_pneu = kmTrocaPneuNormalizado,
@@ -212,7 +214,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                 } catch (e: Exception) {
                     repository.salvarManutencao(
                         motorista?.motorista_id ?: "", viagemId, dataApi, placaSelecionada,
-                        servicoSelecionado, descricaoServico, localManutencao, valor.text,
+                        servicoSelecionado, tipoManutencaoSelecionado, descricaoServico, localManutencao, valor.text,
                         kmTrocaOleoNormalizado,
                         kmTrocaPneuNormalizado,
                         pneusSelecionados.sorted().joinToString(","),
@@ -273,6 +275,59 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                             ui.AppDropdownMenuItem(text = { Text(s) }, onClick = { servicoSelecionado = s; servicoExpanded = false })
                         }
                     }
+                    Spacer(Modifier.height(12.dp))
+
+                    // Preventiva x Corretiva — planejada ou reparo/quebra.
+                    Text("Tipo *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                    Spacer(Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = { tipoManutencaoSelecionado = "preventiva" },
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (tipoManutencaoSelecionado == "preventiva") Color(0xFF10B981) else Color(0xFFE5E7EB)
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.EventAvailable,
+                                null,
+                                tint = if (tipoManutencaoSelecionado == "preventiva") Color.White else AppColors.TextSecondary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Preventiva",
+                                color = if (tipoManutencaoSelecionado == "preventiva") Color.White else AppColors.TextSecondary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Button(
+                            onClick = { tipoManutencaoSelecionado = "corretiva" },
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (tipoManutencaoSelecionado == "corretiva") Color(0xFFEF4444) else Color(0xFFE5E7EB)
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                null,
+                                tint = if (tipoManutencaoSelecionado == "corretiva") Color.White else AppColors.TextSecondary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Corretiva",
+                                color = if (tipoManutencaoSelecionado == "corretiva") Color.White else AppColors.TextSecondary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    Text(
+                        "Preventiva: manutenção planejada. Corretiva: reparo de algo que quebrou.",
+                        fontSize = 12.sp,
+                        color = AppColors.TextSecondary,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                     Spacer(Modifier.height(12.dp))
 
                     OutlinedTextField(descricaoServico, { descricaoServico = it }, label = { Text("Descrição do serviço") },

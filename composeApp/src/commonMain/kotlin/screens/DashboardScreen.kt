@@ -227,6 +227,7 @@ private fun DashboardContent(
     var viagemAtualInfo by remember { mutableStateOf<String?>(null) }
     var viagemAtualId by remember { mutableStateOf<Long?>(null) }
     var temInternet by remember { mutableStateOf(true) }
+    var planoManutencaoPendente by remember { mutableStateOf<List<api.PlanoManutencaoItem>>(emptyList()) }
     val sincronizando = syncStatus.state == SyncState.SYNCING
     val scope = rememberCoroutineScope()
 
@@ -303,6 +304,16 @@ private fun DashboardContent(
             delay(15000)
             syncStatus = syncStatus.copy(state = SyncState.IDLE, message = "")
         }
+    }
+
+    // Plano de manutenção (itens vencidos/vencendo por data) — só leitura,
+    // cadastro é do admin. Falha silenciosa: é um alerta informativo, não
+    // pode travar o Dashboard se a API não responder.
+    LaunchedEffect(Unit) {
+        try {
+            val resp = api.ApiClient.planoManutencaoPendente(motorista?.motorista_id ?: "")
+            if (resp.status == "ok") planoManutencaoPendente = resp.itens
+        } catch (_: Exception) {}
     }
 
     LaunchedEffect(Unit) {
@@ -462,6 +473,11 @@ private fun DashboardContent(
 
             if (syncStatus.state != SyncState.IDLE) {
                 SyncStatusCard(syncStatus)
+                Spacer(Modifier.height(12.dp))
+            }
+
+            if (planoManutencaoPendente.isNotEmpty()) {
+                PlanoManutencaoAlertCard(planoManutencaoPendente)
                 Spacer(Modifier.height(12.dp))
             }
 

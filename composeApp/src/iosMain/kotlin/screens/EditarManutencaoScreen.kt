@@ -158,6 +158,7 @@ actual fun EditarManutencaoScreen(
     var dataManutencao by remember { mutableStateOf(dataAtualFormatada()) }
     var placa by remember { mutableStateOf("") }
     var servico by remember { mutableStateOf("") }
+    var tipoManutencao by remember { mutableStateOf("preventiva") }
     var descricaoServico by remember { mutableStateOf("") }
     var localManutencao by remember { mutableStateOf("") }
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
@@ -246,6 +247,7 @@ actual fun EditarManutencaoScreen(
                 dataManutencao = converterDataParaExibicao(manutencao.data_manutencao)
                 placa = manutencao.placa
                 servico = manutencao.servico
+                tipoManutencao = manutencao.tipo_manutencao
                 descricaoServico = manutencao.descricao_servico ?: ""
                 localManutencao = manutencao.local_manutencao ?: ""
                 val valorFormatado = formatarValor(((manutencao.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
@@ -370,6 +372,53 @@ actual fun EditarManutencaoScreen(
                                         tiposPneu = emptyMap()
                                     }
                                 })
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+
+                        // Preventiva x Corretiva — planejada ou reparo/quebra.
+                        Text("Tipo *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Spacer(Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(
+                                onClick = { tipoManutencao = "preventiva" },
+                                modifier = Modifier.weight(1f).height(50.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (tipoManutencao == "preventiva") Color(0xFF10B981) else Color(0xFFE5E7EB)
+                                )
+                            ) {
+                                Icon(
+                                    Icons.Default.EventAvailable,
+                                    null,
+                                    tint = if (tipoManutencao == "preventiva") Color.White else AppColors.TextSecondary
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Preventiva",
+                                    color = if (tipoManutencao == "preventiva") Color.White else AppColors.TextSecondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Button(
+                                onClick = { tipoManutencao = "corretiva" },
+                                modifier = Modifier.weight(1f).height(50.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (tipoManutencao == "corretiva") Color(0xFFEF4444) else Color(0xFFE5E7EB)
+                                )
+                            ) {
+                                Icon(
+                                    Icons.Default.Warning,
+                                    null,
+                                    tint = if (tipoManutencao == "corretiva") Color.White else AppColors.TextSecondary
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Corretiva",
+                                    color = if (tipoManutencao == "corretiva") Color.White else AppColors.TextSecondary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
                         Spacer(Modifier.height(12.dp))
@@ -542,6 +591,7 @@ actual fun EditarManutencaoScreen(
                                                 data_manutencao = converterDataParaAPI(dataManutencao),
                                                 placa = placa,
                                                 servico = servico,
+                                                tipo_manutencao = tipoManutencao,
                                                 descricao_servico = descricaoServico.ifBlank { null },
                                                 local_manutencao = localManutencao.ifBlank { null },
                                                 valor = valor.text,

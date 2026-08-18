@@ -368,6 +368,7 @@ CREATE TABLE Manutencao (
     data_manutencao TEXT NOT NULL,
     placa TEXT NOT NULL,
     servico TEXT NOT NULL,
+    tipo_manutencao TEXT NOT NULL DEFAULT 'preventiva',
     descricao_servico TEXT,
     local_manutencao TEXT,
     valor TEXT NOT NULL,
@@ -400,6 +401,7 @@ INSERT INTO Manutencao (
     data_manutencao,
     placa,
     servico,
+    tipo_manutencao,
     descricao_servico,
     local_manutencao,
     valor,
@@ -410,7 +412,7 @@ INSERT INTO Manutencao (
     foto_comprovante1,
     foto_comprovante2,
     sincronizado
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
 
 marcarManutencaoSincronizada:
 UPDATE Manutencao SET sincronizado = 1 WHERE id = ?;
