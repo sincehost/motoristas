@@ -177,7 +177,7 @@ actual fun AdicionarCombustivelScreen(
                 try {
                     val syncResp = api.ApiClient.syncDados(motorista?.motorista_id ?: "")
                     if (syncResp.status == "ok") {
-                        repository.salvarEquipamentos(syncResp.equipamentos.map { it.id to it.placa })
+                        repository.salvarEquipamentos(syncResp.equipamentos.map { Triple(it.id, it.placa, it.km) })
                         equipamentos = repository.getEquipamentosParaDropdown()
                     }
                 } catch (e: Exception) {
