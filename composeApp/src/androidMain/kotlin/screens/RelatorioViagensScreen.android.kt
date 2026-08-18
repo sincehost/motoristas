@@ -146,13 +146,16 @@ actual fun RelatorioViagensScreen(
             }
 
             val totalFrete = rel.total_valor_frete + rel.total_valor_frete_retorno
-            val imposto = totalFrete * 0.10
-            val saldo = totalFrete - rel.total_valor_arla - rel.total_valor_diesel - rel.total_valor_descarga - rel.total_outras_despesas - imposto
+            val imposto = totalFrete * (rel.percentual_imposto / 100.0)
+            val saldo = totalFrete - rel.total_valor_arla - rel.total_valor_diesel - rel.total_valor_descarga - rel.total_outras_despesas - imposto - rel.comissao_periodo
 
             y += 5f
             paint.color = android.graphics.Color.parseColor("#CCCCCC"); canvas.drawLine(left, y, right, y, paint); y += 20f
             drawItem("Total Fretes:", "R$ ${formatMoney(totalFrete)}")
-            drawItem("Imposto (10%):", "R$ ${formatMoney(imposto)}")
+            drawItem("Imposto (${formatNumber(rel.percentual_imposto)}%):", "R$ ${formatMoney(imposto)}")
+            if (rel.comissao_periodo > 0) {
+                drawItem("Comissão/Salário:", "R$ ${formatMoney(rel.comissao_periodo)}")
+            }
 
             y += 10f
             val saldoColor = if (saldo >= 0) "#10B981" else "#EF4444"
@@ -404,13 +407,16 @@ actual fun RelatorioViagensScreen(
                         }
                         
                         val totalFrete = rel.total_valor_frete + rel.total_valor_frete_retorno
-                        val imposto = totalFrete * 0.10
-                        val saldo = totalFrete - rel.total_valor_arla - rel.total_valor_diesel - rel.total_valor_descarga - rel.total_outras_despesas - imposto
-                        
+                        val imposto = totalFrete * (rel.percentual_imposto / 100.0)
+                        val saldo = totalFrete - rel.total_valor_arla - rel.total_valor_diesel - rel.total_valor_descarga - rel.total_outras_despesas - imposto - rel.comissao_periodo
+
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                        
+
                         RelatorioItem("Total Fretes:", "R$ ${formatMoney(totalFrete)}")
-                        RelatorioItem("Imposto:", "R$ ${formatMoney(imposto)}")
+                        RelatorioItem("Imposto (${formatNumber(rel.percentual_imposto)}%):", "R$ ${formatMoney(imposto)}")
+                        if (rel.comissao_periodo > 0) {
+                            RelatorioItem("Comissão/Salário:", "R$ ${formatMoney(rel.comissao_periodo)}")
+                        }
                         
                         Spacer(Modifier.height(8.dp))
                         
