@@ -2,7 +2,8 @@ package util
 
 import platform.Foundation.*
 import platform.UIKit.*
-import platform.AVFoundation.AVAuthorizationStatus
+import platform.AVFoundation.AVAuthorizationStatusDenied
+import platform.AVFoundation.AVAuthorizationStatusRestricted
 import platform.AVFoundation.AVCaptureDevice
 import platform.AVFoundation.AVMediaTypeVideo
 import platform.AVFoundation.authorizationStatusForMediaType
@@ -36,8 +37,7 @@ object CameraHelper {
      */
     fun cameraSemPermissao(): Boolean {
         val status = AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)
-        return status == AVAuthorizationStatus.AVAuthorizationStatusDenied ||
-            status == AVAuthorizationStatus.AVAuthorizationStatusRestricted
+        return status == AVAuthorizationStatusDenied || status == AVAuthorizationStatusRestricted
     }
 
     /**
