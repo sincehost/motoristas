@@ -129,6 +129,46 @@ fun PlanoManutencaoAlertCard(itens: List<api.PlanoManutencaoItem>) {
 }
 
 // ===============================
+// CARD DE ALERTA — CNH VENCENDO/VENCIDA (mesmo alerta de 30 dias que já
+// existe pro admin, mostrado aqui pro próprio motorista).
+// ===============================
+@Composable
+fun CnhAlertCard(status: api.CnhStatusResponse) {
+    val isDarkMode = isDark()
+    val backgroundColor = if (status.vencido) {
+        if (isDarkMode) Color(0xFF3D1A1A) else Color(0xFFFFEBEE)
+    } else {
+        if (isDarkMode) Color(0xFF3D2E1A) else Color(0xFFFFF3E0)
+    }
+    val iconColor = if (status.vencido) {
+        if (isDarkMode) Color(0xFFFF7070) else Color(0xFFD32F2F)
+    } else {
+        if (isDarkMode) Color(0xFFFFB74D) else Color(0xFFFF6F00)
+    }
+    val titulo = if (status.vencido) "CNH vencida" else "CNH vencendo em ${status.dias} dia(s)"
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Badge, null, tint = iconColor, modifier = Modifier.size(24.dp))
+            Column {
+                Text(titulo, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = iconColor)
+                status.data_vencimento?.let {
+                    Text("Validade: ${formatarDataBR(it)}", fontSize = 12.sp, color = AppColors.TextSecondary)
+                }
+            }
+        }
+    }
+}
+
+// ===============================
 // CARD DE VIAGEM EM ANDAMENTO
 // ===============================
 @Composable

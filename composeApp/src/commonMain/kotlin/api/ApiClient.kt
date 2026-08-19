@@ -513,6 +513,32 @@ object ApiClient {
             setBody(mapOf("motorista_id" to motoristaId))
         }.body()
     }
+
+    // Status da CNH do próprio motorista — mesmo alerta de 30 dias do painel.
+    suspend fun cnhStatus(motoristaId: String): CnhStatusResponse {
+        return client.post("${getBaseUrl()}/motorista/cnh_status.php") {
+            contentType(ContentType.Application.Json)
+            withAuth()
+            setBody(mapOf("motorista_id" to motoristaId))
+        }.body()
+    }
+
+    // Mensagens que o admin mandou pro motorista.
+    suspend fun buscarMensagens(motoristaId: String): MensagensResponse {
+        return client.post("${getBaseUrl()}/motorista/mensagens.php") {
+            contentType(ContentType.Application.Json)
+            withAuth()
+            setBody(mapOf("motorista_id" to motoristaId))
+        }.body()
+    }
+
+    suspend fun marcarMensagemLida(motoristaId: String, mensagemId: Int): MarcarMensagemLidaResponse {
+        return client.post("${getBaseUrl()}/motorista/marcar_mensagem_lida.php") {
+            contentType(ContentType.Application.Json)
+            withAuth()
+            setBody(mapOf("motorista_id" to motoristaId, "mensagem_id" to mensagemId.toString()))
+        }.body()
+    }
     // ===============================
     // RELATÓRIO DE VIAGENS
     // ===============================

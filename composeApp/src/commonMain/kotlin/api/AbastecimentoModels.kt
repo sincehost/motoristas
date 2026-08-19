@@ -161,6 +161,41 @@ data class PlanoPendenteResponse(
     val itens: List<PlanoManutencaoItem> = emptyList()
 )
 
+/** Status da CNH do próprio motorista — mesmo alerta (30 dias) que já existe
+ * pro admin em admin_documentos.php, só que sempre do motorista logado. */
+@Serializable
+data class CnhStatusResponse(
+    val status: String,
+    val tem_cnh_cadastrada: Boolean = false,
+    val data_vencimento: String? = null,
+    val dias: Int = 0,
+    val vencido: Boolean = false,
+    val a_vencer: Boolean = false
+)
+
+/** Mensagem que o admin mandou pro motorista, exibida no Dashboard — ele
+ * pode fechar (reaparece depois) ou marcar como lida (some de vez). */
+@Serializable
+data class MensagemMotorista(
+    val id: Int,
+    val mensagem: String,
+    val lida: Boolean,
+    val criado_em: String
+)
+
+@Serializable
+data class MensagensResponse(
+    val status: String,
+    val mensagem: String? = null,
+    val mensagens: List<MensagemMotorista> = emptyList()
+)
+
+@Serializable
+data class MarcarMensagemLidaResponse(
+    val status: String,
+    val mensagem: String? = null
+)
+
 // ===============================
 // LISTAGEM DE MANUTENÇÕES - ATUALIZADO COM PAGINAÇÃO
 // ===============================

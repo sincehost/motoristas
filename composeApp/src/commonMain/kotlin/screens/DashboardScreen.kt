@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -228,6 +229,11 @@ private fun DashboardContent(
     var viagemAtualId by remember { mutableStateOf<Long?>(null) }
     var temInternet by remember { mutableStateOf(true) }
     var planoManutencaoPendente by remember { mutableStateOf<List<api.PlanoManutencaoItem>>(emptyList()) }
+    var cnhStatus by remember { mutableStateOf<api.CnhStatusResponse?>(null) }
+    var mensagensMotorista by remember { mutableStateOf<List<api.MensagemMotorista>>(emptyList()) }
+    // Mensagens fechadas nesta sessão (não marcadas como lida, só "não mostrar de novo agora") —
+    // reaparecem no próximo login, igual o motorista pediu.
+    var mensagensFechadasNestaSessao by remember { mutableStateOf<Set<Int>>(emptySet()) }
     val sincronizando = syncStatus.state == SyncState.SYNCING
     val scope = rememberCoroutineScope()
 
@@ -306,15 +312,30 @@ private fun DashboardContent(
         }
     }
 
-    // Plano de manutenção (itens vencidos/vencendo por data) — só leitura,
-    // cadastro é do admin. Falha silenciosa: é um alerta informativo, não
-    // pode travar o Dashboard se a API não responder.
-    LaunchedEffect(Unit) {
+    // Avisos (plano de manutenção, CNH vencendo, mensagens do admin) — só
+    // leitura, cadastro é do admin. Falha silenciosa em cada um: são alertas
+    // informativos, não podem travar o Dashboard se a API não responder.
+    // Antes só rodava 1x na abertura do app (LaunchedEffect(Unit)) — se o
+    // admin marcasse um item como resolvido, o motorista só via sumir
+    // deslogando e logando de novo. Agora também recarrega ao voltar pro
+    // Dashboard e no pull-to-refresh (ver mais abaixo).
+    suspend fun carregarAvisos() {
+        val motoristaId = motorista?.motorista_id ?: return
         try {
-            val resp = api.ApiClient.planoManutencaoPendente(motorista?.motorista_id ?: "")
+            val resp = api.ApiClient.planoManutencaoPendente(motoristaId)
             if (resp.status == "ok") planoManutencaoPendente = resp.itens
         } catch (_: Exception) {}
+        try {
+            val resp = api.ApiClient.cnhStatus(motoristaId)
+            if (resp.status == "ok") cnhStatus = resp
+        } catch (_: Exception) {}
+        try {
+            val resp = api.ApiClient.buscarMensagens(motoristaId)
+            if (resp.status == "ok") mensagensMotorista = resp.mensagens
+        } catch (_: Exception) {}
     }
+
+    LaunchedEffect(Unit) { carregarAvisos() }
 
     LaunchedEffect(Unit) {
         offlineManager.verificarViagemAtual(
@@ -326,11 +347,12 @@ private fun DashboardContent(
         )
     }
 
-    // Atualiza viagem e pendentes ao voltar para o dashboard
+    // Atualiza viagem, pendentes e avisos ao voltar para o dashboard
     LaunchedEffect(telaAtual) {
         if (telaAtual == null) {
             verificarViagem()
             pendentes = repository.countTotalPendentes()
+            carregarAvisos()
         }
     }
 
@@ -416,6 +438,59 @@ private fun DashboardContent(
         )
     }
 
+    // Mensagem do admin pro motorista — mostra a mais antiga que ainda não foi
+    // fechada nesta sessão nem marcada como lida. "Fechar" só esconde por agora
+    // (reaparece no próximo carregamento); "Marcar como lida" é definitivo.
+    val mensagemAtual = mensagensMotorista.firstOrNull { !it.lida && it.id !in mensagensFechadasNestaSessao }
+    if (mensagemAtual != null) {
+        AppAlertDialog(
+            onDismissRequest = { mensagensFechadasNestaSessao = mensagensFechadasNestaSessao + mensagemAtual.id },
+            containerColor = AppColors.Surface,
+            icon = {
+                Icon(Icons.Default.MarkEmailUnread, null, tint = AppColors.Primary, modifier = Modifier.size(36.dp))
+            },
+            title = {
+                Text("Mensagem da administração", fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            },
+            text = {
+                Text(
+                    mensagemAtual.mensagem,
+                    fontSize = 14.sp, textAlign = TextAlign.Center, color = AppColors.TextSecondary, modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val id = mensagemAtual.id
+                            scope.launch {
+                                try {
+                                    api.ApiClient.marcarMensagemLida(motorista?.motorista_id ?: "", id)
+                                } catch (_: Exception) {}
+                                mensagensMotorista = mensagensMotorista.filter { it.id != id }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Marcar como lida", fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(
+                        onClick = { mensagensFechadasNestaSessao = mensagensFechadasNestaSessao + mensagemAtual.id },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Fechar")
+                    }
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             DashboardTopBar(
@@ -452,6 +527,7 @@ private fun DashboardContent(
                 scope.launch {
                     verificarViagem()
                     pendentes = repository.countTotalPendentes()
+                    carregarAvisos()
                     if (temInternet && pendentes > 0 && syncStatus.state == SyncState.IDLE) {
                         executarSync(silencioso = true)
                     }
@@ -479,6 +555,13 @@ private fun DashboardContent(
             if (planoManutencaoPendente.isNotEmpty()) {
                 PlanoManutencaoAlertCard(planoManutencaoPendente)
                 Spacer(Modifier.height(12.dp))
+            }
+
+            cnhStatus?.let { cnh ->
+                if (cnh.tem_cnh_cadastrada && (cnh.vencido || cnh.a_vencer)) {
+                    CnhAlertCard(cnh)
+                    Spacer(Modifier.height(12.dp))
+                }
             }
 
             if (verificandoViagem) {
