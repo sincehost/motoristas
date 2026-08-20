@@ -294,11 +294,14 @@ actual fun RelatorioViagensScreen(
 
                         val totalFrete = rel.total_valor_frete + rel.total_valor_frete_retorno
                         val imposto = rel.valor_imposto
-                        val saldo = totalFrete - rel.total_valor_arla - rel.total_valor_diesel - rel.total_valor_descarga - rel.total_outras_despesas - imposto - rel.comissao_periodo
+                        val saldo = totalFrete - rel.total_valor_arla - rel.total_valor_diesel - rel.total_valor_descarga - rel.total_outras_despesas - rel.total_valor_pedagio - imposto - rel.comissao_periodo
 
                         Divider(modifier = Modifier.padding(vertical = 12.dp))
 
                         RelatorioItem("Total Fretes:", "R$ ${formatMoney(totalFrete)}")
+                        if (rel.total_valor_pedagio > 0) {
+                            RelatorioItem("Pedágio:", "R$ ${formatMoney(rel.total_valor_pedagio)}")
+                        }
                         RelatorioItem("Imposto (${formatNumber(rel.percentual_imposto)}%):", "R$ ${formatMoney(imposto)}")
                         if (rel.comissao_periodo > 0) {
                             RelatorioItem("Comissão/Salário:", "R$ ${formatMoney(rel.comissao_periodo)}")

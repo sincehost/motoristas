@@ -240,6 +240,7 @@ data class RelatorioViagensResponse(
     val total_valor_frete_retorno: Double = 0.0,
     val total_valor_descarga: Double = 0.0,
     val total_outras_despesas: Double = 0.0,
+    val total_valor_pedagio: Double = 0.0,
     val comissao_periodo: Double = 0.0,
     val percentual_imposto: Double = 10.0,
     val valor_imposto: Double = 0.0,
