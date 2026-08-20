@@ -11,27 +11,9 @@ workflows:
         script: |
           chmod +x gradlew
 
-      - name: Create Podfile
+      - name: Install Pods
         script: |
           cd iosApp
-          cat > Podfile << 'PODFILE_END'
-          platform :ios, '14.0'
-          
-          use_frameworks!
-          
-          target 'iosApp' do
-          end
-          
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-                config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
-                config.build_settings['OTHER_LDFLAGS'] << '-lsqlite3'
-              end
-            end
-          end
-          PODFILE_END
           pod install
 
       - name: Build iOS with SQLite3
