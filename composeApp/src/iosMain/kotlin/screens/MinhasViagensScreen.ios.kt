@@ -750,7 +750,9 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
     var outrasDespesas by remember { mutableStateOf<List<OutraDespesaItem>>(emptyList()) }
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(viagemId) {
+    suspend fun carregarResumo() {
+        loading = true
+        erro = null
         try {
             val response = ApiClient.resumoViagem(ResumoRequest(viagem_id = viagemId, motorista_id = motorista?.motorista_id ?: ""))
             if (response.status == "ok") resumo = response.resumo else erro = response.mensagem
@@ -764,6 +766,9 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
         loading = false
     }
 
+    LaunchedEffect(viagemId) { carregarResumo() }
+    val scopeRetry = rememberCoroutineScope()
+
     Scaffold(
         topBar = {
             GradientTopBar(
@@ -774,7 +779,13 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
     ) { padding ->
         when {
             loading -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AppColors.Primary) }
-            erro != null -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Text(erro!!, color = AppColors.Error) }
+            erro != null -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(erro!!, color = AppColors.Error, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = { scopeRetry.launch { carregarResumo() } }) { Text("Tentar Novamente") }
+                }
+            }
             resumo != null -> Column(modifier = Modifier.fillMaxSize().padding(padding).background(AppColors.Background).verticalScroll(scrollState).padding(16.dp)) {
                 Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground)) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {

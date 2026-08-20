@@ -42,7 +42,14 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) { viagemAtual = repository.getViagemAtual(); semViagem = viagemAtual == null; carregando = false }
+    LaunchedEffect(Unit) {
+        try {
+            viagemAtual = repository.getViagemAtual(); semViagem = viagemAtual == null
+        } catch (_: Exception) {
+            semViagem = true
+        }
+        carregando = false
+    }
 
     var docCnhValida by remember { mutableStateOf(false) }; var docCrlvVeiculo by remember { mutableStateOf(false) }
     var docAnttValida by remember { mutableStateOf(false) }; var docSeguroCarga by remember { mutableStateOf(false) }
@@ -181,7 +188,14 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) { viagemAtual = repository.getViagemAtual(); semViagem = viagemAtual == null; carregando = false }
+    LaunchedEffect(Unit) {
+        try {
+            viagemAtual = repository.getViagemAtual(); semViagem = viagemAtual == null
+        } catch (_: Exception) {
+            semViagem = true
+        }
+        carregando = false
+    }
 
     var avariaCarroceria by remember { mutableStateOf(false) }; var avariaCabine by remember { mutableStateOf(false) }
     var avariaPneus by remember { mutableStateOf(false) }; var avariaEspelhos by remember { mutableStateOf(false) }

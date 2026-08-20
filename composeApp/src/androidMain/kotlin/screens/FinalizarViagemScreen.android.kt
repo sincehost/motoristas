@@ -195,13 +195,19 @@ actual fun FinalizarViagemScreen(
         }
     }
 
+    var mostrarPermissaoNegada by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             try {
                 val uri = cameraState.prepareCapture()
                 cameraLauncher.launch(uri)
             } catch (e: Exception) { }
+        } else {
+            mostrarPermissaoNegada = true
         }
+    }
+    if (mostrarPermissaoNegada) {
+        ui.CameraPermissaoNegadaDialog(onDismiss = { mostrarPermissaoNegada = false })
     }
 
     // Galeria — GetContent funciona em TODOS os Androids (inclusive Xiaomi/Poco/MIUI)

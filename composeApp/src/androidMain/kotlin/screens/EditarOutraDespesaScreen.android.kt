@@ -88,8 +88,16 @@ actual fun EditarOutraDespesaScreen(
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success || cameraState.checkPhotoExistsAfterCapture()) cameraState.onPhotoTaken()
     }
+    var mostrarPermissaoNegada by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) runCatching { cameraLauncher.launch(cameraState.prepareCapture()) }
+        if (granted) {
+            runCatching { cameraLauncher.launch(cameraState.prepareCapture()) }
+        } else {
+            mostrarPermissaoNegada = true
+        }
+    }
+    if (mostrarPermissaoNegada) {
+        ui.CameraPermissaoNegadaDialog(onDismiss = { mostrarPermissaoNegada = false })
     }
 
     fun tirarFoto() {

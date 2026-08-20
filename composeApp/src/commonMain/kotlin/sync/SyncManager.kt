@@ -503,6 +503,21 @@ class SyncManager(private val repository: AppRepository) {
                     onSemViagem()
                     return
                 }
+            } else {
+                // status != "ok" (ex: motorista_id vazio) — resposta válida,
+                // não uma exceção, então o catch abaixo nunca rodava e o
+                // card "Verificando viagem..." ficava girando pra sempre.
+                // Mesmo fallback do catch: usa dado local se tiver.
+                val viagemLocal = repository.getViagemAtual()
+                if (viagemLocal != null) {
+                    onLoading(false)
+                    onModoOffline(true)
+                    onViagemEncontrada(viagemLocal.viagem_id, viagemLocal.destino)
+                } else {
+                    onLoading(false)
+                    onModoOffline(false)
+                    onSemViagem()
+                }
             }
         } catch (e: Exception) {
             // Fallback offline

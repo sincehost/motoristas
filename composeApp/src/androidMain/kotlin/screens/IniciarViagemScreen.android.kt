@@ -158,13 +158,19 @@ actual fun IniciarViagemScreen(
         }
     }
 
+    var mostrarPermissaoNegada by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
             val uri = cameraState.prepareCapture()
             cameraLauncher.launch(uri)
+        } else {
+            mostrarPermissaoNegada = true
         }
+    }
+    if (mostrarPermissaoNegada) {
+        ui.CameraPermissaoNegadaDialog(onDismiss = { mostrarPermissaoNegada = false })
     }
 
     fun abrirCamera() {

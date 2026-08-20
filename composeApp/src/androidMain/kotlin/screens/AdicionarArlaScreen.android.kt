@@ -157,13 +157,19 @@ actual fun AdicionarArlaScreen(
         }
     }
 
+    var mostrarPermissaoNegada by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             try {
                 val uri = cameraState.prepareCapture()
                 cameraLauncher.launch(uri)
             } catch (e: Exception) { }
+        } else {
+            mostrarPermissaoNegada = true
         }
+    }
+    if (mostrarPermissaoNegada) {
+        ui.CameraPermissaoNegadaDialog(onDismiss = { mostrarPermissaoNegada = false })
     }
 
     // Photo Picker — não requer READ_MEDIA_IMAGES

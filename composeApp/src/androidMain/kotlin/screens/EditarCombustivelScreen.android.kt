@@ -178,6 +178,7 @@ actual fun EditarCombustivelScreen(
         }
     }
 
+    var mostrarPermissaoNegada by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             try {
@@ -187,7 +188,12 @@ actual fun EditarCombustivelScreen(
                 }
                 cameraLauncher.launch(uri)
             } catch (e: Exception) { }
+        } else {
+            mostrarPermissaoNegada = true
         }
+    }
+    if (mostrarPermissaoNegada) {
+        ui.CameraPermissaoNegadaDialog(onDismiss = { mostrarPermissaoNegada = false })
     }
 
     fun tirarFoto(tipo: String) {

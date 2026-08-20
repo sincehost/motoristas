@@ -57,8 +57,12 @@ actual fun ChecklistPreViagemScreen(
 
     LaunchedEffect(Unit) {
         carregando = true
-        viagemAtual = repository.getViagemAtual()
-        if (viagemAtual == null) semViagemAberta = true
+        try {
+            viagemAtual = repository.getViagemAtual()
+            if (viagemAtual == null) semViagemAberta = true
+        } catch (_: Exception) {
+            semViagemAberta = true
+        }
         carregando = false
     }
 

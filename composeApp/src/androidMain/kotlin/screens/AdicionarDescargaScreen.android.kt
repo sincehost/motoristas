@@ -150,13 +150,19 @@ actual fun AdicionarDescargaScreen(
         }
     }
 
+    var mostrarPermissaoNegada by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             try {
                 val uri = cameraState.prepareCapture()
                 cameraLauncher.launch(uri)
             } catch (e: Exception) { }
+        } else {
+            mostrarPermissaoNegada = true
         }
+    }
+    if (mostrarPermissaoNegada) {
+        ui.CameraPermissaoNegadaDialog(onDismiss = { mostrarPermissaoNegada = false })
     }
 
     fun tirarFoto() {
@@ -231,6 +237,7 @@ actual fun AdicionarDescargaScreen(
                 } catch (e: Exception) {
                     if (cameraState.base64.isNullOrBlank()) {
                         erro = "Foto do comprovante é obrigatória"
+                        salvando = false
                         return@launch
                     }
 
