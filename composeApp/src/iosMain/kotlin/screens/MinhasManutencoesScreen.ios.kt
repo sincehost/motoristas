@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,6 +71,8 @@ private fun ListaManutencoesContent(
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     var carregando by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullToRefreshState()
     var erro by remember { mutableStateOf<String?>(null) }
     var manutencoes by remember { mutableStateOf<List<ManutencaoItem>>(emptyList()) }
 
@@ -102,6 +106,7 @@ private fun ListaManutencoesContent(
                 erro = "Sem conexão com internet"
             }
             carregando = false
+            isRefreshing = false
         }
     }
 
@@ -191,10 +196,18 @@ private fun ListaManutencoesContent(
             )
         }
     ) { padding ->
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                carregarManutencoes()
+            },
+            state = pullRefreshState,
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .background(AppColors.Background)
         ) {
             when {
@@ -281,6 +294,7 @@ private fun ListaManutencoesContent(
                     }
                 }
             }
+        }
         }
     }
 }
