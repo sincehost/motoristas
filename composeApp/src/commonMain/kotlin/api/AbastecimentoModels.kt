@@ -196,6 +196,12 @@ data class MarcarMensagemLidaResponse(
     val mensagem: String? = null
 )
 
+@Serializable
+data class RegistrarFcmTokenResponse(
+    val status: String,
+    val mensagem: String? = null
+)
+
 // ===============================
 // LISTAGEM DE MANUTENÇÕES - ATUALIZADO COM PAGINAÇÃO
 // ===============================

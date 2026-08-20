@@ -4,6 +4,7 @@ use_frameworks!
 
 target 'iosApp' do
   # Pods do projeto
+  pod 'FirebaseMessaging'
 end
 
 post_install do |installer|

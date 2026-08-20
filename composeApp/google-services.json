@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "111714324784",
+    "project_id": "trakvia-a33a2",
+    "storage_bucket": "trakvia-a33a2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:111714324784:android:2a23af23026c70700d38f5",
+        "android_client_info": {
+          "package_name": "br.com.lfsystem.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD78pkxpVdGlUiwY3L7ZfGuCQbe_PtiIDs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

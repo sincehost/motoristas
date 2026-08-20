@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     id("org.jetbrains.kotlin.plugin.serialization") version "2.1.20"
     id("app.cash.sqldelight") version "2.0.1"
+    id("com.google.gms.google-services")
 }
 
 kotlin {
@@ -75,6 +76,10 @@ kotlin {
             // Scanear Nota — leitura de cupom fiscal (OCR + QR/código de barras), 100% on-device
             implementation("com.google.mlkit:text-recognition:16.0.1")
             implementation("com.google.mlkit:barcode-scanning:17.3.0")
+
+            // Notificações push (FCM)
+            implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+            implementation("com.google.firebase:firebase-messaging")
         }
 
         iosMain.dependencies {

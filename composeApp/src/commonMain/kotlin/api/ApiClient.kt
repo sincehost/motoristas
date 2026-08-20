@@ -539,6 +539,15 @@ object ApiClient {
             setBody(mapOf("motorista_id" to motoristaId, "mensagem_id" to mensagemId.toString()))
         }.body()
     }
+
+    // Registra/atualiza o token de push (FCM) do aparelho pro motorista logado.
+    suspend fun registrarFcmToken(motoristaId: String, token: String, plataforma: String): RegistrarFcmTokenResponse {
+        return client.post("${getBaseUrl()}/motorista/registrar_push_token.php") {
+            contentType(ContentType.Application.Json)
+            withAuth()
+            setBody(mapOf("motorista_id" to motoristaId, "token" to token, "plataforma" to plataforma))
+        }.body()
+    }
     // ===============================
     // RELATÓRIO DE VIAGENS
     // ===============================

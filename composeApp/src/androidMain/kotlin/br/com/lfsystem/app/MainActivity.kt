@@ -19,8 +19,10 @@ import androidx.core.content.ContextCompat
 import api.ApiClient
 import api.ApiUrlStorage
 import app.App
+import com.google.firebase.messaging.FirebaseMessaging
 import database.AppRepository
 import database.DatabaseDriverFactory
+import push.PushTokenManager
 import screens.NetworkMonitor
 import util.BiometricAuth
 import util.SyncNotificationHelper
@@ -85,6 +87,16 @@ class MainActivity : ComponentActivity() {
 
         // Cria canais de notificação
         SyncNotificationHelper.criarCanal(applicationContext)
+        TrakviaMessagingService.criarCanal(applicationContext)
+
+        // Busca o token FCM atual do aparelho (não bloqueia — chega via
+        // callback; LoginScreen/App.kt registram com o backend quando
+        // já tiver motorista logado).
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                task.result?.let { PushTokenManager.setToken(it) }
+            }
+        }
 
         // Pedir permissão de notificação (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

@@ -9,7 +9,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import api.ApiClient
 import database.AppRepository
+import push.PushTokenManager
+import push.plataformaPushId
 import screens.BiometricLockScreen
 import screens.DashboardScreen
 import screens.LoginScreen
@@ -35,6 +38,22 @@ fun App(
     // persistente) — login novo via LoginScreen não passa por aqui, porque
     // o motorista acabou de confirmar a identidade digitando a senha.
     var isLocked by remember { mutableStateOf(isLoggedIn) }
+
+    // Re-registra o token de push sempre que ele mudar (renovação do FCM)
+    // enquanto já houver um motorista logado — o registro do 1º login já
+    // acontece dentro do próprio LoginScreen.
+    LaunchedEffect(isLoggedIn) {
+        if (!isLoggedIn) return@LaunchedEffect
+        PushTokenManager.token.collect { fcmToken ->
+            if (fcmToken == null) return@collect
+            val motoristaId = try { repository.getMotoristaLogado()?.motorista_id } catch (_: Exception) { null }
+            if (motoristaId != null) {
+                try {
+                    ApiClient.registrarFcmToken(motoristaId, fcmToken, plataformaPushId())
+                } catch (_: Exception) {}
+            }
+        }
+    }
 
     // Se algum erro grave aconteceu, mostrar tela de erro
     if (appError != null) {

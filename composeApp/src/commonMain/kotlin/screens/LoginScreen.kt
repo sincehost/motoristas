@@ -42,6 +42,8 @@ import database.AppRepository
 import database.TipoDespesaSync
 import database.TipoCombustivelSync
 import kotlinx.coroutines.delay
+import push.PushTokenManager
+import push.plataformaPushId
 import kotlinx.coroutines.launch
 import ui.AppColors
 
@@ -440,6 +442,19 @@ fun LoginScreen(
                                             usuario = usuario,
                                             senha = senha
                                         )
+
+                                        // Push: se o token do aparelho já chegou, registra agora.
+                                        // Se ainda não chegou (comum no 1º login), PushTokenManager
+                                        // emite depois e App.kt reenvia assim que aparecer.
+                                        PushTokenManager.tokenAtual()?.let { fcmToken ->
+                                            try {
+                                                ApiClient.registrarFcmToken(
+                                                    motoristaId = resp.motorista_id ?: "",
+                                                    token = fcmToken,
+                                                    plataforma = plataformaPushId()
+                                                )
+                                            } catch (_: Exception) {}
+                                        }
 
                                         statusMsg = "Sincronizando dados..."
 
