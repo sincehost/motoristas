@@ -21,7 +21,7 @@ interface ApiUrlStorage {
 
 object ApiClient {
 
-    private const val CENTRAL_URL = "https://lfsystem.com.br/api"
+    private const val CENTRAL_URL = "https://trakvia.com.br/api"
     private var baseUrl: String? = null
     private var storage: ApiUrlStorage? = null
     private var authToken: String? = null
