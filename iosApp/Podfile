@@ -29,6 +29,15 @@ post_install do |installer|
       config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
       config.build_settings['OTHER_LDFLAGS'] << '-lsqlite3'
       config.build_settings['OTHER_LDFLAGS'] << '-ObjC'
+
+      # Xcode 26 não gera mais o link automático entre pods aqui (bug/mudança
+      # recente reportada em vários projetos CocoaPods+Firebase) — o
+      # FirebaseCore não acha o GoogleUtilities/FirebaseCoreInternal na hora
+      # de linkar a própria framework dele. Força explícito.
+      if target.name == 'FirebaseCore'
+        config.build_settings['OTHER_LDFLAGS'] << '-framework "GoogleUtilities"'
+        config.build_settings['OTHER_LDFLAGS'] << '-framework "FirebaseCoreInternal"'
+      end
     end
   end
 end
