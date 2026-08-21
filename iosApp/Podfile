@@ -1,9 +1,12 @@
 ﻿platform :ios, '14.0'
 
 
-# Linkage estático — com o dinâmico (padrão), o link do FirebaseCore não
-# resolve a dependência cruzada com GoogleUtilities (símbolos GUL* somem).
-use_frameworks! :linkage => :static
+# Dinâmico (padrão) — linkage estático quebra o recurso "Heartbeat" interno
+# do Firebase (FIRHeartbeatController não pega no link final do app), então
+# voltamos pro dinâmico; a versão travada abaixo já resolve o problema
+# original (símbolos do GoogleUtilities sumindo por incompatibilidade de
+# versão entre FirebaseCore/GoogleUtilities baixados na hora do build).
+use_frameworks!
 
 target 'iosApp' do
   # Pods do projeto
