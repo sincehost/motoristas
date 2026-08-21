@@ -5,8 +5,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -27,7 +27,11 @@ import screens.NetworkMonitor
 import util.BiometricAuth
 import util.SyncNotificationHelper
 
-class MainActivity : ComponentActivity() {
+// FragmentActivity (não ComponentActivity puro) — BiometricPrompt na versão
+// da lib usada aqui (androidx.biometric 1.1.0) exige um FragmentActivity de
+// verdade; sem isso, o cast em BiometricAuth.android.kt:87 lança
+// ClassCastException toda vez que o motorista tenta desbloquear com digital.
+class MainActivity : FragmentActivity() {
 
     private lateinit var repository: AppRepository
 
@@ -38,15 +42,6 @@ class MainActivity : ComponentActivity() {
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
-                // TEMPORÁRIO — diagnóstico do crash "abre a biometria e fecha"
-                // sem precisar de ADB. Ler em Android/data/br.com.lfsystem.app/
-                // files/crash_log.txt (gerenciador de arquivos do aparelho).
-                // Remover depois de identificar a causa.
-                try {
-                    java.io.File(getExternalFilesDir(null), "crash_log.txt")
-                        .writeText(java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(java.util.Date()) + "\n" + android.util.Log.getStackTraceString(throwable))
-                } catch (_: Exception) {}
-
                 // Limpar cache de database problemático se for erro de schema
                 val msg = throwable.message ?: ""
                 if (msg.contains("no such column") || msg.contains("no such table") ||
