@@ -4,7 +4,10 @@ use_frameworks!
 
 target 'iosApp' do
   # Pods do projeto
-  pod 'FirebaseMessaging'
+  # Versão travada de propósito: sem isso, cada build do Codemagic baixa o
+  # Firebase mais novo publicado na hora, e uma versão nova incompatível entre
+  # FirebaseCore/GoogleUtilities quebra o link sem nenhuma mudança nossa.
+  pod 'FirebaseMessaging', '11.15.0'
 end
 
 post_install do |installer|
@@ -13,6 +16,7 @@ post_install do |installer|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
       config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
       config.build_settings['OTHER_LDFLAGS'] << '-lsqlite3'
+      config.build_settings['OTHER_LDFLAGS'] << '-ObjC'
     end
   end
 end
