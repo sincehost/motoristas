@@ -1,6 +1,9 @@
 ﻿platform :ios, '14.0'
 
-use_frameworks!
+
+# Linkage estático — com o dinâmico (padrão), o link do FirebaseCore não
+# resolve a dependência cruzada com GoogleUtilities (símbolos GUL* somem).
+use_frameworks! :linkage => :static
 
 target 'iosApp' do
   # Pods do projeto
