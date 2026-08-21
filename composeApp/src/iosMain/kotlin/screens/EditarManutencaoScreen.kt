@@ -572,6 +572,7 @@ actual fun EditarManutencaoScreen(
                                     if (dataManutencao.isBlank()) { mostrarMensagem("Informe a data", isErro = true); return@launch }
                                     if (servico.isBlank()) { mostrarMensagem("Informe o serviço", isErro = true); return@launch }
                                     if (valor.text.isBlank()) { mostrarMensagem("Informe o valor", isErro = true); return@launch }
+                                    if (fotoComprovante1Base64.isNullOrBlank()) { mostrarMensagem("Tire a foto do cupom fiscal", isErro = true); return@launch }
                                     if (servico == "Troca de Óleo" && kmTrocaOleo.text.isBlank()) { mostrarMensagem("Informe o KM da troca de óleo", isErro = true); return@launch }
                                     if (servico == "Troca de Pneu") {
                                         if (kmTrocaPneu.text.isBlank()) { mostrarMensagem("Informe o KM da troca de pneu", isErro = true); return@launch }

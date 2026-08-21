@@ -177,6 +177,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
         focusManager.clearFocus()
         if (placaSelecionada.isBlank()) { erroMsg = "Selecione uma placa"; return }
         if (valor.text.isBlank()) { erroMsg = "Informe o valor"; return }
+        if (foto1Base64.isNullOrBlank()) { erroMsg = "Tire a foto do cupom fiscal"; return }
         if (servicoSelecionado == "Troca de Óleo" && kmTrocaOleo.text.isBlank()) { erroMsg = "Informe o KM da troca de óleo"; return }
         if (servicoSelecionado == "Troca de Pneu") {
             if (kmTrocaPneu.text.isBlank()) { erroMsg = "Informe o KM da troca de pneu"; return }

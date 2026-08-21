@@ -207,6 +207,7 @@ actual fun ManutencaoScreen(
         // Validações
         if (placaSelecionada.isBlank()) { erro = "Selecione uma placa"; return }
         if (valor.text.isEmpty()) { erro = "Informe o valor"; return }
+        if (cameraState1.base64.isNullOrBlank()) { erro = "Tire a foto do cupom fiscal"; return }
         if (servicoSelecionado == "Troca de Óleo" && kmTrocaOleo.text.isBlank()) { erro = "Informe o KM da troca de óleo"; return }
         if (servicoSelecionado == "Troca de Pneu") {
             if (kmTrocaPneu.text.isBlank()) { erro = "Informe o KM da troca de pneu"; return }
