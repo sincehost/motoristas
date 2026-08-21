@@ -11,6 +11,12 @@ target 'iosApp' do
   # Firebase mais novo publicado na hora, e uma versão nova incompatível entre
   # FirebaseCore/GoogleUtilities quebra o link sem nenhuma mudança nossa.
   pod 'FirebaseMessaging', '11.15.0'
+  # Declarados explícitos (mesma versão) — senão ficam como dependência
+  # transitiva implícita e o linker do app derruba classes deles (ex:
+  # FIRHeartbeatController, do FirebaseCoreInternal) por não achar que
+  # precisa incluir esse código no binário final.
+  pod 'FirebaseCore', '11.15.0'
+  pod 'FirebaseCoreInternal', '11.15.0'
 end
 
 post_install do |installer|
