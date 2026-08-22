@@ -12,6 +12,8 @@ data class ViagemItem(
     val data_viagem: String = "",
     val data_chegada: String? = null,
     val placa: String = "",
+    val implemento1_placa: String = "",
+    val implemento2_placa: String = "",
     val km_inicio: String = "",
     val pesocarga: String = "",
     val valorfrete: String = "",
@@ -66,6 +68,13 @@ data class ViagemDetalhe(
     val destino_id: Int = 0,
     val destino_nome: String = "",
     val placa: String = "",
+    // Composição — null quando a viagem não tem (ou foi criada antes desta
+    // migração / por um app antigo que só manda placa).
+    val veiculo_id: Int? = null,
+    val implemento1_id: Int? = null,
+    val implemento1_placa: String? = null,
+    val implemento2_id: Int? = null,
+    val implemento2_placa: String? = null,
     val data_viagem: String = "",
     val data_chegada: String = "",
     val km_inicio: String = "",
@@ -93,7 +102,9 @@ data class DestinoItem(
 @Serializable
 data class EquipamentoItem(
     val id: Int,
-    val placa: String
+    val placa: String,
+    // "veiculo" | "implemento" | null (ainda não classificado no servidor).
+    val categoria: String? = null
 )
 
 @Serializable
@@ -117,6 +128,12 @@ data class AtualizarViagemRequest(
     val cte2: String = "",
     val destino_id: Int? = null,
     val placa: String = "",
+    // Composição — deixa null pra NÃO mexer na composição já salva (o
+    // servidor só atualiza veiculo/implementos quando um desses três vier
+    // explicitamente preenchido). Ver viagem/atualizar.php.
+    val veiculo_id: Int? = null,
+    val implemento1_id: Int? = null,
+    val implemento2_id: Int? = null,
     val data_viagem: String = "",
     val data_chegada: String = "",
     val km_inicio: String = "",

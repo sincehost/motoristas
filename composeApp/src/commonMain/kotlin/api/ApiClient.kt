@@ -152,17 +152,6 @@ object ApiClient {
     }
 
     // ===============================
-    // INICIAR VIAGEM
-    // ===============================
-    suspend fun iniciarViagem(request: IniciarViagemRequest): IniciarViagemResponse {
-        return client.post("${getBaseUrl()}/viagem/inserir.php") {
-            contentType(ContentType.Application.Json)
-            withAuth()
-            setBody(request)
-        }.body()
-    }
-
-    // ===============================
     // LISTAR VIAGENS
     // ===============================
     suspend fun listarViagens(request: ListarViagensRequest): ListarViagensResponse {
@@ -641,7 +630,9 @@ data class DestinoDto(
 data class EquipamentoDto(
     val id: String,
     val placa: String,
-    val km: String = ""
+    val km: String = "",
+    // "veiculo" | "implemento" | null (ainda não classificado no servidor).
+    val categoria: String? = null
 )
 
 @Serializable
@@ -678,6 +669,12 @@ data class ViagemRequest(
     val data_viagem: String,
     val km_inicio: String,
     val placa: String,
+    // Composição (opcional) — veiculo_id substitui `placa` como fonte da
+    // verdade quando presente; implementos são sempre opcionais. Deixar tudo
+    // null aqui equivale ao comportamento de antes desta migração.
+    val veiculo_id: Int? = null,
+    val implemento1_id: Int? = null,
+    val implemento2_id: Int? = null,
     val pesocarga: String,
     val valorfrete: String? = null,
     val foto_painel_saida: String? = null
@@ -687,32 +684,8 @@ data class ViagemRequest(
 data class ViagemResponse(
     val status: String,
     val mensagem: String? = null,
-    val viagem_id: Int? = null
-)
-
-// ===============================
-// INICIAR VIAGEM
-// ===============================
-@Serializable
-data class IniciarViagemRequest(
-    val motorista_id: String,
-    val data: String,
-    val destino_id: Int,
-    val equipamento_id: Int,
-    val km_saida: String,
-    val peso_carga: String,
-    val valor_frete: String,
-    val ordem: String,
-    val cte: String,
-    val observacao: String,
-    val foto_painel_saida_base64: String?
-)
-
-@Serializable
-data class IniciarViagemResponse(
-    val status: String,
-    val mensagem: String? = null,
-    val viagem_id: Int? = null
+    val viagem_id: Int? = null,
+    val veiculo_id: Int? = null
 )
 
 // ===============================

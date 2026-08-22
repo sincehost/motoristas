@@ -13,6 +13,7 @@ import br.com.lfsystem.app.database.Arla
 import br.com.lfsystem.app.database.Abastecimento
 import br.com.lfsystem.app.database.ViagemAtual
 import api.ApiClient
+import api.EquipamentoDto
 import util.PasswordHasher
 
 /** Par (id, nome) não basta pra tipo de despesa — precisa também de
@@ -110,19 +111,39 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         return queries.getAllEquipamentos().executeAsList()
     }
 
+    /** Só motorizados — pra popular o seletor de veículo principal da composição. */
+    fun getVeiculos(): List<Equipamento> {
+        return queries.getVeiculos().executeAsList()
+    }
+
+    /** Só implementos — pra popular os seletores opcionais da composição. */
+    fun getImplementos(): List<Equipamento> {
+        return queries.getImplementos().executeAsList()
+    }
+
     fun getEquipamentosParaDropdown(): List<Pair<Long, String>> {
         return queries.getAllEquipamentos()
             .executeAsList()
             .map { it.servidor_id to it.placa }
     }
 
-    fun salvarEquipamentos(equipamentos: List<Triple<String, String, String>>) {
+    fun getVeiculosParaDropdown(): List<Pair<Long, String>> {
+        return queries.getVeiculos().executeAsList().map { it.servidor_id to it.placa }
+    }
+
+    fun getImplementosParaDropdown(): List<Pair<Long, String>> {
+        return queries.getImplementos().executeAsList().map { it.servidor_id to it.placa }
+    }
+
+    fun salvarEquipamentos(equipamentos: List<EquipamentoDto>) {
         queries.deleteAllEquipamentos()
-        equipamentos.forEach { (id, placa, km) ->
+        equipamentos.forEach { e ->
             queries.insertEquipamento(
-                servidor_id = id.toLong(),
-                placa = placa,
-                km = km
+                servidor_id = e.id.toLong(),
+                placa = e.placa,
+                km = e.km,
+                categoria = e.categoria,
+                ativo = 1
             )
         }
     }
@@ -249,6 +270,50 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
             valorfrete = valorFrete,
             foto_painel_saida = fotoPainelSaida,
             data_criacao = dataCriacao
+        )
+    }
+
+    /** Mesma coisa, mas guardando a composição (veículo + até 2 implementos)
+     * escolhida na hora de iniciar a viagem — usado quando salva offline. */
+    fun salvarViagemComComposicao(
+        numerobd: String,
+        cte: String,
+        numerobd2: String?,
+        cte2: String?,
+        destinoId: Long,
+        destinoNome: String,
+        placa: String,
+        dataViagem: String,
+        kmInicio: String,
+        pesoCarga: String,
+        valorFrete: String?,
+        fotoPainelSaida: String?,
+        dataCriacao: String,
+        veiculoId: Long?,
+        implemento1Id: Long?,
+        implemento1Placa: String?,
+        implemento2Id: Long?,
+        implemento2Placa: String?
+    ) {
+        queries.insertViagemComComposicao(
+            numerobd = numerobd,
+            cte = cte,
+            numerobd2 = numerobd2,
+            cte2 = cte2,
+            destino_id = destinoId,
+            destino_nome = destinoNome,
+            placa = placa,
+            data_viagem = dataViagem,
+            km_inicio = kmInicio,
+            pesocarga = pesoCarga,
+            valorfrete = valorFrete,
+            foto_painel_saida = fotoPainelSaida,
+            data_criacao = dataCriacao,
+            veiculo_id = veiculoId,
+            implemento1_id = implemento1Id,
+            implemento1_placa = implemento1Placa,
+            implemento2_id = implemento2Id,
+            implemento2_placa = implemento2Placa
         )
     }
 
@@ -492,6 +557,24 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     fun salvarViagemAtual(viagemId: Long, destino: String, dataInicio: String, kmInicio: String = "", kmRota: String = "0") {
         queries.insertViagemAtual(viagemId, destino, dataInicio, kmInicio, kmRota)
+    }
+
+    /** Mesma coisa, mas guardando também a composição da viagem — permite que
+     * Abastecimento/ARLA/Descarga leiam o veículo sem perguntar de novo. */
+    fun salvarViagemAtualComComposicao(
+        viagemId: Long,
+        destino: String,
+        dataInicio: String,
+        kmInicio: String = "",
+        kmRota: String = "0",
+        placa: String = "",
+        veiculoId: Long? = null,
+        implemento1Placa: String? = null,
+        implemento2Placa: String? = null
+    ) {
+        queries.insertViagemAtualComComposicao(
+            viagemId, destino, dataInicio, kmInicio, kmRota, placa, veiculoId, implemento1Placa, implemento2Placa
+        )
     }
 
     fun limparViagemAtual() {

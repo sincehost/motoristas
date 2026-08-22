@@ -8,7 +8,13 @@ data class ViagemAberta(
     val id: Int,
     val destino: String,
     val data: String,
-    val km_inicio: String = ""
+    val km_inicio: String = "",
+    // Veículo (+ implementos, se houver) da viagem aberta — usado pelas
+    // telas de Abastecimento/ARLA/Descarga pra não perguntar a placa de novo.
+    val placa: String = "",
+    val veiculo_id: Int? = null,
+    val implemento1_placa: String? = null,
+    val implemento2_placa: String? = null
 )
 
 // ========== ABASTECIMENTO ==========

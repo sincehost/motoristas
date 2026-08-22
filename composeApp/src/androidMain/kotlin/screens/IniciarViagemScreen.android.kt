@@ -62,7 +62,12 @@ actual fun IniciarViagemScreen(
     val context = LocalContext.current
     val motorista = remember { repository.getMotoristaLogado() }
     val destinos = remember { repository.getAllDestinos() }
-    val equipamentos = remember { repository.getAllEquipamentos() }
+    // Se a frota ainda não tiver nenhum equipamento classificado (Veículo x
+    // Implemento — depende de migração no servidor), cai pra lista completa
+    // no seletor de veículo principal, senão a tela ficaria sem opção nenhuma.
+    val todosEquipamentos = remember { repository.getAllEquipamentos() }
+    val veiculos = remember { repository.getVeiculos().ifEmpty { todosEquipamentos } }
+    val implementos = remember { repository.getImplementos() }
 
     // Estados de verificação de viagem em andamento
     var carregando by remember { mutableStateOf(true) }
@@ -123,7 +128,19 @@ actual fun IniciarViagemScreen(
         if (destinoSelecionadoId >= 0) Pair(destinoSelecionadoId, destinoSelecionadoNome) else null
 
     var placaExpandida by remember { mutableStateOf(false) }
+    var veiculoSelecionadoId by rememberSaveable { mutableStateOf(-1L) }
     var placaSelecionada by rememberSaveable { mutableStateOf("") }
+
+    // Composição — até 2 implementos opcionais (carreta, semirreboque…).
+    var implemento1Visivel by rememberSaveable { mutableStateOf(false) }
+    var implemento1Expandido by remember { mutableStateOf(false) }
+    var implemento1Id by rememberSaveable { mutableStateOf(-1L) }
+    var implemento1Placa by rememberSaveable { mutableStateOf("") }
+
+    var implemento2Visivel by rememberSaveable { mutableStateOf(false) }
+    var implemento2Expandido by remember { mutableStateOf(false) }
+    var implemento2Id by rememberSaveable { mutableStateOf(-1L) }
+    var implemento2Placa by rememberSaveable { mutableStateOf("") }
 
     var dataViagem by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
     var kmInicio by rememberSaveableTextField("")
@@ -395,21 +412,125 @@ actual fun IniciarViagemScreen(
                                 value = placaSelecionada,
                                 onValueChange = {},
                                 readOnly = true,
-                                label = { Text("Placa do Cavalo Mecânico *") },
+                                label = { Text("Veículo (Cavalo Mecânico / Caminhão) *") },
                                 leadingIcon = { Icon(Icons.Default.LocalShipping, null, tint = AppColors.Primary) },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = placaExpandida) },
                                 modifier = Modifier.fillMaxWidth().menuAnchor(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp)
                             )
                             ExposedDropdownMenu(expanded = placaExpandida, onDismissRequest = { placaExpandida = false }) {
-                                equipamentos.forEach { equip ->
+                                veiculos.forEach { equip ->
                                     DropdownMenuItem(
                                         text = { Text(equip.placa) },
                                         onClick = {
+                                            veiculoSelecionadoId = equip.servidor_id
                                             placaSelecionada = equip.placa
                                             placaExpandida = false
                                         }
                                     )
+                                }
+                            }
+                        }
+
+                        // Implementos (opcional) — carreta, semirreboque… nunca aparecem
+                        // no seletor de veículo acima, só aqui.
+                        if (implementos.isNotEmpty()) {
+                            Spacer(Modifier.height(12.dp))
+                            if (implemento1Visivel) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    ExposedDropdownMenuBox(
+                                        expanded = implemento1Expandido,
+                                        onExpandedChange = { implemento1Expandido = it },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = implemento1Placa,
+                                            onValueChange = {},
+                                            readOnly = true,
+                                            label = { Text("Implemento 1 (opcional)") },
+                                            leadingIcon = { Icon(Icons.Default.RvHookup, null, tint = AppColors.Primary) },
+                                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = implemento1Expandido) },
+                                            modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                            colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp)
+                                        )
+                                        ExposedDropdownMenu(expanded = implemento1Expandido, onDismissRequest = { implemento1Expandido = false }) {
+                                            implementos.filter { it.servidor_id != implemento2Id }.forEach { equip ->
+                                                DropdownMenuItem(
+                                                    text = { Text(equip.placa) },
+                                                    onClick = {
+                                                        implemento1Id = equip.servidor_id
+                                                        implemento1Placa = equip.placa
+                                                        implemento1Expandido = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                    IconButton(onClick = {
+                                        implemento1Visivel = false
+                                        implemento1Id = -1L
+                                        implemento1Placa = ""
+                                        // Sem implemento 1, não faz sentido manter o 2.
+                                        implemento2Visivel = false
+                                        implemento2Id = -1L
+                                        implemento2Placa = ""
+                                    }) {
+                                        Icon(Icons.Default.RemoveCircle, "Remover implemento", tint = AppColors.Error)
+                                    }
+                                }
+
+                                Spacer(Modifier.height(8.dp))
+
+                                if (implemento2Visivel) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        ExposedDropdownMenuBox(
+                                            expanded = implemento2Expandido,
+                                            onExpandedChange = { implemento2Expandido = it },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            OutlinedTextField(
+                                                value = implemento2Placa,
+                                                onValueChange = {},
+                                                readOnly = true,
+                                                label = { Text("Implemento 2 (opcional)") },
+                                                leadingIcon = { Icon(Icons.Default.RvHookup, null, tint = AppColors.Primary) },
+                                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = implemento2Expandido) },
+                                                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp)
+                                            )
+                                            ExposedDropdownMenu(expanded = implemento2Expandido, onDismissRequest = { implemento2Expandido = false }) {
+                                                implementos.filter { it.servidor_id != implemento1Id }.forEach { equip ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(equip.placa) },
+                                                        onClick = {
+                                                            implemento2Id = equip.servidor_id
+                                                            implemento2Placa = equip.placa
+                                                            implemento2Expandido = false
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        IconButton(onClick = {
+                                            implemento2Visivel = false
+                                            implemento2Id = -1L
+                                            implemento2Placa = ""
+                                        }) {
+                                            Icon(Icons.Default.RemoveCircle, "Remover implemento", tint = AppColors.Error)
+                                        }
+                                    }
+                                } else {
+                                    TextButton(onClick = { implemento2Visivel = true }) {
+                                        Icon(Icons.Default.AddCircle, null, tint = AppColors.Primary)
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Adicionar 2º implemento")
+                                    }
+                                }
+                            } else {
+                                TextButton(onClick = { implemento1Visivel = true }) {
+                                    Icon(Icons.Default.AddCircle, null, tint = AppColors.Primary)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Adicionar implemento (carreta, semirreboque…)")
                                 }
                             }
                         }
@@ -627,6 +748,9 @@ actual fun IniciarViagemScreen(
                                                 data_viagem = dataViagemAPI,
                                                 km_inicio = kmInicioNormalizado,
                                                 placa = placaSelecionada,
+                                                veiculo_id = veiculoSelecionadoId.takeIf { it > 0 }?.toInt(),
+                                                implemento1_id = if (implemento1Visivel) implemento1Id.takeIf { it > 0 }?.toInt() else null,
+                                                implemento2_id = if (implemento2Visivel) implemento2Id.takeIf { it > 0 }?.toInt() else null,
                                                 pesocarga = pesoCarga.text,
                                                 valorfrete = valorFreteParaAPI,
                                                 foto_painel_saida = cameraState.base64
@@ -636,11 +760,15 @@ actual fun IniciarViagemScreen(
                                         if (response.status == "ok") {
                                             // API salvou com sucesso
                                             val viagemIdReal = response.viagem_id ?: 0
-                                            repository.salvarViagemAtual(
+                                            repository.salvarViagemAtualComComposicao(
                                                 viagemId = viagemIdReal.toLong(),
                                                 destino = destinoSelecionado!!.second,
                                                 dataInicio = dataViagemAPI,
-                                                kmInicio = kmInicioNormalizado
+                                                kmInicio = kmInicioNormalizado,
+                                                placa = placaSelecionada,
+                                                veiculoId = veiculoSelecionadoId.takeIf { it > 0 },
+                                                implemento1Placa = if (implemento1Visivel) implemento1Placa.ifBlank { null } else null,
+                                                implemento2Placa = if (implemento2Visivel) implemento2Placa.ifBlank { null } else null
                                             )
                                             mostrarMensagem("Viagem registrada com sucesso!")
                                         } else {
@@ -686,7 +814,7 @@ actual fun IniciarViagemScreen(
                                             return@launch
                                         }
 
-                                        repository.salvarViagem(
+                                        repository.salvarViagemComComposicao(
                                             numerobd = numerobd,
                                             cte = cte,
                                             numerobd2 = numerobd2.ifBlank { null },
@@ -699,15 +827,24 @@ actual fun IniciarViagemScreen(
                                             pesoCarga = pesoCarga.text,
                                             valorFrete = valorFreteParaAPI,
                                             fotoPainelSaida = cameraState.base64,
-                                            dataCriacao = dataCriacao
+                                            dataCriacao = dataCriacao,
+                                            veiculoId = veiculoSelecionadoId.takeIf { it > 0 },
+                                            implemento1Id = if (implemento1Visivel) implemento1Id.takeIf { it > 0 } else null,
+                                            implemento1Placa = if (implemento1Visivel) implemento1Placa.ifBlank { null } else null,
+                                            implemento2Id = if (implemento2Visivel) implemento2Id.takeIf { it > 0 } else null,
+                                            implemento2Placa = if (implemento2Visivel) implemento2Placa.ifBlank { null } else null
                                         )
                                         val viagens = repository.getViagensParaSincronizar()
                                         val idLocal = viagens.lastOrNull()?.id ?: java.lang.System.currentTimeMillis()
-                                        repository.salvarViagemAtual(
+                                        repository.salvarViagemAtualComComposicao(
                                             viagemId = -idLocal,
                                             destino = destinoSelecionado!!.second,
                                             dataInicio = dataViagemAPI,
-                                            kmInicio = kmInicioNormalizado
+                                            kmInicio = kmInicioNormalizado,
+                                            placa = placaSelecionada,
+                                            veiculoId = veiculoSelecionadoId.takeIf { it > 0 },
+                                            implemento1Placa = if (implemento1Visivel) implemento1Placa.ifBlank { null } else null,
+                                            implemento2Placa = if (implemento2Visivel) implemento2Placa.ifBlank { null } else null
                                         )
                                         mostrarMensagem("Sem internet. Viagem salva e será sincronizada automaticamente quando conectar.")
                                     }

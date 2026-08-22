@@ -92,6 +92,31 @@ actual fun AdicionarCombustivelScreen(
     // Tipos de combustível (catálogo da empresa, cadastrado no admin)
     val tiposCombustivel = remember { repository.getAllTiposCombustivel() }
 
+    // ★ FIX PROCESS-DEATH: campos que perdiam valor ao abrir câmera
+    // Pair<Long,String> não é diretamente rememberSaveable, separamos em dois campos
+    var placaSelecionadaId by rememberSaveable { mutableStateOf(-1L) }
+    var placaSelecionadaNome by rememberSaveable { mutableStateOf("") }
+    val placaSelecionada: Pair<Long, String>? =
+        if (placaSelecionadaId >= 0) Pair(placaSelecionadaId, placaSelecionadaNome) else null
+
+    // Resolve o veículo (id local) da viagem — prefere veiculo_id (mais
+    // preciso), cai pra casar por placa se a viagem for antiga/offline e não
+    // tiver esse id ainda. Só fica sem nada se nenhum dos dois resolver, caso
+    // em que a tela mostra o seletor manual como fallback.
+    fun aplicarViagem(viagem: api.ViagemAberta, listaEquip: List<Pair<Long, String>>) {
+        viagemEmAndamento = viagem
+        val vid = viagem.veiculo_id
+        if (vid != null) {
+            placaSelecionadaId = vid.toLong()
+            placaSelecionadaNome = viagem.placa
+        } else if (viagem.placa.isNotBlank()) {
+            listaEquip.find { it.second == viagem.placa }?.let {
+                placaSelecionadaId = it.first
+                placaSelecionadaNome = it.second
+            }
+        }
+    }
+
     // Carrega dados ao iniciar (LOCAL primeiro, depois API)
     LaunchedEffect(Unit) {
         carregando = true
@@ -102,11 +127,18 @@ actual fun AdicionarCombustivelScreen(
         // 1. Verifica viagem LOCALMENTE primeiro
         val viagemLocal = repository.getViagemAtual()
         if (viagemLocal != null) {
-            viagemEmAndamento = api.ViagemAberta(
-                id = viagemLocal.viagem_id.toInt(),
-                destino = viagemLocal.destino,
-                data = viagemLocal.data_inicio,
-                km_inicio = viagemLocal.km_inicio
+            aplicarViagem(
+                api.ViagemAberta(
+                    id = viagemLocal.viagem_id.toInt(),
+                    destino = viagemLocal.destino,
+                    data = viagemLocal.data_inicio,
+                    km_inicio = viagemLocal.km_inicio,
+                    placa = viagemLocal.placa,
+                    veiculo_id = viagemLocal.veiculo_id?.toInt(),
+                    implemento1_placa = viagemLocal.implemento1_placa,
+                    implemento2_placa = viagemLocal.implemento2_placa
+                ),
+                equipamentos
             )
             modoOffline = false
             carregando = false
@@ -122,17 +154,25 @@ actual fun AdicionarCombustivelScreen(
             )
             if (response.status == "ok" && response.viagens.isNotEmpty()) {
                 val viagem = response.viagens.first()
-                viagemEmAndamento = viagem
                 // Salva localmente para funcionar offline depois
-                repository.salvarViagemAtual(viagem.id.toLong(), viagem.destino, viagem.data)
+                repository.salvarViagemAtualComComposicao(
+                    viagemId = viagem.id.toLong(),
+                    destino = viagem.destino,
+                    dataInicio = viagem.data,
+                    placa = viagem.placa,
+                    veiculoId = viagem.veiculo_id?.toLong(),
+                    implemento1Placa = viagem.implemento1_placa,
+                    implemento2Placa = viagem.implemento2_placa
+                )
                 modoOffline = false
 
                 // Atualiza equipamentos da API
                 val syncResp = api.ApiClient.syncDados(motorista?.motorista_id ?: "")
                 if (syncResp.status == "ok") {
-                    repository.salvarEquipamentos(syncResp.equipamentos.map { Triple(it.id, it.placa, it.km) })
+                    repository.salvarEquipamentos(syncResp.equipamentos)
                     equipamentos = repository.getEquipamentosParaDropdown()
                 }
+                aplicarViagem(viagem, equipamentos)
             } else {
                 // Nenhuma viagem em andamento
                 semViagemAberta = true
@@ -146,12 +186,6 @@ actual fun AdicionarCombustivelScreen(
     }
 
     // Campos do formulário
-    // ★ FIX PROCESS-DEATH: campos que perdiam valor ao abrir câmera
-    // Pair<Long,String> não é diretamente rememberSaveable, separamos em dois campos
-    var placaSelecionadaId by rememberSaveable { mutableStateOf(-1L) }
-    var placaSelecionadaNome by rememberSaveable { mutableStateOf("") }
-    val placaSelecionada: Pair<Long, String>? =
-        if (placaSelecionadaId >= 0) Pair(placaSelecionadaId, placaSelecionadaNome) else null
     var data by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
     var nomePosto by rememberSaveable { mutableStateOf("") }
     var kmPosto by rememberSaveableTextField("")
@@ -489,22 +523,45 @@ actual fun AdicionarCombustivelScreen(
 
                             Spacer(Modifier.height(16.dp))
 
-                            // Placa
-                            Text("Placa *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                            // Placa — quando a viagem já sabe o veículo, só mostra (não
+                            // pergunta de novo); o seletor manual é só um fallback pra
+                            // viagens antigas onde isso não foi resolvido.
+                            Text("Veículo *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                             Spacer(Modifier.height(8.dp))
-                            ExposedDropdownMenuBox(expanded = placaExpandida, onExpandedChange = { placaExpandida = it }) {
-                                OutlinedTextField(
-                                    value = placaSelecionada?.second ?: "Selecione uma placa",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = placaExpandida) },
-                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                    colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                    leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Primary) })
-                                
-                                ExposedDropdownMenu(expanded = placaExpandida, onDismissRequest = { placaExpandida = false }) {
-                                    equipamentos.forEach { (id, placa) ->
-                                        DropdownMenuItem(text = { Text(placa) }, onClick = { placaSelecionadaId = id; placaSelecionadaNome = placa; placaExpandida = false })
+                            if (viagemEmAndamento?.placa?.isNotBlank() == true) {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = AppColors.Background)
+                                ) {
+                                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.LocalShipping, null, tint = AppColors.Primary)
+                                        Spacer(Modifier.width(10.dp))
+                                        Column {
+                                            Text(viagemEmAndamento!!.placa, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
+                                            if (!viagemEmAndamento!!.implemento1_placa.isNullOrBlank()) {
+                                                Text(
+                                                    "+ ${listOfNotNull(viagemEmAndamento!!.implemento1_placa, viagemEmAndamento!!.implemento2_placa).joinToString(" + ")}",
+                                                    fontSize = 12.sp, color = AppColors.TextSecondary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                ExposedDropdownMenuBox(expanded = placaExpandida, onExpandedChange = { placaExpandida = it }) {
+                                    OutlinedTextField(
+                                        value = placaSelecionada?.second ?: "Selecione uma placa",
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = placaExpandida) },
+                                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                        colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
+                                        leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Primary) })
+
+                                    ExposedDropdownMenu(expanded = placaExpandida, onDismissRequest = { placaExpandida = false }) {
+                                        equipamentos.forEach { (id, placa) ->
+                                            DropdownMenuItem(text = { Text(placa) }, onClick = { placaSelecionadaId = id; placaSelecionadaNome = placa; placaExpandida = false })
+                                        }
                                     }
                                 }
                             }

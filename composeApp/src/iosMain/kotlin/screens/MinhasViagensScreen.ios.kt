@@ -477,6 +477,11 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
     var cte2 by remember { mutableStateOf("") }
     var destinoId by remember { mutableStateOf(0) }
     var placa by remember { mutableStateOf("") }
+    var veiculoId by remember { mutableStateOf(-1) }
+    var implemento1Id by remember { mutableStateOf(-1) }
+    var implemento1Placa by remember { mutableStateOf("") }
+    var implemento2Id by remember { mutableStateOf(-1) }
+    var implemento2Placa by remember { mutableStateOf("") }
     var dataViagem by remember { mutableStateOf("") }
     var dataChegada by remember { mutableStateOf("") }
     var kmInicio by remember { mutableStateOf(TextFieldValue("")) }
@@ -518,6 +523,11 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                 cte2 = response.viagem.cte2
                 destinoId = response.viagem.destino_id
                 placa = response.viagem.placa
+                veiculoId = response.viagem.veiculo_id ?: -1
+                implemento1Id = response.viagem.implemento1_id ?: -1
+                implemento1Placa = response.viagem.implemento1_placa ?: ""
+                implemento2Id = response.viagem.implemento2_id ?: -1
+                implemento2Placa = response.viagem.implemento2_placa ?: ""
                 dataViagem = response.viagem.data_viagem
                 dataChegada = response.viagem.data_chegada
                 // Servidor devolve decimal puro do banco DECIMAL(10,1) ("115676.0")
@@ -564,7 +574,11 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                     viagem_id = viagemId,
                     motorista_id = motorista?.motorista_id ?: "",
                     numerobd = numerobd, numerobd2 = numerobd2, cte = cte, cte2 = cte2,
-                    destino_id = destinoId, placa = placa, data_viagem = dataViagem, data_chegada = dataChegada,
+                    destino_id = destinoId, placa = placa,
+                    veiculo_id = veiculoId.takeIf { it > 0 },
+                    implemento1_id = implemento1Id.takeIf { it > 0 },
+                    implemento2_id = implemento2Id.takeIf { it > 0 },
+                    data_viagem = dataViagem, data_chegada = dataChegada,
                     km_inicio = normalizarKmParaEnvio(kmInicio.text),
                     km_chegada = if (kmChegada.isNotBlank()) normalizarKmParaEnvio(kmChegada) else kmChegada,
                     km_posto = if (kmPosto.isNotBlank()) normalizarKmParaEnvio(kmPosto) else kmPosto,
@@ -600,6 +614,17 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
 
     var destinoExpandido by remember { mutableStateOf(false) }
     var placaExpandida by remember { mutableStateOf(false) }
+    var implemento1Expandida by remember { mutableStateOf(false) }
+    var implemento2Expandida by remember { mutableStateOf(false) }
+    // Sem categoria classificada ainda (migração não rodou nesse tenant), a
+    // API devolve tudo com categoria == null — nesse caso mantém a lista
+    // completa no seletor principal em vez de deixar sem opção nenhuma.
+    val veiculosEdit = remember(equipamentos) {
+        equipamentos.filter { it.categoria == "veiculo" || it.categoria == null }
+    }
+    val implementosEdit = remember(equipamentos) {
+        equipamentos.filter { it.categoria == "implemento" }
+    }
 
     // Diálogos modais de erro e sucesso
     if (erroMsgEditar != null) ui.ErroDialog(erroMsgEditar!!) { erroMsgEditar = null }
@@ -627,7 +652,7 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                 .verticalScroll(scrollState).padding(16.dp)) {
                 Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground)) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                        Text("Placa", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                        Text("Veículo", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
                         ui.AppDropdownField(
                             label = "",
@@ -636,8 +661,42 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                             onExpandedChange = { placaExpandida = it },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            equipamentos.forEach { eq ->
-                                ui.AppDropdownMenuItem(text = { Text(eq.placa) }, onClick = { placa = eq.placa; placaExpandida = false })
+                            veiculosEdit.forEach { eq ->
+                                ui.AppDropdownMenuItem(text = { Text(eq.placa) }, onClick = { placa = eq.placa; veiculoId = eq.id; placaExpandida = false })
+                            }
+                        }
+
+                        if (implementosEdit.isNotEmpty()) {
+                            Spacer(Modifier.height(16.dp))
+                            Text("Implemento 1 (opcional)", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                            Spacer(Modifier.height(8.dp))
+                            ui.AppDropdownField(
+                                label = "",
+                                selectedText = implemento1Placa,
+                                expanded = implemento1Expandida,
+                                onExpandedChange = { implemento1Expandida = it },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                ui.AppDropdownMenuItem(text = { Text("Nenhum") }, onClick = { implemento1Id = -1; implemento1Placa = ""; implemento1Expandida = false })
+                                implementosEdit.filter { it.id != implemento2Id }.forEach { eq ->
+                                    ui.AppDropdownMenuItem(text = { Text(eq.placa) }, onClick = { implemento1Id = eq.id; implemento1Placa = eq.placa; implemento1Expandida = false })
+                                }
+                            }
+
+                            Spacer(Modifier.height(16.dp))
+                            Text("Implemento 2 (opcional)", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                            Spacer(Modifier.height(8.dp))
+                            ui.AppDropdownField(
+                                label = "",
+                                selectedText = implemento2Placa,
+                                expanded = implemento2Expandida,
+                                onExpandedChange = { implemento2Expandida = it },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                ui.AppDropdownMenuItem(text = { Text("Nenhum") }, onClick = { implemento2Id = -1; implemento2Placa = ""; implemento2Expandida = false })
+                                implementosEdit.filter { it.id != implemento1Id }.forEach { eq ->
+                                    ui.AppDropdownMenuItem(text = { Text(eq.placa) }, onClick = { implemento2Id = eq.id; implemento2Placa = eq.placa; implemento2Expandida = false })
+                                }
                             }
                         }
 

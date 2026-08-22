@@ -121,7 +121,12 @@ actual fun IniciarViagemScreen(
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
     val destinos = remember { repository.getAllDestinos() }
-    val equipamentos = remember { repository.getAllEquipamentos() }
+    // Se a frota ainda não tiver nenhum equipamento classificado (Veículo x
+    // Implemento — depende de migração no servidor), cai pra lista completa
+    // no seletor de veículo principal, senão a tela ficaria sem opção nenhuma.
+    val todosEquipamentos = remember { repository.getAllEquipamentos() }
+    val veiculos = remember { repository.getVeiculos().ifEmpty { todosEquipamentos } }
+    val implementos = remember { repository.getImplementos() }
 
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
@@ -183,7 +188,19 @@ actual fun IniciarViagemScreen(
     var destinoSelecionado by remember { mutableStateOf<Pair<Long, String>?>(null) }
 
     var placaExpandida by remember { mutableStateOf(false) }
+    var veiculoSelecionadoId by remember { mutableStateOf<Long?>(null) }
     var placaSelecionada by remember { mutableStateOf<String?>(null) }
+
+    // Composição — até 2 implementos opcionais (carreta, semirreboque…).
+    var implemento1Visivel by remember { mutableStateOf(false) }
+    var implemento1Expandido by remember { mutableStateOf(false) }
+    var implemento1Id by remember { mutableStateOf<Long?>(null) }
+    var implemento1Placa by remember { mutableStateOf<String?>(null) }
+
+    var implemento2Visivel by remember { mutableStateOf(false) }
+    var implemento2Expandido by remember { mutableStateOf(false) }
+    var implemento2Id by remember { mutableStateOf<Long?>(null) }
+    var implemento2Placa by remember { mutableStateOf<String?>(null) }
 
     var dataViagem by remember { mutableStateOf(dataAtualFormatada()) }
     var kmInicio by remember { mutableStateOf(TextFieldValue("")) }
@@ -503,7 +520,7 @@ actual fun IniciarViagemScreen(
                         Spacer(Modifier.height(12.dp))
 
                         ui.AppDropdownField(
-                            label = "Placa do Cavalo Mecânico *",
+                            label = "Veículo (Cavalo Mecânico / Caminhão) *",
                             selectedText = placaSelecionada ?: "",
                             expanded = placaExpandida,
                             onExpandedChange = {
@@ -515,14 +532,110 @@ actual fun IniciarViagemScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            equipamentos.forEach { equip ->
+                            veiculos.forEach { equip ->
                                 ui.AppDropdownMenuItem(
                                     text = { Text(equip.placa) },
                                     onClick = {
+                                        veiculoSelecionadoId = equip.servidor_id
                                         placaSelecionada = equip.placa
                                         placaExpandida = false
                                     }
                                 )
+                            }
+                        }
+
+                        // Implementos (opcional) — carreta, semirreboque… nunca aparecem
+                        // no seletor de veículo acima, só aqui.
+                        if (implementos.isNotEmpty()) {
+                            Spacer(Modifier.height(12.dp))
+                            if (implemento1Visivel) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    ui.AppDropdownField(
+                                        label = "Implemento 1 (opcional)",
+                                        selectedText = implemento1Placa ?: "",
+                                        expanded = implemento1Expandido,
+                                        onExpandedChange = {
+                                            focusManager.clearFocus()
+                                            implemento1Expandido = it
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.RvHookup, null, tint = AppColors.Primary)
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        implementos.filter { it.servidor_id != implemento2Id }.forEach { equip ->
+                                            ui.AppDropdownMenuItem(
+                                                text = { Text(equip.placa) },
+                                                onClick = {
+                                                    implemento1Id = equip.servidor_id
+                                                    implemento1Placa = equip.placa
+                                                    implemento1Expandido = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                    IconButton(onClick = {
+                                        implemento1Visivel = false
+                                        implemento1Id = null
+                                        implemento1Placa = null
+                                        // Sem implemento 1, não faz sentido manter o 2.
+                                        implemento2Visivel = false
+                                        implemento2Id = null
+                                        implemento2Placa = null
+                                    }) {
+                                        Icon(Icons.Default.RemoveCircle, "Remover implemento", tint = AppColors.Error)
+                                    }
+                                }
+
+                                Spacer(Modifier.height(8.dp))
+
+                                if (implemento2Visivel) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        ui.AppDropdownField(
+                                            label = "Implemento 2 (opcional)",
+                                            selectedText = implemento2Placa ?: "",
+                                            expanded = implemento2Expandido,
+                                            onExpandedChange = {
+                                                focusManager.clearFocus()
+                                                implemento2Expandido = it
+                                            },
+                                            leadingIcon = {
+                                                Icon(Icons.Default.RvHookup, null, tint = AppColors.Primary)
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            implementos.filter { it.servidor_id != implemento1Id }.forEach { equip ->
+                                                ui.AppDropdownMenuItem(
+                                                    text = { Text(equip.placa) },
+                                                    onClick = {
+                                                        implemento2Id = equip.servidor_id
+                                                        implemento2Placa = equip.placa
+                                                        implemento2Expandido = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                        IconButton(onClick = {
+                                            implemento2Visivel = false
+                                            implemento2Id = null
+                                            implemento2Placa = null
+                                        }) {
+                                            Icon(Icons.Default.RemoveCircle, "Remover implemento", tint = AppColors.Error)
+                                        }
+                                    }
+                                } else {
+                                    TextButton(onClick = { implemento2Visivel = true }) {
+                                        Icon(Icons.Default.AddCircle, null, tint = AppColors.Primary)
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Adicionar 2º implemento")
+                                    }
+                                }
+                            } else {
+                                TextButton(onClick = { implemento1Visivel = true }) {
+                                    Icon(Icons.Default.AddCircle, null, tint = AppColors.Primary)
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Adicionar implemento (carreta, semirreboque…)")
+                                }
                             }
                         }
 
@@ -822,6 +935,9 @@ actual fun IniciarViagemScreen(
                                                 data_viagem = dataViagemAPI,
                                                 km_inicio = kmInicioNormalizado,
                                                 placa = placaSelecionada ?: "",
+                                                veiculo_id = veiculoSelecionadoId?.toInt(),
+                                                implemento1_id = if (implemento1Visivel) implemento1Id?.toInt() else null,
+                                                implemento2_id = if (implemento2Visivel) implemento2Id?.toInt() else null,
                                                 pesocarga = pesoCarga.text,
                                                 valorfrete = valorFreteParaAPI,
                                                 foto_painel_saida = fotoBase64
@@ -830,11 +946,15 @@ actual fun IniciarViagemScreen(
 
                                         if (response.status == "ok") {
                                             val viagemIdReal = response.viagem_id ?: 0
-                                            repository.salvarViagemAtual(
+                                            repository.salvarViagemAtualComComposicao(
                                                 viagemId = viagemIdReal.toLong(),
                                                 destino = destinoSelecionado!!.second,
                                                 dataInicio = dataViagemAPI,
-                                                kmInicio = kmInicioNormalizado
+                                                kmInicio = kmInicioNormalizado,
+                                                placa = placaSelecionada ?: "",
+                                                veiculoId = veiculoSelecionadoId,
+                                                implemento1Placa = if (implemento1Visivel) implemento1Placa else null,
+                                                implemento2Placa = if (implemento2Visivel) implemento2Placa else null
                                             )
                                             sucessoMsg = "Viagem registrada com sucesso!"
                                         } else {
@@ -862,7 +982,7 @@ actual fun IniciarViagemScreen(
                                     } catch (e: Exception) {
                                         // Exceção de REDE (sem internet, timeout, servidor indisponível)
                                         // Salvar localmente para sincronização posterior
-                                        repository.salvarViagem(
+                                        repository.salvarViagemComComposicao(
                                             numerobd = numerobd,
                                             cte = cte,
                                             numerobd2 = numerobd2.ifBlank { null },
@@ -875,16 +995,25 @@ actual fun IniciarViagemScreen(
                                             pesoCarga = pesoCarga.text,
                                             valorFrete = valorFreteParaAPI,
                                             fotoPainelSaida = fotoBase64,
-                                            dataCriacao = dataCriacao
+                                            dataCriacao = dataCriacao,
+                                            veiculoId = veiculoSelecionadoId,
+                                            implemento1Id = if (implemento1Visivel) implemento1Id else null,
+                                            implemento1Placa = if (implemento1Visivel) implemento1Placa else null,
+                                            implemento2Id = if (implemento2Visivel) implemento2Id else null,
+                                            implemento2Placa = if (implemento2Visivel) implemento2Placa else null
                                         )
                                         val viagens = repository.getViagensParaSincronizar()
                                         val currentEpochMillis = (NSDate().timeIntervalSince1970 * 1000).toLong()
                                         val idLocal = viagens.lastOrNull()?.id ?: currentEpochMillis
-                                        repository.salvarViagemAtual(
+                                        repository.salvarViagemAtualComComposicao(
                                             viagemId = -idLocal,
                                             destino = destinoSelecionado!!.second,
                                             dataInicio = dataViagemAPI,
-                                            kmInicio = kmInicioNormalizado
+                                            kmInicio = kmInicioNormalizado,
+                                            placa = placaSelecionada ?: "",
+                                            veiculoId = veiculoSelecionadoId,
+                                            implemento1Placa = if (implemento1Visivel) implemento1Placa else null,
+                                            implemento2Placa = if (implemento2Visivel) implemento2Placa else null
                                         )
                                         sucessoMsg = "Sem internet. Viagem salva e será sincronizada automaticamente quando conectar."
                                     }

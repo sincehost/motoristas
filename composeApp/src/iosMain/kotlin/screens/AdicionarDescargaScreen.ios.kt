@@ -146,16 +146,16 @@ actual fun AdicionarDescargaScreen(
     // Dados carregados
     var motorista by remember { mutableStateOf<br.com.lfsystem.app.database.Motorista?>(null) }
     var viagemAtual by remember { mutableStateOf<br.com.lfsystem.app.database.ViagemAtual?>(null) }
-    var placas by remember { mutableStateOf<List<String>>(emptyList()) }
+
+    // Placa não é mais escolhida aqui — é sempre a do veículo da viagem ativa.
+    val placaVeiculo = viagemAtual?.placa ?: ""
 
     // Campos do formulário
     var data by remember { mutableStateOf(dataAtualFormatada()) }
-    var placaSelecionada by remember { mutableStateOf<String?>(null) }
     var ordemDescarga by remember { mutableStateOf("") }
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var fotoBase64 by remember { mutableStateOf<String?>(null) }
     var fotoImageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-    var expandedPlaca by remember { mutableStateOf(false) }
 
     // Função para mostrar mensagens
     fun mostrarMensagem(mensagem: String, isErro: Boolean = false) {
@@ -171,9 +171,8 @@ actual fun AdicionarDescargaScreen(
         try {
             motorista = repository.getMotoristaLogado()
             viagemAtual = repository.getViagemAtual()
-            placas = repository.getEquipamentosParaDropdown().map { it.second }
 
-            // Tentar carregar placas (e viagem, se não houver localmente) da API
+            // Tentar carregar a viagem (se não houver localmente) da API
             motorista?.let { m ->
                 try {
                     val response = ApiClient.abastecimentoDados(
@@ -183,14 +182,19 @@ actual fun AdicionarDescargaScreen(
                         )
                     )
                     if (response.status == "ok") {
-                        if (response.placas.isNotEmpty()) {
-                            placas = response.placas
-                        }
                         // Se não havia viagem em andamento localmente, tenta achar via API
                         // (evita bloquear o usuário quando o cache local de ViagemAtual está vazio)
                         if (viagemAtual == null && response.viagens.isNotEmpty()) {
                             val viagem = response.viagens.first()
-                            repository.salvarViagemAtual(viagem.id.toLong(), viagem.destino, viagem.data)
+                            repository.salvarViagemAtualComComposicao(
+                                viagemId = viagem.id.toLong(),
+                                destino = viagem.destino,
+                                dataInicio = viagem.data,
+                                placa = viagem.placa,
+                                veiculoId = viagem.veiculo_id?.toLong(),
+                                implemento1Placa = viagem.implemento1_placa,
+                                implemento2Placa = viagem.implemento2_placa
+                            )
                             viagemAtual = repository.getViagemAtual()
                         }
                     }
@@ -279,10 +283,6 @@ actual fun AdicionarDescargaScreen(
             mostrarMensagem("Informe a data", isErro = true)
             return
         }
-        if (placaSelecionada.isNullOrBlank()) {
-            mostrarMensagem("Selecione a placa", isErro = true)
-            return
-        }
         if (ordemDescarga.isBlank()) {
             mostrarMensagem("Informe a ordem de descarga", isErro = true)
             return
@@ -315,7 +315,7 @@ actual fun AdicionarDescargaScreen(
                             motorista_id = mot.motorista_id,
                             viagem_id = viagem.viagem_id.toInt(),
                             data = dataAPI,
-                            placa = placaSelecionada!!,
+                            placa = placaVeiculo,
                             ordem_descarga = ordemDescargaInt,
                             valor = valor.text,
                             foto = fotoBase64
@@ -333,7 +333,7 @@ actual fun AdicionarDescargaScreen(
                         motoristaId = mot.motorista_id,
                         viagemId = viagem.viagem_id,
                         data = dataAPI,
-                        placa = placaSelecionada!!,
+                        placa = placaVeiculo,
                         ordemDescarga = ordemDescargaInt.toLong(),
                         valor = valor.text,
                         foto = fotoBase64
@@ -466,12 +466,12 @@ actual fun AdicionarDescargaScreen(
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text(
-                            "Viagem em Andamento",
+                            "Descarga na viagem",
                             fontSize = 12.sp,
                             color = primaryColor.copy(alpha = 0.7f)
                         )
                         Text(
-                            viagemAtual?.destino ?: "",
+                            listOfNotNull(placaVeiculo.ifBlank { null }, viagemAtual?.destino).joinToString(" • "),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = primaryColor
@@ -497,37 +497,6 @@ actual fun AdicionarDescargaScreen(
                         primaryColor = primaryColor,
                         modifier = Modifier.fillMaxWidth()
                     )
-
-                    Spacer(Modifier.height(20.dp))
-
-                    // Placa
-                    Text(
-                        "Placa do Veículo",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = labelColor
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    ui.AppDropdownField(
-                        label = "Placa do Veículo",
-                        selectedText = placaSelecionada ?: "",
-                        expanded = expandedPlaca,
-                        onExpandedChange = { expandedPlaca = it },
-                        leadingIcon = {
-                            Icon(Icons.Default.DirectionsCar, null, tint = placeholderColor)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        placas.forEach { placa ->
-                            ui.AppDropdownMenuItem(
-                                text = { Text(placa) },
-                                onClick = {
-                                    placaSelecionada = placa
-                                    expandedPlaca = false
-                                }
-                            )
-                        }
-                    }
 
                     Spacer(Modifier.height(20.dp))
 

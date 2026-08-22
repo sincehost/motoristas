@@ -58,6 +58,43 @@ actual class DatabaseDriverFactory(private val context: Context) {
                     try {
                         db.execSQL("ALTER TABLE Manutencao ADD COLUMN tipo_manutencao TEXT NOT NULL DEFAULT 'preventiva'")
                     } catch (_: Exception) {}
+                    // Veículo x Implemento + composição da viagem.
+                    try {
+                        db.execSQL("ALTER TABLE Equipamento ADD COLUMN categoria TEXT")
+                    } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE Equipamento ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1")
+                    } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE Viagem ADD COLUMN veiculo_id INTEGER")
+                    } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE Viagem ADD COLUMN implemento1_id INTEGER")
+                    } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE Viagem ADD COLUMN implemento1_placa TEXT")
+                    } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE Viagem ADD COLUMN implemento2_id INTEGER")
+                    } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE Viagem ADD COLUMN implemento2_placa TEXT")
+                    } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE ViagemAtual ADD COLUMN placa TEXT NOT NULL DEFAULT ''")
+                    } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE ViagemAtual ADD COLUMN veiculo_id INTEGER")
+                    } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE ViagemAtual ADD COLUMN implemento1_placa TEXT")
+                    } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE ViagemAtual ADD COLUMN implemento2_placa TEXT")
+                    } catch (_: Exception) {}
+                    try {
+                        db.execSQL("ALTER TABLE Descarga ADD COLUMN equipamento_id INTEGER")
+                    } catch (_: Exception) {}
                 }
             }
         )

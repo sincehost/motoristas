@@ -74,9 +74,6 @@ actual fun AdicionarDescargaScreen(
     var viagemEmAndamento by remember { mutableStateOf<api.ViagemAberta?>(null) }
     var semViagemAberta by remember { mutableStateOf(false) }
 
-    // Placas disponíveis
-    var placas by remember { mutableStateOf<List<String>>(emptyList()) }
-
     // Carrega viagem em andamento ao iniciar
     LaunchedEffect(Unit) {
         carregando = true
@@ -87,13 +84,13 @@ actual fun AdicionarDescargaScreen(
             viagemEmAndamento = api.ViagemAberta(
                 id = viagemLocal.viagem_id.toInt(),
                 destino = viagemLocal.destino,
-                data = viagemLocal.data_inicio
+                data = viagemLocal.data_inicio,
+                placa = viagemLocal.placa,
+                veiculo_id = viagemLocal.veiculo_id?.toInt(),
+                implemento1_placa = viagemLocal.implemento1_placa,
+                implemento2_placa = viagemLocal.implemento2_placa
             )
             modoOffline = false
-
-            // Carrega placas localmente
-            placas = repository.getEquipamentosParaDropdown().map { it.second }
-
             carregando = false
             return@LaunchedEffect
         }
@@ -106,15 +103,20 @@ actual fun AdicionarDescargaScreen(
                 )
             )
             if (response.status == "ok") {
-                // Carrega placas
-                placas = response.placas
-
                 // Verifica viagem
                 if (response.viagens.isNotEmpty()) {
                     val viagem = response.viagens.first()
                     viagemEmAndamento = viagem
                     // Salva localmente
-                    repository.salvarViagemAtual(viagem.id.toLong(), viagem.destino, viagem.data)
+                    repository.salvarViagemAtualComComposicao(
+                        viagemId = viagem.id.toLong(),
+                        destino = viagem.destino,
+                        dataInicio = viagem.data,
+                        placa = viagem.placa,
+                        veiculoId = viagem.veiculo_id?.toLong(),
+                        implemento1Placa = viagem.implemento1_placa,
+                        implemento2Placa = viagem.implemento2_placa
+                    )
                     modoOffline = false
                 } else {
                     semViagemAberta = true
@@ -126,16 +128,15 @@ actual fun AdicionarDescargaScreen(
             // Sem internet e sem viagem local
             modoOffline = true
             semViagemAberta = true
-            // Tenta carregar placas localmente
-            placas = repository.getEquipamentosParaDropdown().map { it.second }
         }
         carregando = false
     }
 
+    // Placa não é mais escolhida aqui — é sempre a do veículo da viagem ativa.
+    val placaVeiculo = viagemEmAndamento?.placa ?: ""
+
     // ★ FIX PROCESS-DEATH: campos sobrevivem quando câmera mata o processo
     var data by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
-    var placaSelecionada by rememberSaveable { mutableStateOf("") }
-    var expandedPlaca by remember { mutableStateOf(false) }
     var ordemDescarga by rememberSaveable { mutableStateOf("") }
     var valor by rememberSaveableTextField("")
 
@@ -186,10 +187,6 @@ actual fun AdicionarDescargaScreen(
             erro = "Informe a data"
             return
         }
-        if (placaSelecionada.isBlank()) {
-            erro = "Selecione a placa"
-            return
-        }
         if (ordemDescarga.isEmpty()) {
             erro = "Informe a ordem de descarga"
             return
@@ -223,7 +220,7 @@ actual fun AdicionarDescargaScreen(
                             motorista_id = motorista?.motorista_id ?: "",
                             viagem_id = viagemEmAndamento!!.id,
                             data = dataAPI,
-                            placa = placaSelecionada,
+                            placa = placaVeiculo,
                             ordem_descarga = ordemDescargaInt,
                             valor = valor.text,
                             foto = cameraState.base64!! // Garantido que não é null pela validação acima
@@ -245,7 +242,7 @@ actual fun AdicionarDescargaScreen(
                         motoristaId = motorista?.motorista_id ?: "",
                         viagemId = viagemEmAndamento!!.id.toLong(),
                         data = dataAPI,
-                        placa = placaSelecionada,
+                        placa = placaVeiculo,
                         ordemDescarga = ordemDescargaInt.toLong(),
                         valor = valor.text,
                         foto = cameraState.base64!!
@@ -336,8 +333,11 @@ actual fun AdicionarDescargaScreen(
                             Icon(Icons.Default.LocalShipping, null, tint = Color(0xFF1E88E5), modifier = Modifier.size(32.dp))
                             Spacer(Modifier.width(12.dp))
                             Column {
-                                Text("Viagem em andamento", fontSize = 12.sp, color = AppColors.TextSecondary)
-                                Text(viagemEmAndamento?.destino ?: "", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppColors.TextPrimary)
+                                Text("Descarga na viagem", fontSize = 12.sp, color = AppColors.TextSecondary)
+                                Text(
+                                    listOfNotNull(placaVeiculo.ifBlank { null }, viagemEmAndamento?.destino).joinToString(" • "),
+                                    fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppColors.TextPrimary
+                                )
                                 Text("Iniciada em: ${formatarDataBR(viagemEmAndamento?.data ?: "")}", fontSize = 12.sp, color = AppColors.TextSecondary)
                             }
                         }
@@ -360,40 +360,6 @@ actual fun AdicionarDescargaScreen(
                                 primaryColor = Color(0xFF1E88E5),
                                 modifier = Modifier.fillMaxWidth()
                             )
-
-                            Spacer(Modifier.height(16.dp))
-
-                            // Placa do Veículo
-                            Text("Placa do Veículo *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-                            Spacer(Modifier.height(8.dp))
-                            ExposedDropdownMenuBox(
-                                expanded = expandedPlaca,
-                                onExpandedChange = { expandedPlaca = it }
-                            ) {
-                                OutlinedTextField(
-                                    value = if (placaSelecionada.isBlank()) "Selecione a placa" else placaSelecionada,
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                    colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                    leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF1E88E5)) },
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPlaca) })
-                                
-                                ExposedDropdownMenu(
-                                    expanded = expandedPlaca,
-                                    onDismissRequest = { expandedPlaca = false }
-                                ) {
-                                    placas.forEach { placa ->
-                                        DropdownMenuItem(
-                                            text = { Text(placa) },
-                                            onClick = {
-                                                placaSelecionada = placa
-                                                expandedPlaca = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
 
                             Spacer(Modifier.height(16.dp))
 

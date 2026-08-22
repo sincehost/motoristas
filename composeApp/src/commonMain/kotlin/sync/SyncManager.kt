@@ -455,7 +455,7 @@ class SyncManager(private val repository: AppRepository) {
                         val syncResp = ApiClient.syncDados(repository.getMotoristaLogado()?.motorista_id ?: "")
                         if (syncResp.status == "ok") {
                             repository.salvarDestinos(syncResp.destinos.map { it.id to it.nome })
-                            repository.salvarEquipamentos(syncResp.equipamentos.map { Triple(it.id, it.placa, it.km) })
+                            repository.salvarEquipamentos(syncResp.equipamentos)
                             repository.salvarFormasPagamento(syncResp.formas_pagamento.map { Triple(it.id, it.nome, it.codigo) })
                             repository.salvarTiposDespesa(syncResp.tipos_despesa.map { TipoDespesaSync(it.id, it.nome, it.icone, it.cor) })
                             repository.salvarTiposCombustivel(syncResp.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) })
@@ -626,6 +626,9 @@ class SyncManager(private val repository: AppRepository) {
                     data_viagem = viagem.data_viagem,
                     km_inicio = viagem.km_inicio,
                     placa = viagem.placa,
+                    veiculo_id = viagem.veiculo_id?.toInt(),
+                    implemento1_id = viagem.implemento1_id?.toInt(),
+                    implemento2_id = viagem.implemento2_id?.toInt(),
                     pesocarga = viagem.pesocarga,
                     valorfrete = viagem.valorfrete,
                     foto_painel_saida = viagem.foto_painel_saida

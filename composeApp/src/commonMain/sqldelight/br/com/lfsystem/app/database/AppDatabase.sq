@@ -26,7 +26,11 @@ CREATE TABLE Equipamento (
     id INTEGER PRIMARY KEY,
     servidor_id INTEGER NOT NULL,
     placa TEXT NOT NULL,
-    km TEXT NOT NULL DEFAULT ''
+    km TEXT NOT NULL DEFAULT '',
+    -- 'veiculo' | 'implemento' | NULL (ainda não classificado no servidor).
+    -- Usado pra separar os dois seletores na hora de montar a composição.
+    categoria TEXT,
+    ativo INTEGER NOT NULL DEFAULT 1
 );
 
 -- ===============================
@@ -79,7 +83,15 @@ CREATE TABLE Viagem (
     foto_painel_saida TEXT,
     data_criacao TEXT NOT NULL,
     sincronizado INTEGER NOT NULL DEFAULT 0,
-    ultimo_erro TEXT
+    ultimo_erro TEXT,
+    -- Composição (opcional) — servidor_id de cada equipamento, resolvidos na
+    -- hora de iniciar a viagem. NULL = viagem sem implemento ou criada antes
+    -- desta migração (continua funcionando só com a placa acima).
+    veiculo_id INTEGER,
+    implemento1_id INTEGER,
+    implemento1_placa TEXT,
+    implemento2_id INTEGER,
+    implemento2_placa TEXT
 );
 
 -- ===============================
@@ -115,11 +127,19 @@ SELECT * FROM Destino WHERE servidor_id = ?;
 -- QUERIES DE EQUIPAMENTOS
 -- ===============================
 getAllEquipamentos:
-SELECT * FROM Equipamento ORDER BY placa;
+SELECT * FROM Equipamento WHERE ativo = 1 ORDER BY placa;
+
+-- Só os motorizados — pra popular o seletor de veículo principal da composição.
+getVeiculos:
+SELECT * FROM Equipamento WHERE ativo = 1 AND categoria = 'veiculo' ORDER BY placa;
+
+-- Só implementos — pra popular os seletores opcionais da composição.
+getImplementos:
+SELECT * FROM Equipamento WHERE ativo = 1 AND categoria = 'implemento' ORDER BY placa;
 
 insertEquipamento:
-INSERT OR REPLACE INTO Equipamento (servidor_id, placa, km)
-VALUES (?, ?, ?);
+INSERT OR REPLACE INTO Equipamento (servidor_id, placa, km, categoria, ativo)
+VALUES (?, ?, ?, ?, ?);
 
 deleteAllEquipamentos:
 DELETE FROM Equipamento;
@@ -191,6 +211,16 @@ SELECT COUNT(*) FROM Viagem WHERE sincronizado = 0;
 insertViagem:
 INSERT INTO Viagem (numerobd, cte, numerobd2, cte2, destino_id, destino_nome, placa, data_viagem, km_inicio, pesocarga, valorfrete, foto_painel_saida, data_criacao, sincronizado)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);
+
+-- Mesma coisa, mas já com a composição (veículo + até 2 implementos)
+-- resolvida na hora de iniciar a viagem.
+insertViagemComComposicao:
+INSERT INTO Viagem (
+    numerobd, cte, numerobd2, cte2, destino_id, destino_nome, placa,
+    data_viagem, km_inicio, pesocarga, valorfrete, foto_painel_saida, data_criacao, sincronizado,
+    veiculo_id, implemento1_id, implemento1_placa, implemento2_id, implemento2_placa
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?);
 
 marcarViagemSincronizada:
 UPDATE Viagem SET sincronizado = 1 WHERE id = ?;
@@ -342,7 +372,13 @@ CREATE TABLE ViagemAtual (
     destino TEXT NOT NULL,
     data_inicio TEXT NOT NULL,
     km_inicio TEXT NOT NULL DEFAULT '',
-    km_rota TEXT NOT NULL DEFAULT '0'
+    km_rota TEXT NOT NULL DEFAULT '0',
+    -- Composição da viagem em andamento — Abastecimento/ARLA/Descarga lêem
+    -- daqui pra saber o veículo sem perguntar de novo pro motorista.
+    placa TEXT NOT NULL DEFAULT '',
+    veiculo_id INTEGER,
+    implemento1_placa TEXT,
+    implemento2_placa TEXT
 );
 
 -- ===============================
@@ -354,6 +390,12 @@ SELECT * FROM ViagemAtual LIMIT 1;
 insertViagemAtual:
 INSERT OR REPLACE INTO ViagemAtual (id, viagem_id, destino, data_inicio, km_inicio, km_rota)
 VALUES (1, ?, ?, ?, ?, ?);
+
+-- Mesma coisa, mas já guardando a composição (usado pelo Iniciar Viagem
+-- quando a tela nova, com veículo + implementos, estiver em uso).
+insertViagemAtualComComposicao:
+INSERT OR REPLACE INTO ViagemAtual (id, viagem_id, destino, data_inicio, km_inicio, km_rota, placa, veiculo_id, implemento1_placa, implemento2_placa)
+VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteViagemAtual:
 DELETE FROM ViagemAtual;
@@ -510,7 +552,8 @@ CREATE TABLE Descarga (
     valor TEXT NOT NULL,
     foto TEXT,
     sincronizado INTEGER NOT NULL DEFAULT 0,
-    ultimo_erro TEXT
+    ultimo_erro TEXT,
+    equipamento_id INTEGER
 );
 
 -- ===============================
