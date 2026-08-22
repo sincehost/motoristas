@@ -76,15 +76,13 @@ actual fun EditarCombustivelScreen(
     var destino by remember { mutableStateOf("") }
     var dataViagem by remember { mutableStateOf("") }
 
-    // Equipamentos (placas)
-    var equipamentos by remember { mutableStateOf<List<Pair<Long, String>>>(emptyList()) }
-
     // Formas de pagamento e tipos de combustível (catálogo da empresa, cadastrado no admin)
     val formasPagamento = remember { repository.getAllFormasPagamento() }
     val tiposCombustivel = remember { repository.getAllTiposCombustivel() }
 
-    // Campos do formulário
-    var placaSelecionada by remember { mutableStateOf<Pair<Long, String>?>(null) }
+    // Placa não é mais editável aqui — é sempre a do veículo da viagem (o
+    // servidor já ignora/deriva isso da viagem; ver atualizar_abastecimento.php).
+    var placaVeiculo by remember { mutableStateOf("") }
     var data by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
     var nomePosto by rememberSaveable { mutableStateOf("") }
     var kmPosto by remember { mutableStateOf(TextFieldValue("")) }
@@ -100,7 +98,6 @@ actual fun EditarCombustivelScreen(
     val cameraStateCupom = rememberCameraState(context, prefix = "COMB_EDIT_CUP")
 
     // Dropdowns
-    var placaExpandida by remember { mutableStateOf(false) }
     var combustivelExpandido by remember { mutableStateOf(false) }
 
     // Camera
@@ -111,9 +108,6 @@ actual fun EditarCombustivelScreen(
         carregando = true
 
         try {
-            // Carrega equipamentos do banco local
-            equipamentos = repository.getEquipamentosParaDropdown()
-
             // Busca dados do abastecimento da API
             val response = api.ApiClient.buscarAbastecimento(
                 api.BuscarAbastecimentoRequest(
@@ -130,7 +124,7 @@ actual fun EditarCombustivelScreen(
                 dataViagem = abast.data_viagem
 
                 // Campos do formulário
-                placaSelecionada = equipamentos.find { it.second == abast.placa }
+                placaVeiculo = abast.placa
                 data = formatarDataBRParaExibicao(abast.data_abastecimento)
                 nomePosto = abast.nome_posto
                 val kmPostoTexto = abast.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: abast.km_posto
@@ -213,7 +207,6 @@ actual fun EditarCombustivelScreen(
     // Função atualizar
     fun atualizarAbastecimento() {
         // Validação
-        if (placaSelecionada == null) { erro = "Selecione uma placa"; return }
         if (nomePosto.isEmpty()) { erro = "Informe o nome do posto"; return }
         if (kmPosto.text.isEmpty()) { erro = "Informe o KM no posto"; return }
         if (tipoCombustivel.isEmpty()) { erro = "Selecione o tipo de combustível"; return }
@@ -234,7 +227,7 @@ actual fun EditarCombustivelScreen(
                         abastecimento_id = abastecimentoId,
                         motorista_id = motorista?.motorista_id ?: "",
                         viagem_id = viagemId,
-                        placa = placaSelecionada!!.second,
+                        placa = placaVeiculo,
                         data_abastecimento = converterDataParaAPI(data),
                         nome_posto = nomePosto,
                         km_posto = normalizarKmParaEnvio(kmPosto.text),
@@ -349,23 +342,17 @@ actual fun EditarCombustivelScreen(
 
                         Spacer(Modifier.height(16.dp))
 
-                        // Placa
-                        Text("Placa *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        // Veículo — não é mais editável aqui, é sempre o da viagem.
+                        Text("Veículo", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
-                        ExposedDropdownMenuBox(expanded = placaExpandida, onExpandedChange = { placaExpandida = it }) {
-                            OutlinedTextField(
-                                value = placaSelecionada?.second ?: "Selecione uma placa",
-                                onValueChange = {},
-                                readOnly = true,
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = placaExpandida) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Primary) })
-                            
-                            ExposedDropdownMenu(expanded = placaExpandida, onDismissRequest = { placaExpandida = false }) {
-                                equipamentos.forEach { (id, placa) ->
-                                    DropdownMenuItem(text = { Text(placa) }, onClick = { placaSelecionada = id to placa; placaExpandida = false })
-                                }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = AppColors.Background)
+                        ) {
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Primary)
+                                Spacer(Modifier.width(10.dp))
+                                Text(placaVeiculo.ifBlank { "—" }, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
                             }
                         }
 

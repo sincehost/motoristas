@@ -142,7 +142,6 @@ actual fun EditarCombustivelScreen(
     onVoltar: () -> Unit
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
-    val equipamentos = remember { repository.getEquipamentosParaDropdown() }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
@@ -178,7 +177,6 @@ actual fun EditarCombustivelScreen(
     val fotoCupomBitmap = remember(fotoCupomBase64) { fotoCupomBase64?.let { CameraHelper.base64ToImageBitmap(it) } }
 
     var combustivelExpanded by remember { mutableStateOf(false) }
-    var placaExpanded by remember { mutableStateOf(false) }
 
     // Carrega dados da API
     LaunchedEffect(Unit) {
@@ -256,7 +254,6 @@ actual fun EditarCombustivelScreen(
     }
 
     fun salvar() {
-        if (placa.isBlank()) { erroMsg = "Selecione uma placa"; return }
         if (nomePosto.isBlank()) { erroMsg = "Informe o posto"; return }
         if (kmPosto.text.isBlank()) { erroMsg = "Informe o KM"; return }
         if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L && horas.isBlank()) { erroMsg = "Informe as horas"; return }
@@ -335,17 +332,17 @@ actual fun EditarCombustivelScreen(
 
                 Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground), shape = RoundedCornerShape(16.dp)) {
                     Column(Modifier.padding(20.dp)) {
-                        // Antes travada (readOnly) — Android sempre permitiu trocar a placa aqui.
-                        ui.AppDropdownField(
-                            label = "Placa *",
-                            selectedText = placa,
-                            expanded = placaExpanded,
-                            onExpandedChange = { placaExpanded = it },
-                            leadingIcon = { Icon(Icons.Default.DirectionsCar, null) },
-                            modifier = Modifier.fillMaxWidth()
+                        // Veículo — não é mais editável aqui, é sempre o da viagem.
+                        Text("Veículo", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                        Spacer(Modifier.height(8.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = AppColors.Background)
                         ) {
-                            equipamentos.forEach { (_, p) ->
-                                ui.AppDropdownMenuItem(text = { Text(p) }, onClick = { placa = p; placaExpanded = false })
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.DirectionsCar, null, tint = AppColors.Primary)
+                                Spacer(Modifier.width(10.dp))
+                                Text(placa.ifBlank { "—" }, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
                             }
                         }
                         Spacer(Modifier.height(12.dp))

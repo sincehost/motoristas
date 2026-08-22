@@ -83,14 +83,14 @@ actual fun EditarDescargaScreen(
     onVoltar: () -> Unit
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
-    val equipamentos = remember { repository.getEquipamentosParaDropdown() }
     var carregando by remember { mutableStateOf(true) }
     var salvando by remember { mutableStateOf(false) }
     var modoOffline by remember { mutableStateOf(false) }
 
     var data by remember { mutableStateOf(dataAtualFormatada()) }
+    // Placa não é mais editável aqui — é sempre a do veículo da viagem (o
+    // servidor já ignora/deriva isso da viagem; ver descarga/atualizar_descarga.php).
     var placa by remember { mutableStateOf("") }
-    var placaExpanded by remember { mutableStateOf(false) }
     var ordemDescarga by remember { mutableStateOf("") }
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var fotoBase64 by remember { mutableStateOf<String?>(null) }
@@ -228,17 +228,17 @@ actual fun EditarDescargaScreen(
                         )
                         Spacer(Modifier.height(12.dp))
 
-                        // Antes travada (enabled = false) — Android sempre permitiu trocar a placa aqui.
-                        ui.AppDropdownField(
-                            label = "Placa *",
-                            selectedText = placa,
-                            expanded = placaExpanded,
-                            onExpandedChange = { placaExpanded = it },
-                            leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF06B6D4)) },
-                            modifier = Modifier.fillMaxWidth()
+                        // Veículo — não é mais editável aqui, é sempre o da viagem.
+                        Text("Veículo", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
+                        Spacer(Modifier.height(8.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = AppColors.Background)
                         ) {
-                            equipamentos.forEach { (_, p) ->
-                                ui.AppDropdownMenuItem(text = { Text(p) }, onClick = { placa = p; placaExpanded = false })
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF06B6D4))
+                                Spacer(Modifier.width(10.dp))
+                                Text(placa.ifBlank { "—" }, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
                             }
                         }
                         Spacer(Modifier.height(12.dp))
@@ -350,7 +350,6 @@ actual fun EditarDescargaScreen(
                         Button(
                             onClick = {
                                 scope.launch {
-                                    if (placa.isBlank()) { mostrarMensagem("Selecione a placa", isErro = true); return@launch }
                                     if (data.isBlank()) { mostrarMensagem("Informe a data", isErro = true); return@launch }
                                     if (ordemDescarga.isBlank()) { mostrarMensagem("Informe a ordem de descarga", isErro = true); return@launch }
                                     val ordemDescargaInt = ordemDescarga.toIntOrNull()

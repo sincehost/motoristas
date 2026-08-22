@@ -73,13 +73,12 @@ actual fun EditarDescargaScreen(
     var destino by remember { mutableStateOf("") }
     var dataViagem by remember { mutableStateOf("") }
 
-    // Placas disponíveis
-    var placas by remember { mutableStateOf<List<String>>(emptyList()) }
+    // Placa não é mais editável aqui — é sempre a do veículo da viagem (o
+    // servidor já ignora/deriva isso da viagem; ver descarga/atualizar_descarga.php).
+    var placaVeiculo by remember { mutableStateOf("") }
 
     // Campos do formulário
     var data by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
-    var placaSelecionada by remember { mutableStateOf<String?>(null) }
-    var expandedPlaca by remember { mutableStateOf(false) }
     var ordemDescarga by rememberSaveable { mutableStateOf("") }
     var valor by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
 
@@ -93,9 +92,6 @@ actual fun EditarDescargaScreen(
         carregando = true
 
         try {
-            // Carrega placas localmente
-            placas = repository.getEquipamentosParaDropdown().map { it.second }
-
             // Busca dados da descarga da API
             val response = api.ApiClient.buscarDescarga(
                 api.BuscarDescargaRequest(
@@ -113,7 +109,7 @@ actual fun EditarDescargaScreen(
 
                 // Campos do formulário
                 data = formatarDataBRParaExibicao(desc.data_descarga)
-                placaSelecionada = desc.placa
+                placaVeiculo = desc.placa
                 ordemDescarga = desc.ordem_descarga.toString()
                 valor = TextFieldValue(formatarDecimalParaExibicao(desc.valor))
 
@@ -169,7 +165,6 @@ actual fun EditarDescargaScreen(
     // Função atualizar
     fun atualizarDescarga() {
         // Validação
-        if (placaSelecionada.isNullOrBlank()) { erro = "Selecione a placa"; return }
         if (ordemDescarga.isEmpty()) { erro = "Informe a ordem de descarga"; return }
         val ordemDescargaInt = ordemDescarga.toIntOrNull()
         if (ordemDescargaInt == null || ordemDescargaInt <= 0) {
@@ -189,7 +184,7 @@ actual fun EditarDescargaScreen(
                         motorista_id = motorista?.motorista_id ?: "",
                         viagem_id = viagemId,
                         data = converterDataParaAPI(data),
-                        placa = placaSelecionada!!,
+                        placa = placaVeiculo,
                         ordem_descarga = ordemDescargaInt,
                         // Envia mascarado em BR ("60,00") direto — é o
                         // servidor que converte pra decimal. Convertendo
@@ -303,35 +298,18 @@ actual fun EditarDescargaScreen(
 
                         Spacer(Modifier.height(16.dp))
 
-                        // Placa do Veículo
-                        Text("Placa do Veículo *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        // Placa do Veículo — não é mais editável aqui, é sempre a do
+                        // veículo da viagem.
+                        Text("Veículo", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
-                        ExposedDropdownMenuBox(
-                            expanded = expandedPlaca,
-                            onExpandedChange = { expandedPlaca = it }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = AppColors.Background)
                         ) {
-                            OutlinedTextField(
-                                value = placaSelecionada ?: "Selecione a placa",
-                                onValueChange = {},
-                                readOnly = true,
-                                modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                leadingIcon = { Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF1E88E5)) },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPlaca) })
-                            
-                            ExposedDropdownMenu(
-                                expanded = expandedPlaca,
-                                onDismissRequest = { expandedPlaca = false }
-                            ) {
-                                placas.forEach { placa ->
-                                    DropdownMenuItem(
-                                        text = { Text(placa) },
-                                        onClick = {
-                                            placaSelecionada = placa
-                                            expandedPlaca = false
-                                        }
-                                    )
-                                }
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.DirectionsCar, null, tint = Color(0xFF1E88E5))
+                                Spacer(Modifier.width(10.dp))
+                                Text(placaVeiculo.ifBlank { "—" }, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
                             }
                         }
 
