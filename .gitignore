@@ -5,3 +5,9 @@ build/
 local.properties
 Pods/
 DerivedData/
+
+# Chave de assinatura do Android — NUNCA versionar (compromete a assinatura do app publicado)
+/chave
+*.jks
+*.keystore
+*.p12
