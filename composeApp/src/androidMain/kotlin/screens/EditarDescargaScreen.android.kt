@@ -45,6 +45,7 @@ import util.DateInputField
 import util.rememberCameraState
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.mensagemErroAmigavel
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -125,7 +126,7 @@ actual fun EditarDescargaScreen(
             }
         } catch (e: Exception) {
             modoOffline = true
-            erro = "Erro ao carregar dados: ${e.message}"
+            erro = "Erro ao carregar dados: ${mensagemErroAmigavel(e.message)}"
         }
 
         carregando = false
@@ -203,7 +204,7 @@ actual fun EditarDescargaScreen(
                 }
 
             } catch (e: Exception) {
-                erro = "Erro ao atualizar: ${e.message}"
+                erro = "Erro ao atualizar: ${mensagemErroAmigavel(e.message)}"
             }
             salvando = false
         }

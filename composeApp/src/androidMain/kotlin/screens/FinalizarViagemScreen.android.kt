@@ -51,6 +51,7 @@ import util.formatarKmInput
 import util.normalizarKmParaEnvio
 import util.kmParaDouble
 import util.formatarKmExibicao
+import util.mensagemErroAmigavel
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -421,7 +422,7 @@ actual fun FinalizarViagemScreen(
                     sucesso = "Viagem salva! Será sincronizada quando houver conexão."
                 }
             } catch (e: Exception) {
-                erro = "Erro ao salvar: ${e.message}"
+                erro = "Erro ao salvar: ${mensagemErroAmigavel(e.message)}"
             }
             salvando = false
         }

@@ -46,6 +46,7 @@ import util.converterDataParaAPI
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
 import util.analisarTextoCupom
+import util.mensagemErroAmigavel
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
@@ -93,7 +94,7 @@ private class CombustivelCameraDelegate(
                     onMessage("Erro ao comprimir imagem", true)
                 }
             } catch (e: Exception) {
-                onMessage("Erro: ${e.message}", true)
+                onMessage("Erro: ${mensagemErroAmigavel(e.message)}", true)
             }
         } else {
             onMessage("Nenhuma imagem selecionada", true)
@@ -454,7 +455,7 @@ actual fun AdicionarCombustivelScreen(
                 mostrarMensagem("Abastecimento salvo! Sincronize quando tiver internet.")
 
             } catch (e: Exception) {
-                mostrarMensagem("Erro ao salvar: ${e.message}", isErro = true)
+                mostrarMensagem("Erro ao salvar: ${mensagemErroAmigavel(e.message)}", isErro = true)
             }
             salvando = false
         }

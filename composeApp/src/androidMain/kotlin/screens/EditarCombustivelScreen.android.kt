@@ -48,6 +48,7 @@ import util.converterDataParaAPI
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
 import util.formatarKmExibicao
+import util.mensagemErroAmigavel
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -156,7 +157,7 @@ actual fun EditarCombustivelScreen(
             }
         } catch (e: Exception) {
             modoOffline = true
-            erro = "Erro ao carregar dados: ${e.message}"
+            erro = "Erro ao carregar dados: ${mensagemErroAmigavel(e.message)}"
         }
 
         carregando = false
@@ -255,7 +256,7 @@ actual fun EditarCombustivelScreen(
                 }
 
             } catch (e: Exception) {
-                erro = "Erro ao atualizar: ${e.message}"
+                erro = "Erro ao atualizar: ${mensagemErroAmigavel(e.message)}"
             }
             salvando = false
         }

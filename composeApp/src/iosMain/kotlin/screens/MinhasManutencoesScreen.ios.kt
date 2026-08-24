@@ -128,7 +128,7 @@ private fun ListaManutencoesContent(
                     mostrarMensagem(response.mensagem ?: "Erro ao excluir", isErro = true)
                 }
             } catch (e: Exception) {
-                mostrarMensagem("Erro: ${e.message}", isErro = true)
+                mostrarMensagem("Erro: ${util.mensagemErroAmigavel(e.message)}", isErro = true)
             }
             excluindo = false
             mostrarDialogoExcluir = false
@@ -543,8 +543,12 @@ private fun formatarData(data: String): String {
 private fun formatarValor(valor: String): String {
     return try {
         val numero = valor.replace(",", ".").toDoubleOrNull() ?: 0.0
-        val inteiro = numero.toInt()
-        val decimal = ((numero - inteiro) * 100).toInt()
+        // Arredonda em centavos ANTES de separar inteiro/decimal — a versão
+        // anterior truncava (`.toInt()`), então erro de ponto flutuante
+        // (ex: 10.09999999) virava "10,09" em vez de "10,10".
+        val centavosTotal = kotlin.math.round(numero * 100).toLong()
+        val inteiro = centavosTotal / 100
+        val decimal = centavosTotal % 100
         val inteiroFormatado = inteiro.toString().reversed().chunked(3).joinToString(".").reversed()
         "$inteiroFormatado,${decimal.toString().padStart(2, '0')}"
     } catch (e: Exception) {

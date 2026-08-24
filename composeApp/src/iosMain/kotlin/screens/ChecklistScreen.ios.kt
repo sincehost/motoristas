@@ -29,6 +29,7 @@ import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
+import util.mensagemErroAmigavel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,7 +115,7 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
         if (r.status == "ok") { repository.getChecklistsPreParaSincronizar().lastOrNull()?.let { repository.marcarChecklistPreSincronizado(it.id) } }
         } catch (_: Exception) {}
         sucessoMsg = "Checklist pré-viagem salvo!"
-        } catch (e: Exception) { erroMsg = "Erro: ${e.message}" }; salvando = false } }
+        } catch (e: Exception) { erroMsg = "Erro: ${mensagemErroAmigavel(e.message)}" }; salvando = false } }
 
     if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
     if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onSucesso() }
@@ -243,7 +244,7 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
         if (r.status == "ok") { repository.getChecklistsPosParaSincronizar().lastOrNull()?.let { repository.marcarChecklistPosSincronizado(it.id) } }
         } catch (_: Exception) {}
         sucessoMsg = "Checklist pós-viagem salvo!"
-        } catch (e: Exception) { erroMsg = "Erro: ${e.message}" }; salvando = false } }
+        } catch (e: Exception) { erroMsg = "Erro: ${mensagemErroAmigavel(e.message)}" }; salvando = false } }
 
     if (erroMsg != null) ui.ErroDialog(erroMsg!!) { erroMsg = null }
     if (sucessoMsg != null) ui.SucessoDialog(sucessoMsg!!) { sucessoMsg = null; onSucesso() }

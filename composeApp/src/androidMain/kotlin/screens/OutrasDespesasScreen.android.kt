@@ -128,6 +128,10 @@ actual fun OutrasDespesasScreen(
         if (valor.text.isEmpty()) { erro = "Informe o valor"; return }
         if (dataDespesa.isEmpty()) { erro = "Informe a data"; return }
         if (viagemAtual == null) { erro = "Nenhuma viagem em andamento"; return }
+        if (!cameraState.hasPhoto || cameraState.base64.isNullOrEmpty()) {
+            erro = "Adicione uma foto do comprovante da despesa para continuar."
+            return
+        }
 
         val dataAPI = converterDataParaAPI(dataDespesa)
         val viagemId = viagemAtual.viagem_id
@@ -149,7 +153,7 @@ actual fun OutrasDespesasScreen(
 
                 sucesso = "Despesa registrada com sucesso!"
             } catch (e: Exception) {
-                erro = "Erro ao salvar: ${e.message}"
+                erro = util.mensagemErroAmigavel(e.message)
             }
             salvando = false
         }
@@ -312,7 +316,7 @@ actual fun OutrasDespesasScreen(
                         Spacer(Modifier.height(16.dp))
 
                         // ★ Foto do Comprovante — agora usa cameraState
-                        Text("Foto do Comprovante", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text("Foto do Comprovante *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
 
                         if (cameraState.hasPhoto && cameraState.bitmap != null) {

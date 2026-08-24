@@ -172,7 +172,7 @@ private fun ListaViagensContent(
                     erro = response.mensagem ?: "Erro ao carregar viagens"
                 }
             } catch (e: Exception) {
-                erro = "Erro: ${e.message}"
+                erro = util.mensagemErroAmigavel(e.message)
             }
             loading = false
         }
@@ -201,7 +201,7 @@ private fun ListaViagensContent(
                     mostrarMensagem(response.mensagem ?: "Erro ao excluir", isErro = true)
                 }
             } catch (e: Exception) {
-                mostrarMensagem("Erro: ${e.message}", isErro = true)
+                mostrarMensagem(util.mensagemErroAmigavel(e.message), isErro = true)
             }
             excluindo = false
         }
@@ -559,7 +559,7 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                 erro = response.mensagem ?: "Erro ao carregar"
             }
         } catch (e: Exception) {
-            erro = "Erro: ${e.message}"
+            erro = util.mensagemErroAmigavel(e.message)
         }
         loading = false
     }
@@ -606,7 +606,7 @@ private fun EditarViagemContent(repository: AppRepository, viagemId: Int, onVolt
                     mostrarMensagem(response.mensagem ?: "Erro ao salvar", isErro = true)
                 }
             } catch (e: Exception) {
-                mostrarMensagem("Erro: ${e.message}", isErro = true)
+                mostrarMensagem(util.mensagemErroAmigavel(e.message), isErro = true)
             }
             salvando = false
         }
@@ -821,7 +821,7 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                     outrasDespesas = responseDespesas.outras_despesas
                 }
             } catch (_: Exception) {}
-        } catch (e: Exception) { erro = "Erro: ${e.message}" }
+        } catch (e: Exception) { erro = util.mensagemErroAmigavel(e.message) }
         loading = false
     }
 
@@ -1042,7 +1042,7 @@ private fun DespesasViagemContent(
                     descargas = response.descargas
                     outrasDespesas = response.outras_despesas
                 } else erro = response.mensagem
-            } catch (e: Exception) { erro = "Erro: ${e.message}" }
+            } catch (e: Exception) { erro = util.mensagemErroAmigavel(e.message) }
             loading = false
         }
     }
@@ -1073,7 +1073,7 @@ private fun DespesasViagemContent(
                     mostrarMensagem(response.mensagem ?: "Erro ao excluir", isErro = true)
                 }
             } catch (e: Exception) {
-                mostrarMensagem("Erro: ${e.message}", isErro = true)
+                mostrarMensagem(util.mensagemErroAmigavel(e.message), isErro = true)
             }
             excluindo = false
             mostrarDialogoExcluir = false

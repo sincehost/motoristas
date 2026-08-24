@@ -42,6 +42,7 @@ import util.CameraHelper
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.mensagemErroAmigavel
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
@@ -98,7 +99,7 @@ private class AdicionarDescargaCameraDelegate(
                     onMessage("Erro ao comprimir imagem", true)
                 }
             } catch (e: Exception) {
-                onMessage("Erro: ${e.message}", true)
+                onMessage("Erro: ${mensagemErroAmigavel(e.message)}", true)
             }
         } else {
             onMessage("Nenhuma imagem selecionada", true)
@@ -341,7 +342,7 @@ actual fun AdicionarDescargaScreen(
                     sucessoMsg = "Descarga salva! Sincronize quando tiver internet."
                 }
             } catch (e: Exception) {
-                mostrarMensagem("Erro ao salvar: ${e.message}", isErro = true)
+                mostrarMensagem("Erro ao salvar: ${mensagemErroAmigavel(e.message)}", isErro = true)
             } finally {
                 salvando = false
             }

@@ -47,6 +47,7 @@ import util.rememberCameraState
 import util.rememberSaveableTextField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.mensagemErroAmigavel
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -251,7 +252,7 @@ actual fun AdicionarDescargaScreen(
                 }
 
             } catch (e: Exception) {
-                erro = "Erro ao salvar: ${e.message}"
+                erro = "Erro ao salvar: ${mensagemErroAmigavel(e.message)}"
             }
             salvando = false
         }

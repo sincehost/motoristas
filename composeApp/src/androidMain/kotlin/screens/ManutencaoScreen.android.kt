@@ -53,6 +53,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import util.rememberCameraState
 import util.rememberSaveableTextField
 import util.ImageCompressor
+import util.mensagemErroAmigavel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -275,7 +276,7 @@ actual fun ManutencaoScreen(
                     sucesso = "Manutenção salva! Sincronize quando tiver internet."
                 }
             } catch (e: Exception) {
-                erro = "Erro ao salvar: ${e.message}"
+                erro = "Erro ao salvar: ${mensagemErroAmigavel(e.message)}"
             }
             salvando = false
         }

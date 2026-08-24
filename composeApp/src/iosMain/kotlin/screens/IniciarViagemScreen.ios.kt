@@ -95,7 +95,7 @@ private class CameraDelegate(
                     onMessage("Erro ao comprimir imagem", true)
                 }
             } catch (e: Exception) {
-                onMessage("Erro: ${e.message}", true)
+                onMessage(util.mensagemErroAmigavel(e.message), true)
             }
         } else {
             onMessage("Nenhuma imagem selecionada", true)
@@ -981,7 +981,16 @@ actual fun IniciarViagemScreen(
                                         }
                                     } catch (e: Exception) {
                                         // Exceção de REDE (sem internet, timeout, servidor indisponível)
-                                        // Salvar localmente para sincronização posterior
+                                        // Salvar localmente para sincronização posterior — mas só quando é
+                                        // mesmo falta de conexão. Um erro técnico inesperado (bug, resposta
+                                        // malformada) não deve virar silenciosamente "viagem salva offline",
+                                        // senão o motorista nunca fica sabendo que algo deu errado de verdade.
+                                        if (!util.isErroDeConectividade(e.message)) {
+                                            loading = false
+                                            mostrarMensagem(util.mensagemErroAmigavel(e.message), isErro = true)
+                                            return@launch
+                                        }
+
                                         repository.salvarViagemComComposicao(
                                             numerobd = numerobd,
                                             cte = cte,

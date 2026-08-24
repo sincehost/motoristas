@@ -25,6 +25,7 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import ui.AppAlertDialog
 import ui.AppColors
 import ui.GradientTopBar
+import util.mensagemErroAmigavel
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -122,7 +123,7 @@ private fun ListaManutencoesContent(
             } catch (e: Exception) {
                 println("Erro ao carregar manutenções: ${e.message}")
                 e.printStackTrace()
-                erro = "Erro ao carregar manutenções: ${e.message}"
+                erro = "Erro ao carregar manutenções: ${mensagemErroAmigavel(e.message)}"
             }
             carregando = false
             isRefreshing = false
@@ -146,7 +147,7 @@ private fun ListaManutencoesContent(
                     erro = response.mensagem ?: "Erro ao excluir"
                 }
             } catch (e: Exception) {
-                erro = "Erro: ${e.message}"
+                erro = mensagemErroAmigavel(e.message)
             }
             excluindo = false
             mostrarDialogoExcluir = false

@@ -2,26 +2,18 @@
 <!--
     CORREÇÃO M5: Restringir tráfego HTTP sem criptografia.
     Antes, usesCleartextTraffic=true permitia HTTP para QUALQUER domínio.
-    Agora, apenas os domínios da API que precisam de HTTP são permitidos.
-    O domínio principal (lfsystem.com.br) já usa HTTPS.
-    
-    Se algum cliente usa API em servidor local (IP sem SSL),
-    adicionar o IP/domínio aqui.
+
+    A exceção de cleartext pra "10.0.0.0"/"192.168.0.0"/"localhost" foi
+    removida: confirmado que nenhum tenant roda API local sem HTTPS, e
+    aqueles valores nunca cobriam de verdade uma faixa de IP local mesmo
+    (o <domain> do Android não aceita CIDR/faixa, só IP/host exato — então
+    na prática já não protegia nada). Se um dia isso for necessário de
+    verdade, adicionar aqui o IP/domínio exato do servidor em questão.
 -->
 <network-security-config>
-    <!-- Padrão: bloquear HTTP em todos os domínios -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-
-    <!-- Permitir HTTP apenas para domínios específicos que ainda não têm SSL -->
-    <!-- APIs de clientes podem rodar em servidores sem certificado -->
-    <domain-config cleartextTrafficPermitted="true">
-        <!-- Servidores locais de desenvolvimento -->
-        <domain includeSubdomains="true">10.0.0.0</domain>
-        <domain includeSubdomains="true">192.168.0.0</domain>
-        <domain includeSubdomains="true">localhost</domain>
-    </domain-config>
 </network-security-config>

@@ -29,6 +29,7 @@ import ui.AppColors
 import ui.GradientTopBar
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.mensagemErroAmigavel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -204,7 +205,7 @@ actual fun ChecklistPreViagemScreen(
 
                 mostrarMensagem("Checklist pré-viagem salvo com sucesso!")
             } catch (e: Exception) {
-                mostrarMensagem("Erro ao salvar: ${e.message}", erro = true)
+                mostrarMensagem("Erro ao salvar: ${mensagemErroAmigavel(e.message)}", erro = true)
             }
             salvando = false
         }

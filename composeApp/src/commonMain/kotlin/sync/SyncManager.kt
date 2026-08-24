@@ -669,7 +669,7 @@ class SyncManager(private val repository: AppRepository) {
             e.printStackTrace()
             LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             repository.marcarViagemErro(viagem.id, e.message)
-            SyncItemResult(sucesso = false, erro = "Viagem: ${e.message}")
+            SyncItemResult(sucesso = false, erro = "Viagem: ${util.mensagemErroAmigavel(e.message)}")
         }
     }
 
@@ -761,7 +761,7 @@ class SyncManager(private val repository: AppRepository) {
             LogWriter.log("   ${e::class.simpleName}: ${e.message}")
             LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             repository.marcarAbastecimentoErro(abastecimento.id, e.message)
-            SyncItemResult(sucesso = false, erro = "Abastecimento: ${e.message}")
+            SyncItemResult(sucesso = false, erro = "Abastecimento: ${util.mensagemErroAmigavel(e.message)}")
         }
     }
 
@@ -820,7 +820,7 @@ class SyncManager(private val repository: AppRepository) {
             e.printStackTrace()
             LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             repository.marcarArlaErro(arla.id, e.message)
-            SyncItemResult(sucesso = false, erro = "ARLA: ${e.message}")
+            SyncItemResult(sucesso = false, erro = "ARLA: ${util.mensagemErroAmigavel(e.message)}")
         }
     }
 
@@ -859,7 +859,7 @@ class SyncManager(private val repository: AppRepository) {
             }
         } catch (e: Exception) {
             repository.marcarDescargaErro(descarga.id, e.message)
-            SyncItemResult(sucesso = false, erro = "Descarga: ${e.message}")
+            SyncItemResult(sucesso = false, erro = "Descarga: ${util.mensagemErroAmigavel(e.message)}")
         }
     }
 
@@ -910,7 +910,7 @@ class SyncManager(private val repository: AppRepository) {
             }
         } catch (e: Exception) {
             repository.marcarManutencaoErro(manutencao.id, e.message)
-            SyncItemResult(sucesso = false, erro = "Manutenção: ${e.message}")
+            SyncItemResult(sucesso = false, erro = "Manutenção: ${util.mensagemErroAmigavel(e.message)}")
         }
     }
 
@@ -992,7 +992,7 @@ class SyncManager(private val repository: AppRepository) {
         } catch (e: Exception) {
             LogWriter.log("  ❌ Exception na sync: ${e.message}")
             repository.marcarFinalizacaoErro(finalizacao.id, e.message)
-            SyncItemResult(sucesso = false, erro = "Finalização: ${e.message}")
+            SyncItemResult(sucesso = false, erro = "Finalização: ${util.mensagemErroAmigavel(e.message)}")
         }
     }
 
@@ -1036,11 +1036,11 @@ class SyncManager(private val repository: AppRepository) {
             } catch (e: Exception) {
                 LogWriter.log("⚠️ API de outras despesas não disponível, mantendo para próxima sync: ${e.message}")
                 repository.marcarOutraDespesaErro(despesa.id, "API não disponível ainda")
-                SyncItemResult(sucesso = false, erro = "OutraDespesa: API não disponível ainda")
+                SyncItemResult(sucesso = false, erro = "OutraDespesa: ${util.mensagemErroAmigavel(e.message)}")
             }
         } catch (e: Exception) {
             repository.marcarOutraDespesaErro(despesa.id, e.message)
-            SyncItemResult(sucesso = false, erro = "OutraDespesa: ${e.message}")
+            SyncItemResult(sucesso = false, erro = "OutraDespesa: ${util.mensagemErroAmigavel(e.message)}")
         }
     }
 
@@ -1087,7 +1087,7 @@ class SyncManager(private val repository: AppRepository) {
             }
         } catch (e: Exception) {
             repository.marcarChecklistPreErro(checklist.id, e.message)
-            SyncItemResult(sucesso = false, erro = "ChecklistPré: ${e.message}")
+            SyncItemResult(sucesso = false, erro = "ChecklistPré: ${util.mensagemErroAmigavel(e.message)}")
         }
     }
 
@@ -1127,7 +1127,7 @@ class SyncManager(private val repository: AppRepository) {
             }
         } catch (e: Exception) {
             repository.marcarChecklistPosErro(checklist.id, e.message)
-            SyncItemResult(sucesso = false, erro = "ChecklistPós: ${e.message}")
+            SyncItemResult(sucesso = false, erro = "ChecklistPós: ${util.mensagemErroAmigavel(e.message)}")
         }
     }
 }

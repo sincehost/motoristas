@@ -136,6 +136,10 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
         if (valor.text.isBlank()) { erroMsg = "Informe o valor"; return }
         if (dataDespesa.isBlank()) { erroMsg = "Informe a data"; return }
         if (viagemAtual == null) { erroMsg = "Nenhuma viagem em andamento"; return }
+        if (fotoBase64.isNullOrEmpty()) {
+            erroMsg = "Adicione uma foto do comprovante da despesa para continuar."
+            return
+        }
         val viagemId = viagemAtual.viagem_id
         scope.launch {
             salvando = true
@@ -150,7 +154,7 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
                     if (resp.status == "ok") { repository.getOutrasDespesasParaSincronizar().lastOrNull()?.let { repository.marcarOutraDespesaSincronizada(it.id) } }
                 } catch (_: Exception) {}
                 sucessoMsg = "Despesa salva com sucesso!"
-            } catch (e: Exception) { erroMsg = "Erro: ${e.message}" }
+            } catch (e: Exception) { erroMsg = util.mensagemErroAmigavel(e.message) }
             salvando = false
         }
     }
@@ -212,7 +216,7 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
             // === FOTO DO COMPROVANTE ===
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground), shape = RoundedCornerShape(16.dp)) {
                 Column(Modifier.padding(20.dp)) {
-                    Text("Foto do Comprovante", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppColors.TextPrimary)
+                    Text("Foto do Comprovante *", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppColors.TextPrimary)
                     Spacer(Modifier.height(12.dp))
                     if (fotoBitmap != null) {
                         Box(Modifier.fillMaxWidth().height(200.dp)) {

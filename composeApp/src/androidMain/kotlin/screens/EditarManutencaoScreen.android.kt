@@ -52,6 +52,7 @@ import java.util.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import util.rememberCameraState
 import util.ImageCompressor
+import util.mensagemErroAmigavel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -188,7 +189,7 @@ actual fun EditarManutencaoScreen(
             }
         } catch (e: Exception) {
             modoOffline = true
-            erro = "Erro ao carregar dados: ${e.message}"
+            erro = "Erro ao carregar dados: ${mensagemErroAmigavel(e.message)}"
         }
 
         carregando = false
@@ -292,7 +293,7 @@ actual fun EditarManutencaoScreen(
                 }
 
             } catch (e: Exception) {
-                erro = "Erro ao atualizar: ${e.message}"
+                erro = "Erro ao atualizar: ${mensagemErroAmigavel(e.message)}"
             }
             salvando = false
         }

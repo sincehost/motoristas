@@ -48,6 +48,7 @@ import util.converterDataParaAPI
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
 import util.formatarKmExibicao
+import util.mensagemErroAmigavel
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -130,7 +131,7 @@ actual fun EditarArlaScreen(
             }
         } catch (e: Exception) {
             modoOffline = true
-            erro = "Erro ao carregar dados: ${e.message}"
+            erro = "Erro ao carregar dados: ${mensagemErroAmigavel(e.message)}"
         }
 
         carregando = false
@@ -199,7 +200,7 @@ actual fun EditarArlaScreen(
                 }
 
             } catch (e: Exception) {
-                erro = "Erro ao atualizar: ${e.message}"
+                erro = "Erro ao atualizar: ${mensagemErroAmigavel(e.message)}"
             }
             salvando = false
         }
@@ -378,7 +379,7 @@ actual fun EditarArlaScreen(
                         Spacer(Modifier.height(16.dp))
 
                         // Foto
-                        Text("Foto do Comprovante *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                        Text("Foto do Comprovante", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
                         FotoCapturaArla(foto = cameraState.bitmap, onClick = { tirarFoto() }, onRemover = { cameraState.clear() })
 

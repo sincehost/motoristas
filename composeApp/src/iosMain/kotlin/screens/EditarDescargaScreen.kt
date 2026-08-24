@@ -40,6 +40,7 @@ import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.converterDataParaExibicao
+import util.mensagemErroAmigavel
 import kotlin.math.roundToLong
 
 // Delegate da câmera nativa iOS - fora do @Composable
@@ -167,7 +168,7 @@ actual fun EditarDescargaScreen(
             }
         } catch (e: Exception) {
             modoOffline = true
-            mostrarMensagem("Erro ao carregar dados: ${e.message}", isErro = true)
+            mostrarMensagem("Erro ao carregar dados: ${mensagemErroAmigavel(e.message)}", isErro = true)
         }
         carregando = false
     }
@@ -386,7 +387,7 @@ actual fun EditarDescargaScreen(
                                             mostrarMensagem(response.mensagem ?: "Erro ao salvar", isErro = true)
                                         }
                                     } catch (e: Exception) {
-                                        mostrarMensagem("Erro: ${e.message}", isErro = true)
+                                        mostrarMensagem("Erro: ${mensagemErroAmigavel(e.message)}", isErro = true)
                                     }
                                     salvando = false
                                 }

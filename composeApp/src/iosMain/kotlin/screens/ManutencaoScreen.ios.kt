@@ -42,6 +42,7 @@ import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
+import util.mensagemErroAmigavel
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
 
@@ -88,7 +89,7 @@ private class ManutencaoCameraDelegate(
                     onMessage("Erro ao comprimir imagem", true)
                 }
             } catch (e: Exception) {
-                onMessage("Erro: ${e.message}", true)
+                onMessage("Erro: ${mensagemErroAmigavel(e.message)}", true)
             }
         }
 
@@ -224,7 +225,7 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                     )
                     sucessoMsg = "Manutenção salva! Sincronize quando tiver internet."
                 }
-            } catch (e: Exception) { erroMsg = "Erro ao salvar: ${e.message}" }
+            } catch (e: Exception) { erroMsg = "Erro ao salvar: ${mensagemErroAmigavel(e.message)}" }
             salvando = false
         }
     }

@@ -54,6 +54,7 @@ import util.formatarKmInput
 import util.normalizarKmParaEnvio
 import util.formatarKmExibicao
 import util.analisarTextoCupom
+import util.mensagemErroAmigavel
 import java.io.File
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
@@ -371,7 +372,7 @@ actual fun AdicionarCombustivelScreen(
                 sucesso = "Abastecimento salvo! Sincronize quando tiver internet."
 
             } catch (e: Exception) {
-                erro = "Erro ao salvar: ${e.message}"
+                erro = "Erro ao salvar: ${mensagemErroAmigavel(e.message)}"
             }
             salvando = false
         }

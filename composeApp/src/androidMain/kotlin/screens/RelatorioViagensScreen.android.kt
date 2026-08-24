@@ -31,6 +31,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import ui.AppColors
 import ui.GradientTopBar
+import util.mensagemErroAmigavel
 import java.io.File
 import java.io.FileOutputStream
 import java.util.*
@@ -180,7 +181,7 @@ actual fun RelatorioViagensScreen(
             }
             context.startActivity(Intent.createChooser(intent, "Abrir relatório PDF"))
         } catch (e: Exception) {
-            Toast.makeText(context, "Erro ao gerar PDF: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Erro ao gerar PDF: ${mensagemErroAmigavel(e.message)}", Toast.LENGTH_LONG).show()
         }
     }
 

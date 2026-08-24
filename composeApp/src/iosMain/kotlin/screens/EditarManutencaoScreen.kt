@@ -44,6 +44,7 @@ import util.converterDataParaExibicao
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
 import util.formatarKmExibicao
+import util.mensagemErroAmigavel
 import kotlin.math.roundToLong
 
 // Mesma lista do Android (EditarManutencaoScreen.android.kt / ManutencaoScreen.ios.kt).
@@ -277,7 +278,7 @@ actual fun EditarManutencaoScreen(
             }
         } catch (e: Exception) {
             modoOffline = true
-            mostrarMensagem("Erro ao carregar dados: ${e.message}", isErro = true)
+            mostrarMensagem("Erro ao carregar dados: ${mensagemErroAmigavel(e.message)}", isErro = true)
         }
         carregando = false
     }
@@ -610,7 +611,7 @@ actual fun EditarManutencaoScreen(
                                             mostrarMensagem(response.mensagem ?: "Erro ao salvar", isErro = true)
                                         }
                                     } catch (e: Exception) {
-                                        mostrarMensagem("Erro: ${e.message}", isErro = true)
+                                        mostrarMensagem("Erro: ${mensagemErroAmigavel(e.message)}", isErro = true)
                                     }
                                     salvando = false
                                 }

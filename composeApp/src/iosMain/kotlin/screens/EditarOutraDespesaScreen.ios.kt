@@ -37,6 +37,7 @@ import ui.GradientTopBar
 import util.CameraHelper
 import util.converterDataParaAPI
 import util.converterDataParaExibicao
+import util.mensagemErroAmigavel
 
 // Delegate da câmera nativa iOS - fora do @Composable
 private class EditarOutraDespesaCameraDelegate(
@@ -211,7 +212,7 @@ actual fun EditarOutraDespesaScreen(
                     mostrarMensagem(resp.mensagem ?: "Erro ao atualizar", isErro = true)
                 }
             } catch (e: Exception) {
-                mostrarMensagem("Erro: ${e.message}", isErro = true)
+                mostrarMensagem("Erro: ${mensagemErroAmigavel(e.message)}", isErro = true)
             }
             salvando = false
         }

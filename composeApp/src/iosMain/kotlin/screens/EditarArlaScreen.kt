@@ -43,6 +43,7 @@ import util.converterDataParaExibicao
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
 import util.formatarKmExibicao
+import util.mensagemErroAmigavel
 import kotlin.math.roundToLong
 
 // Delegate da câmera nativa iOS - fora do @Composable
@@ -179,7 +180,7 @@ actual fun EditarArlaScreen(
             }
         } catch (e: Exception) {
             modoOffline = true
-            mostrarMensagem("Erro ao carregar dados: ${e.message}", isErro = true)
+            mostrarMensagem("Erro ao carregar dados: ${mensagemErroAmigavel(e.message)}", isErro = true)
         }
         carregando = false
     }
@@ -428,7 +429,7 @@ actual fun EditarArlaScreen(
                                             mostrarMensagem(response.mensagem ?: "Erro ao salvar", isErro = true)
                                         }
                                     } catch (e: Exception) {
-                                        mostrarMensagem("Erro: ${e.message}", isErro = true)
+                                        mostrarMensagem("Erro: ${mensagemErroAmigavel(e.message)}", isErro = true)
                                     }
                                     salvando = false
                                 }

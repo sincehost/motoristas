@@ -28,6 +28,7 @@ import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
+import util.mensagemErroAmigavel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -169,7 +170,7 @@ actual fun ChecklistPosViagemScreen(
 
                 mostrarMensagem("Checklist pós-viagem salvo com sucesso!")
             } catch (e: Exception) {
-                mostrarMensagem("Erro ao salvar: ${e.message}", erro = true)
+                mostrarMensagem("Erro ao salvar: ${mensagemErroAmigavel(e.message)}", erro = true)
             }
             salvando = false
         }

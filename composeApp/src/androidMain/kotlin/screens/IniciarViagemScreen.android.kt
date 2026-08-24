@@ -797,20 +797,12 @@ actual fun IniciarViagemScreen(
                                     } catch (e: Exception) {
                                         // Exceção de REDE (sem internet, timeout, servidor indisponível)
                                         // Salvar localmente para sincronização posterior
-                                        val semConexao = e.message?.let {
-                                            it.contains("Unable to resolve host", ignoreCase = true) ||
-                                            it.contains("No address associated with hostname", ignoreCase = true) ||
-                                            it.contains("Network is unreachable", ignoreCase = true) ||
-                                            it.contains("Connection refused", ignoreCase = true) ||
-                                            it.contains("timeout", ignoreCase = true) ||
-                                            it.contains("ConnectException", ignoreCase = true) ||
-                                            it.contains("SocketTimeoutException", ignoreCase = true)
-                                        } ?: true
+                                        val semConexao = util.isErroDeConectividade(e.message) || e.message == null
 
                                         if (!semConexao) {
                                             // Erro técnico inesperado — não salvar offline
                                             loading = false
-                                            mostrarMensagem("Erro inesperado: ${e.message}", isErro = true)
+                                            mostrarMensagem(util.mensagemErroAmigavel(e.message), isErro = true)
                                             return@launch
                                         }
 

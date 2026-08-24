@@ -37,6 +37,7 @@ import ui.GradientTopBar
 import util.CameraHelper
 import util.dataAtualFormatada
 import util.converterDataParaAPI
+import util.mensagemErroAmigavel
 import util.converterDataParaExibicao
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
@@ -206,7 +207,7 @@ actual fun EditarCombustivelScreen(
             }
         } catch (e: Exception) {
             modoOffline = true
-            erroMsg = "Erro ao carregar: ${e.message}"
+            erroMsg = "Erro ao carregar: ${mensagemErroAmigavel(e.message)}"
         }
         carregando = false
     }
@@ -284,7 +285,7 @@ actual fun EditarCombustivelScreen(
                     )
                 )
                 if (resp.status == "ok") sucessoMsg = "Abastecimento atualizado!" else erroMsg = resp.mensagem ?: "Erro"
-            } catch (e: Exception) { erroMsg = "Erro: ${e.message}" }
+            } catch (e: Exception) { erroMsg = "Erro: ${mensagemErroAmigavel(e.message)}" }
             salvando = false
         }
     }
@@ -406,31 +407,31 @@ actual fun EditarCombustivelScreen(
                         OutlinedTextField(
                             value = litros,
                             onValueChange = { newValue ->
-                                val filtered = newValue.text.filter { c -> c.isDigit() || c == ',' || c == '.' }
-                                litros = TextFieldValue(text = filtered, selection = TextRange(filtered.length))
+                                val formatted = formatarDecimalMascaraComb(newValue.text)
+                                litros = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
                             },
-                            label = { Text("Litros") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            label = { Text("Litros") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                         Spacer(Modifier.height(12.dp))
 
                         OutlinedTextField(
                             value = valorLitro,
                             onValueChange = { newValue ->
-                                val filtered = newValue.text.filter { c -> c.isDigit() || c == ',' || c == '.' }
-                                valorLitro = TextFieldValue(text = filtered, selection = TextRange(filtered.length))
+                                val formatted = formatarDecimalMascaraComb(newValue.text)
+                                valorLitro = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
                             },
-                            label = { Text("Valor por litro (R$)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            label = { Text("Valor por litro (R$)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                         Spacer(Modifier.height(12.dp))
 
                         OutlinedTextField(
                             value = valorTotal,
                             onValueChange = { newValue ->
-                                val filtered = newValue.text.filter { c -> c.isDigit() || c == ',' || c == '.' }
-                                valorTotal = TextFieldValue(text = filtered, selection = TextRange(filtered.length))
+                                val formatted = formatarDecimalMascaraComb(newValue.text)
+                                valorTotal = TextFieldValue(text = formatted, selection = TextRange(formatted.length))
                             },
                             label = { Text("Valor total (R$)") }, leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                         Spacer(Modifier.height(12.dp))
 
@@ -474,6 +475,24 @@ actual fun EditarCombustivelScreen(
  * (centavos) em vez de string do Double, evitando artefato de ponto
  * flutuante.
  */
+// Máscara estilo calculadora (mesmo padrão de AdicionarCombustivelScreen.ios.kt):
+// dígitos entram da direita pra esquerda, deslocando pras casas decimais.
+// Antes, esse campo só filtrava caracteres soltos (dígitos, "," e "."),
+// deixando o motorista digitar "1250.50" livremente — que ia direto pro
+// servidor, que espera SEMPRE texto no formato BR ("1.250,50") e faz
+// str_replace(['.', ','], ['', '.']) uma única vez. Sem essa máscara, um
+// "." digitado virava separador de milhar removido, inflando o valor em
+// até 100x (R$1.250,50 digitado como "1250.50" virava R$125.050,00).
+private fun formatarDecimalMascaraComb(input: String): String {
+    val digits = input.filter { it.isDigit() }
+    if (digits.isEmpty()) return ""
+    val value = digits.toLongOrNull() ?: return ""
+    val inteiros = value / 100
+    val decimais = value % 100
+    val inteirosFormatado = inteiros.toString().reversed().chunked(3).joinToString(".").reversed()
+    return "$inteirosFormatado,${decimais.toString().padStart(2, '0')}"
+}
+
 private fun formatarDecimalParaExibicaoComb(valorServidor: String?): String {
     if (valorServidor.isNullOrBlank()) return ""
     val numero = valorServidor.replace(",", ".").toDoubleOrNull() ?: return valorServidor

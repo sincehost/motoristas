@@ -48,6 +48,7 @@ import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.formatarKmInput
 import util.normalizarKmParaEnvio
+import util.mensagemErroAmigavel
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -262,7 +263,7 @@ actual fun AdicionarArlaScreen(
                     mostrarMensagem("ARLA salvo! Sincronize quando tiver internet.")
                 }
             } catch (e: Exception) {
-                mostrarMensagem("Erro: ${e.message}", erro = true)
+                mostrarMensagem(mensagemErroAmigavel(e.message), erro = true)
             }
             salvando = false
         }
