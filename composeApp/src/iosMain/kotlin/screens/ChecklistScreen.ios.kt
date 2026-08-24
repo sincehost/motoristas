@@ -28,6 +28,7 @@ import ui.GradientTopBar
 import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.formatarKmInput
+import util.formatarKmExibicao
 import util.normalizarKmParaEnvio
 import util.mensagemErroAmigavel
 
@@ -42,15 +43,9 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
     var semViagem by remember { mutableStateOf(false) }
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(Unit) {
-        try {
-            viagemAtual = repository.getViagemAtual(); semViagem = viagemAtual == null
-        } catch (_: Exception) {
-            semViagem = true
-        }
-        carregando = false
-    }
+    // Checklist já enviado nessa viagem — trava a tela em somente-leitura.
+    var jaEnviado by remember { mutableStateOf(false) }
+    var dataEnvio by remember { mutableStateOf("") }
 
     var docCnhValida by remember { mutableStateOf(false) }; var docCrlvVeiculo by remember { mutableStateOf(false) }
     var docAnttValida by remember { mutableStateOf(false) }; var docSeguroCarga by remember { mutableStateOf(false) }
@@ -74,6 +69,46 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
     var cabFreioEstacionamento by remember { mutableStateOf(false) }
     var observacoes by remember { mutableStateOf("") }
 
+    LaunchedEffect(Unit) {
+        try {
+            val v = repository.getViagemAtual()
+            viagemAtual = v
+            if (v == null) {
+                semViagem = true
+            } else {
+                val existente = repository.getChecklistPrePorViagem(v.viagem_id)
+                if (existente != null) {
+                    jaEnviado = true
+                    dataEnvio = existente.data_checklist
+                    docCnhValida = existente.doc_cnh_valida == 1L; docCrlvVeiculo = existente.doc_crlv_veiculo == 1L
+                    docAnttValida = existente.doc_antt_valida == 1L; docSeguroCarga = existente.doc_seguro_carga == 1L
+                    docOrdemColeta = existente.doc_ordem_coleta == 1L
+                    eletFarolDianteiro = existente.elet_farol_dianteiro == 1L; eletFarolTraseiro = existente.elet_farol_traseiro == 1L
+                    eletLuzFreio = existente.elet_luz_freio == 1L; eletSetaDireita = existente.elet_seta_direita == 1L
+                    eletSetaEsquerda = existente.elet_seta_esquerda == 1L; eletLuzRe = existente.elet_luz_re == 1L
+                    eletPainelFuncionando = existente.elet_painel_funcionando == 1L
+                    pneuCalibragemOk = existente.pneu_calibragem_ok == 1L; pneuEstadoConservacao = existente.pneu_estado_conservacao == 1L
+                    pneuEstepeOk = existente.pneu_estepe_ok == 1L; pneuFerramentasTroca = existente.pneu_ferramentas_troca == 1L
+                    fluidoOleoMotor = existente.fluido_oleo_motor == 1L; fluidoAguaRadiador = existente.fluido_agua_radiador == 1L
+                    fluidoFluidoFreio = existente.fluido_fluido_freio == 1L; fluidoArla32 = existente.fluido_arla32 == 1L
+                    fluidoCombustivel = existente.fluido_combustivel == 1L
+                    segExtintorValidade = existente.seg_extintor_validade == 1L; segTriangulo = existente.seg_triangulo == 1L
+                    segMacacoChaveRoda = existente.seg_macaco_chave_roda == 1L; segConesFaixa = existente.seg_cones_faixa == 1L
+                    segEpiCompleto = existente.seg_epi_completo == 1L
+                    carrLonasCordas = existente.carr_lonas_cordas == 1L; carrPortasBau = existente.carr_portas_bau == 1L
+                    carrAssoalhoEstado = existente.carr_assoalho_estado == 1L; carrTravasLacres = existente.carr_travas_lacres == 1L
+                    cabBancosCintos = existente.cab_bancos_cintos == 1L; cabEspelhosRetrovisores = existente.cab_espelhos_retrovisores == 1L
+                    cabLimpadorParabrisa = existente.cab_limpador_parabrisa == 1L; cabArCondicionado = existente.cab_ar_condicionado == 1L
+                    cabFreioEstacionamento = existente.cab_freio_estacionamento == 1L
+                    observacoes = existente.observacoes ?: ""
+                }
+            }
+        } catch (_: Exception) {
+            semViagem = true
+        }
+        carregando = false
+    }
+
     val itensOk = listOf(docCnhValida, docCrlvVeiculo, docAnttValida, docSeguroCarga, docOrdemColeta,
         eletFarolDianteiro, eletFarolTraseiro, eletLuzFreio, eletSetaDireita, eletSetaEsquerda, eletLuzRe, eletPainelFuncionando,
         pneuCalibragemOk, pneuEstadoConservacao, pneuEstepeOk, pneuFerramentasTroca,
@@ -93,7 +128,7 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
         cabBancosCintos = valor; cabEspelhosRetrovisores = valor; cabLimpadorParabrisa = valor; cabArCondicionado = valor; cabFreioEstacionamento = valor
     }
 
-    fun salvar() { if (viagemAtual == null) return; val d = converterDataParaAPI(dataAtualFormatada()); scope.launch {
+    fun salvar() { if (viagemAtual == null || jaEnviado) return; val d = converterDataParaAPI(dataAtualFormatada()); scope.launch {
         salvando = true; try { repository.salvarChecklistPre(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id, d, "",
             docCnhValida, docCrlvVeiculo, docAnttValida, docSeguroCarga, docOrdemColeta,
             eletFarolDianteiro, eletFarolTraseiro, eletLuzFreio, eletSetaDireita, eletSetaEsquerda, eletLuzRe, eletPainelFuncionando,
@@ -126,7 +161,9 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
         else { Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp)) {
             ProgressCard(itensOk, 35)
             Spacer(Modifier.height(8.dp))
-            run {
+            if (jaEnviado) {
+                BadgeJaEnviado(dataEnvio, AppColors.Secondary)
+            } else run {
                 val todosOk = itensOk == 35
                 OutlinedButton(
                     onClick = { marcarTodos(!todosOk) },
@@ -142,36 +179,36 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
             }
             Spacer(Modifier.height(12.dp))
             SecaoChecklist("Documentação", Icons.Default.Description) {
-                CheckItem("CNH válida", docCnhValida) { docCnhValida = it }; CheckItem("CRLV do veículo", docCrlvVeiculo) { docCrlvVeiculo = it }
-                CheckItem("ANTT válida", docAnttValida) { docAnttValida = it }; CheckItem("Seguro de carga", docSeguroCarga) { docSeguroCarga = it }
-                CheckItem("Ordem de coleta", docOrdemColeta) { docOrdemColeta = it } }
+                CheckItem("CNH válida", docCnhValida, readOnly = jaEnviado) { docCnhValida = it }; CheckItem("CRLV do veículo", docCrlvVeiculo, readOnly = jaEnviado) { docCrlvVeiculo = it }
+                CheckItem("ANTT válida", docAnttValida, readOnly = jaEnviado) { docAnttValida = it }; CheckItem("Seguro de carga", docSeguroCarga, readOnly = jaEnviado) { docSeguroCarga = it }
+                CheckItem("Ordem de coleta", docOrdemColeta, readOnly = jaEnviado) { docOrdemColeta = it } }
             SecaoChecklist("Parte Elétrica", Icons.Default.FlashOn) {
-                CheckItem("Farol dianteiro", eletFarolDianteiro) { eletFarolDianteiro = it }; CheckItem("Farol traseiro", eletFarolTraseiro) { eletFarolTraseiro = it }
-                CheckItem("Luz de freio", eletLuzFreio) { eletLuzFreio = it }; CheckItem("Seta direita", eletSetaDireita) { eletSetaDireita = it }
-                CheckItem("Seta esquerda", eletSetaEsquerda) { eletSetaEsquerda = it }; CheckItem("Luz de ré", eletLuzRe) { eletLuzRe = it }
-                CheckItem("Painel funcionando", eletPainelFuncionando) { eletPainelFuncionando = it } }
+                CheckItem("Farol dianteiro", eletFarolDianteiro, readOnly = jaEnviado) { eletFarolDianteiro = it }; CheckItem("Farol traseiro", eletFarolTraseiro, readOnly = jaEnviado) { eletFarolTraseiro = it }
+                CheckItem("Luz de freio", eletLuzFreio, readOnly = jaEnviado) { eletLuzFreio = it }; CheckItem("Seta direita", eletSetaDireita, readOnly = jaEnviado) { eletSetaDireita = it }
+                CheckItem("Seta esquerda", eletSetaEsquerda, readOnly = jaEnviado) { eletSetaEsquerda = it }; CheckItem("Luz de ré", eletLuzRe, readOnly = jaEnviado) { eletLuzRe = it }
+                CheckItem("Painel funcionando", eletPainelFuncionando, readOnly = jaEnviado) { eletPainelFuncionando = it } }
             SecaoChecklist("Pneus e Rodas", Icons.Default.TireRepair) {
-                CheckItem("Calibragem OK", pneuCalibragemOk) { pneuCalibragemOk = it }; CheckItem("Estado conservação", pneuEstadoConservacao) { pneuEstadoConservacao = it }
-                CheckItem("Estepe OK", pneuEstepeOk) { pneuEstepeOk = it }; CheckItem("Ferramentas troca", pneuFerramentasTroca) { pneuFerramentasTroca = it } }
+                CheckItem("Calibragem OK", pneuCalibragemOk, readOnly = jaEnviado) { pneuCalibragemOk = it }; CheckItem("Estado conservação", pneuEstadoConservacao, readOnly = jaEnviado) { pneuEstadoConservacao = it }
+                CheckItem("Estepe OK", pneuEstepeOk, readOnly = jaEnviado) { pneuEstepeOk = it }; CheckItem("Ferramentas troca", pneuFerramentasTroca, readOnly = jaEnviado) { pneuFerramentasTroca = it } }
             SecaoChecklist("Fluidos e Níveis", Icons.Default.WaterDrop) {
-                CheckItem("Óleo motor", fluidoOleoMotor) { fluidoOleoMotor = it }; CheckItem("Água radiador", fluidoAguaRadiador) { fluidoAguaRadiador = it }
-                CheckItem("Fluido freio", fluidoFluidoFreio) { fluidoFluidoFreio = it }; CheckItem("ARLA 32", fluidoArla32) { fluidoArla32 = it }
-                CheckItem("Combustível", fluidoCombustivel) { fluidoCombustivel = it } }
+                CheckItem("Óleo motor", fluidoOleoMotor, readOnly = jaEnviado) { fluidoOleoMotor = it }; CheckItem("Água radiador", fluidoAguaRadiador, readOnly = jaEnviado) { fluidoAguaRadiador = it }
+                CheckItem("Fluido freio", fluidoFluidoFreio, readOnly = jaEnviado) { fluidoFluidoFreio = it }; CheckItem("ARLA 32", fluidoArla32, readOnly = jaEnviado) { fluidoArla32 = it }
+                CheckItem("Combustível", fluidoCombustivel, readOnly = jaEnviado) { fluidoCombustivel = it } }
             SecaoChecklist("Segurança", Icons.Default.Shield) {
-                CheckItem("Extintor (validade)", segExtintorValidade) { segExtintorValidade = it }; CheckItem("Triângulo", segTriangulo) { segTriangulo = it }
-                CheckItem("Macaco/chave roda", segMacacoChaveRoda) { segMacacoChaveRoda = it }; CheckItem("Cones/faixa", segConesFaixa) { segConesFaixa = it }
-                CheckItem("EPI completo", segEpiCompleto) { segEpiCompleto = it } }
+                CheckItem("Extintor (validade)", segExtintorValidade, readOnly = jaEnviado) { segExtintorValidade = it }; CheckItem("Triângulo", segTriangulo, readOnly = jaEnviado) { segTriangulo = it }
+                CheckItem("Macaco/chave roda", segMacacoChaveRoda, readOnly = jaEnviado) { segMacacoChaveRoda = it }; CheckItem("Cones/faixa", segConesFaixa, readOnly = jaEnviado) { segConesFaixa = it }
+                CheckItem("EPI completo", segEpiCompleto, readOnly = jaEnviado) { segEpiCompleto = it } }
             SecaoChecklist("Carroceria / Baú", Icons.Default.Inventory) {
-                CheckItem("Lonas e cordas", carrLonasCordas) { carrLonasCordas = it }; CheckItem("Portas baú", carrPortasBau) { carrPortasBau = it }
-                CheckItem("Assoalho", carrAssoalhoEstado) { carrAssoalhoEstado = it }; CheckItem("Travas/lacres", carrTravasLacres) { carrTravasLacres = it } }
+                CheckItem("Lonas e cordas", carrLonasCordas, readOnly = jaEnviado) { carrLonasCordas = it }; CheckItem("Portas baú", carrPortasBau, readOnly = jaEnviado) { carrPortasBau = it }
+                CheckItem("Assoalho", carrAssoalhoEstado, readOnly = jaEnviado) { carrAssoalhoEstado = it }; CheckItem("Travas/lacres", carrTravasLacres, readOnly = jaEnviado) { carrTravasLacres = it } }
             SecaoChecklist("Cabine", Icons.Default.AirlineSeatReclineNormal) {
-                CheckItem("Bancos/cintos", cabBancosCintos) { cabBancosCintos = it }; CheckItem("Retrovisores", cabEspelhosRetrovisores) { cabEspelhosRetrovisores = it }
-                CheckItem("Limpador parabrisa", cabLimpadorParabrisa) { cabLimpadorParabrisa = it }; CheckItem("Ar condicionado", cabArCondicionado) { cabArCondicionado = it }
-                CheckItem("Freio estacionamento", cabFreioEstacionamento) { cabFreioEstacionamento = it } }
+                CheckItem("Bancos/cintos", cabBancosCintos, readOnly = jaEnviado) { cabBancosCintos = it }; CheckItem("Retrovisores", cabEspelhosRetrovisores, readOnly = jaEnviado) { cabEspelhosRetrovisores = it }
+                CheckItem("Limpador parabrisa", cabLimpadorParabrisa, readOnly = jaEnviado) { cabLimpadorParabrisa = it }; CheckItem("Ar condicionado", cabArCondicionado, readOnly = jaEnviado) { cabArCondicionado = it }
+                CheckItem("Freio estacionamento", cabFreioEstacionamento, readOnly = jaEnviado) { cabFreioEstacionamento = it } }
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(observacoes, { observacoes = it }, label = { Text("Observações (opcional)") }, modifier = Modifier.fillMaxWidth(), minLines = 3, colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(observacoes, { observacoes = it }, readOnly = jaEnviado, label = { Text("Observações (opcional)") }, modifier = Modifier.fillMaxWidth(), minLines = 3, colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp))
             Spacer(Modifier.height(20.dp))
-            BotaoSalvar("Salvar Checklist Pré-Viagem", salvando) { salvar() }
+            if (!jaEnviado) BotaoSalvar("Salvar Checklist Pré-Viagem", salvando) { salvar() }
             Spacer(Modifier.height(32.dp))
         } }
     }
@@ -188,15 +225,9 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
     var semViagem by remember { mutableStateOf(false) }
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(Unit) {
-        try {
-            viagemAtual = repository.getViagemAtual(); semViagem = viagemAtual == null
-        } catch (_: Exception) {
-            semViagem = true
-        }
-        carregando = false
-    }
+    // Checklist já enviado nessa viagem — trava a tela em somente-leitura.
+    var jaEnviado by remember { mutableStateOf(false) }
+    var dataEnvio by remember { mutableStateOf("") }
 
     var avariaCarroceria by remember { mutableStateOf(false) }; var avariaCabine by remember { mutableStateOf(false) }
     var avariaPneus by remember { mutableStateOf(false) }; var avariaEspelhos by remember { mutableStateOf(false) }
@@ -212,6 +243,41 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
     var pendAbastecimentoNecessario by remember { mutableStateOf(false) }; var pendTrocaOleoProxima by remember { mutableStateOf(false) }
     var pendKmAtual by remember { mutableStateOf("") }; var observacoes by remember { mutableStateOf("") }
 
+    LaunchedEffect(Unit) {
+        try {
+            val v = repository.getViagemAtual()
+            viagemAtual = v
+            if (v == null) {
+                semViagem = true
+            } else {
+                val existente = repository.getChecklistPosPorViagem(v.viagem_id)
+                if (existente != null) {
+                    jaEnviado = true
+                    dataEnvio = existente.data_checklist
+                    avariaCarroceria = existente.avaria_carroceria == 1L; avariaCabine = existente.avaria_cabine == 1L
+                    avariaPneus = existente.avaria_pneus == 1L; avariaEspelhos = existente.avaria_espelhos == 1L
+                    avariaFarois = existente.avaria_farois == 1L; avariaDescricao = existente.avaria_descricao ?: ""
+                    posNivelOleo = existente.pos_nivel_oleo == 1L; posNivelAgua = existente.pos_nivel_agua == 1L
+                    posNivelCombustivel = existente.pos_nivel_combustivel == 1L; posNivelArla = existente.pos_nivel_arla == 1L
+                    limpCabineLimpa = existente.limp_cabine_limpa == 1L; limpCarroceriaLimpa = existente.limp_carroceria_limpa == 1L
+                    limpBauVazio = existente.limp_bau_vazio == 1L
+                    funcFreiosOk = existente.func_freios_ok == 1L; funcDirecaoOk = existente.func_direcao_ok == 1L
+                    funcSuspensaoOk = existente.func_suspensao_ok == 1L; funcMotorRuido = existente.func_motor_ruido == 1L
+                    funcCambioOk = existente.func_cambio_ok == 1L
+                    pendManutencaoUrgente = existente.pend_manutencao_urgente == 1L
+                    pendDescricaoManutencao = existente.pend_descricao_manutencao ?: ""
+                    pendAbastecimentoNecessario = existente.pend_abastecimento_necessario == 1L
+                    pendTrocaOleoProxima = existente.pend_troca_oleo_proxima == 1L
+                    pendKmAtual = existente.pend_km_atual?.let { formatarKmExibicao(it.toDoubleOrNull() ?: 0.0) } ?: ""
+                    observacoes = existente.observacoes ?: ""
+                }
+            }
+        } catch (_: Exception) {
+            semViagem = true
+        }
+        carregando = false
+    }
+
     // Botão "Marcar/Desmarcar Itens OK" — Android já tinha, iOS não. Só marca
     // os itens "positivos" (Níveis+Limpeza+Funcionamento); avarias e
     // pendências são flags de problema, não entram no marcar-tudo.
@@ -226,7 +292,7 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
         funcFreiosOk = valor; funcDirecaoOk = valor; funcSuspensaoOk = valor; funcMotorRuido = valor; funcCambioOk = valor
     }
 
-    fun salvar() { if (viagemAtual == null) return; val d = converterDataParaAPI(dataAtualFormatada()); val pendKmAtualNormalizado = if (pendKmAtual.isNotBlank()) normalizarKmParaEnvio(pendKmAtual) else null; scope.launch {
+    fun salvar() { if (viagemAtual == null || jaEnviado) return; val d = converterDataParaAPI(dataAtualFormatada()); val pendKmAtualNormalizado = if (pendKmAtual.isNotBlank()) normalizarKmParaEnvio(pendKmAtual) else null; scope.launch {
         salvando = true; try { repository.salvarChecklistPos(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id, d, "",
             avariaCarroceria, avariaCabine, avariaPneus, avariaEspelhos, avariaFarois, avariaDescricao.ifEmpty { null },
             posNivelOleo, posNivelAgua, posNivelCombustivel, posNivelArla,
@@ -253,7 +319,9 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
         if (carregando) { Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = AppColors.Primary) } }
         else if (semViagem) { SemViagemCard(onVoltar, padding) }
         else { Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp)) {
-            run {
+            if (jaEnviado) {
+                BadgeJaEnviado(dataEnvio, Color(0xFF10B981))
+            } else run {
                 val todosPositivosOk = itensPositivosOk == 12
                 OutlinedButton(
                     onClick = { marcarItensOk(!todosPositivosOk) },
@@ -270,31 +338,31 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
             }
             Spacer(Modifier.height(12.dp))
             SecaoChecklist("Avarias e Danos", Icons.Default.ReportProblem) {
-                CheckItem("Carroceria", avariaCarroceria) { avariaCarroceria = it }; CheckItem("Cabine", avariaCabine) { avariaCabine = it }
-                CheckItem("Pneus", avariaPneus) { avariaPneus = it }; CheckItem("Espelhos", avariaEspelhos) { avariaEspelhos = it }
-                CheckItem("Faróis", avariaFarois) { avariaFarois = it }
-                if (avariaCarroceria||avariaCabine||avariaPneus||avariaEspelhos||avariaFarois) OutlinedTextField(avariaDescricao, { avariaDescricao = it }, label = { Text("Descreva avarias") }, modifier = Modifier.fillMaxWidth().padding(top=8.dp), minLines=2, colors = ui.darkTextFieldColors(), shape=RoundedCornerShape(8.dp)) }
+                CheckItem("Carroceria", avariaCarroceria, readOnly = jaEnviado) { avariaCarroceria = it }; CheckItem("Cabine", avariaCabine, readOnly = jaEnviado) { avariaCabine = it }
+                CheckItem("Pneus", avariaPneus, readOnly = jaEnviado) { avariaPneus = it }; CheckItem("Espelhos", avariaEspelhos, readOnly = jaEnviado) { avariaEspelhos = it }
+                CheckItem("Faróis", avariaFarois, readOnly = jaEnviado) { avariaFarois = it }
+                if (avariaCarroceria||avariaCabine||avariaPneus||avariaEspelhos||avariaFarois) OutlinedTextField(avariaDescricao, { avariaDescricao = it }, readOnly = jaEnviado, label = { Text("Descreva avarias") }, modifier = Modifier.fillMaxWidth().padding(top=8.dp), minLines=2, colors = ui.darkTextFieldColors(), shape=RoundedCornerShape(8.dp)) }
             SecaoChecklist("Níveis e Fluidos", Icons.Default.WaterDrop) {
-                CheckItem("Óleo OK", posNivelOleo) { posNivelOleo = it }; CheckItem("Água OK", posNivelAgua) { posNivelAgua = it }
-                CheckItem("Combustível OK", posNivelCombustivel) { posNivelCombustivel = it }; CheckItem("ARLA OK", posNivelArla) { posNivelArla = it } }
+                CheckItem("Óleo OK", posNivelOleo, readOnly = jaEnviado) { posNivelOleo = it }; CheckItem("Água OK", posNivelAgua, readOnly = jaEnviado) { posNivelAgua = it }
+                CheckItem("Combustível OK", posNivelCombustivel, readOnly = jaEnviado) { posNivelCombustivel = it }; CheckItem("ARLA OK", posNivelArla, readOnly = jaEnviado) { posNivelArla = it } }
             SecaoChecklist("Limpeza", Icons.Default.CleaningServices) {
-                CheckItem("Cabine limpa", limpCabineLimpa) { limpCabineLimpa = it }; CheckItem("Carroceria limpa", limpCarroceriaLimpa) { limpCarroceriaLimpa = it }
-                CheckItem("Baú vazio", limpBauVazio) { limpBauVazio = it } }
+                CheckItem("Cabine limpa", limpCabineLimpa, readOnly = jaEnviado) { limpCabineLimpa = it }; CheckItem("Carroceria limpa", limpCarroceriaLimpa, readOnly = jaEnviado) { limpCarroceriaLimpa = it }
+                CheckItem("Baú vazio", limpBauVazio, readOnly = jaEnviado) { limpBauVazio = it } }
             SecaoChecklist("Funcionamento", Icons.Default.Settings) {
-                CheckItem("Freios OK", funcFreiosOk) { funcFreiosOk = it }; CheckItem("Direção OK", funcDirecaoOk) { funcDirecaoOk = it }
-                CheckItem("Suspensão OK", funcSuspensaoOk) { funcSuspensaoOk = it }; CheckItem("Motor sem ruído", funcMotorRuido) { funcMotorRuido = it }
-                CheckItem("Câmbio OK", funcCambioOk) { funcCambioOk = it } }
+                CheckItem("Freios OK", funcFreiosOk, readOnly = jaEnviado) { funcFreiosOk = it }; CheckItem("Direção OK", funcDirecaoOk, readOnly = jaEnviado) { funcDirecaoOk = it }
+                CheckItem("Suspensão OK", funcSuspensaoOk, readOnly = jaEnviado) { funcSuspensaoOk = it }; CheckItem("Motor sem ruído", funcMotorRuido, readOnly = jaEnviado) { funcMotorRuido = it }
+                CheckItem("Câmbio OK", funcCambioOk, readOnly = jaEnviado) { funcCambioOk = it } }
             SecaoChecklist("Pendências", Icons.Default.PendingActions) {
-                CheckItem("Manutenção urgente", pendManutencaoUrgente) { pendManutencaoUrgente = it }
-                if (pendManutencaoUrgente) OutlinedTextField(pendDescricaoManutencao, { pendDescricaoManutencao = it }, label={Text("Descreva")}, modifier=Modifier.fillMaxWidth().padding(top=8.dp), minLines=2, colors = ui.darkTextFieldColors(), shape=RoundedCornerShape(8.dp))
-                CheckItem("Abastecimento necessário", pendAbastecimentoNecessario) { pendAbastecimentoNecessario = it }
-                CheckItem("Troca óleo próxima", pendTrocaOleoProxima) { pendTrocaOleoProxima = it }
-                OutlinedTextField(pendKmAtual, { pendKmAtual = formatarKmInput(it) }, label={Text("KM atual")}, placeholder={Text("Ex.: 350000.5")}, modifier=Modifier.fillMaxWidth().padding(top=8.dp), shape=RoundedCornerShape(8.dp))
+                CheckItem("Manutenção urgente", pendManutencaoUrgente, readOnly = jaEnviado) { pendManutencaoUrgente = it }
+                if (pendManutencaoUrgente) OutlinedTextField(pendDescricaoManutencao, { pendDescricaoManutencao = it }, readOnly = jaEnviado, label={Text("Descreva")}, modifier=Modifier.fillMaxWidth().padding(top=8.dp), minLines=2, colors = ui.darkTextFieldColors(), shape=RoundedCornerShape(8.dp))
+                CheckItem("Abastecimento necessário", pendAbastecimentoNecessario, readOnly = jaEnviado) { pendAbastecimentoNecessario = it }
+                CheckItem("Troca óleo próxima", pendTrocaOleoProxima, readOnly = jaEnviado) { pendTrocaOleoProxima = it }
+                OutlinedTextField(pendKmAtual, { pendKmAtual = formatarKmInput(it) }, readOnly = jaEnviado, label={Text("KM atual")}, placeholder={Text("Ex.: 350000.5")}, modifier=Modifier.fillMaxWidth().padding(top=8.dp), shape=RoundedCornerShape(8.dp))
                 Text("Digite como aparece no painel. Ex.: 350000.5", fontSize = 12.sp, color = AppColors.Primary, modifier = Modifier.padding(start = 4.dp, top = 2.dp)) }
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(observacoes, { observacoes = it }, label = { Text("Observações (opcional)") }, modifier = Modifier.fillMaxWidth(), minLines = 3, colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(observacoes, { observacoes = it }, readOnly = jaEnviado, label = { Text("Observações (opcional)") }, modifier = Modifier.fillMaxWidth(), minLines = 3, colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp))
             Spacer(Modifier.height(20.dp))
-            BotaoSalvar("Salvar Checklist Pós-Viagem", salvando) { salvar() }
+            if (!jaEnviado) BotaoSalvar("Salvar Checklist Pós-Viagem", salvando) { salvar() }
             Spacer(Modifier.height(32.dp))
         } }
     }
@@ -307,11 +375,20 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
             Row(verticalAlignment=Alignment.CenterVertically) { Icon(icon, null, tint=AppColors.Primary, modifier=Modifier.size(24.dp)); Spacer(Modifier.width(8.dp)); Text(titulo, fontWeight=FontWeight.Bold, fontSize=16.sp) }
             Spacer(Modifier.height(12.dp)); content() } } }
 
-@Composable private fun CheckItem(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable{onChange(!checked)}.padding(vertical=6.dp), verticalAlignment=Alignment.CenterVertically) {
+@Composable private fun CheckItem(label: String, checked: Boolean, readOnly: Boolean = false, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().let { if (readOnly) it else it.clickable{onChange(!checked)} }.padding(vertical=6.dp), verticalAlignment=Alignment.CenterVertically) {
         Box(Modifier.size(28.dp).clip(CircleShape).background(if(checked) AppColors.Success else Color(0xFFE0E0E0)).border(2.dp, if(checked) AppColors.Success else Color(0xFFBDBDBD), CircleShape), contentAlignment=Alignment.Center) {
             if (checked) Icon(Icons.Default.Check, null, tint=Color.White, modifier=Modifier.size(18.dp)) }
         Spacer(Modifier.width(12.dp)); Text(label, fontSize=15.sp, color=if(checked) AppColors.TextPrimary else AppColors.TextSecondary) } }
+
+private fun formatarDataChecklist(data: String): String {
+    return try {
+        val partes = data.split("-")
+        if (partes.size == 3) "${partes[2]}/${partes[1]}/${partes[0]}" else data
+    } catch (e: Exception) {
+        data
+    }
+}
 
 @Composable private fun ProgressCard(ok: Int, total: Int) {
     Card(Modifier.fillMaxWidth(), colors=CardDefaults.cardColors(containerColor=AppColors.CardBackground), shape=RoundedCornerShape(12.dp)) {
@@ -329,3 +406,14 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
 @Composable private fun BotaoSalvar(text: String, salvando: Boolean, onClick: () -> Unit) {
     Button(onClick=onClick, enabled=!salvando, modifier=Modifier.fillMaxWidth().height(56.dp), shape=RoundedCornerShape(12.dp), colors=ButtonDefaults.buttonColors(containerColor=AppColors.Primary)) {
         if (salvando) CircularProgressIndicator(Modifier.size(24.dp), color=Color.White, strokeWidth=2.dp) else Text(text, fontWeight=FontWeight.Bold, fontSize=16.sp) } }
+
+@Composable private fun BadgeJaEnviado(dataEnvio: String, cor: Color) {
+    Row(
+        Modifier.fillMaxWidth().background(cor.copy(alpha = 0.12f), RoundedCornerShape(8.dp)).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Default.Lock, null, tint = cor, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("Checklist já enviado em ${formatarDataChecklist(dataEnvio)} — somente leitura", fontSize = 12.sp, color = cor, fontWeight = FontWeight.Medium)
+    }
+}

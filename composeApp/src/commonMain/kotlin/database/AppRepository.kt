@@ -435,8 +435,14 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
             queries.deleteManutencoesSincronizadas()
             queries.deleteFinalizacoesSincronizadas()
             queries.deleteOutrasDespesasSincronizadas()
-            queries.deleteChecklistsPreSincronizados()
-            queries.deleteChecklistsPosSincronizados()
+            // Checklists Pré/Pós NÃO são apagados aqui de propósito: a tela usa
+            // o registro local (getChecklistPrePorViagem/getChecklistPosPorViagem)
+            // pra saber se o motorista já preencheu o checklist dessa viagem e
+            // travar a tela em somente-leitura. Se apagássemos assim que
+            // sincronizasse (o normal, já que sync roda com frequência durante
+            // a viagem), a trava "some" no meio da viagem e dá pra preencher de
+            // novo. O registro é limpo de qualquer forma quando a viagem em si é
+            // excluída localmente (excluirViagemLocalComDependentes).
         }
     }
 

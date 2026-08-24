@@ -27,6 +27,7 @@ import ui.GradientTopBar
 import util.dataAtualFormatada
 import util.converterDataParaAPI
 import util.formatarKmInput
+import util.formatarKmExibicao
 import util.normalizarKmParaEnvio
 import util.mensagemErroAmigavel
 
@@ -47,23 +48,17 @@ actual fun ChecklistPosViagemScreen(
     var semViagemAberta by remember { mutableStateOf(false) }
     var secaoExpandida by remember { mutableStateOf(0) }
 
+    // Checklist já enviado nessa viagem — trava a tela em somente-leitura pra
+    // não deixar refazer/sobrescrever o que já foi registrado.
+    var jaEnviado by remember { mutableStateOf(false) }
+    var dataEnvio by remember { mutableStateOf("") }
+
     // Mensagens de erro/sucesso (dialog modal)
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     fun mostrarMensagem(mensagem: String, erro: Boolean = false) {
         if (erro) erroMsg = mensagem else sucessoMsg = mensagem
-    }
-
-    LaunchedEffect(Unit) {
-        carregando = true
-        try {
-            viagemAtual = repository.getViagemAtual()
-            if (viagemAtual == null) semViagemAberta = true
-        } catch (_: Exception) {
-            semViagemAberta = true
-        }
-        carregando = false
     }
 
     // === AVARIAS E DANOS (marcado = TEM avaria) ===
@@ -101,6 +96,42 @@ actual fun ChecklistPosViagemScreen(
 
     var observacoes by rememberSaveable { mutableStateOf("") }
 
+    LaunchedEffect(Unit) {
+        carregando = true
+        try {
+            val v = repository.getViagemAtual()
+            viagemAtual = v
+            if (v == null) {
+                semViagemAberta = true
+            } else {
+                val existente = repository.getChecklistPosPorViagem(v.viagem_id)
+                if (existente != null) {
+                    jaEnviado = true
+                    dataEnvio = existente.data_checklist
+                    avariaCarroceria = existente.avaria_carroceria == 1L; avariaCabine = existente.avaria_cabine == 1L
+                    avariaPneus = existente.avaria_pneus == 1L; avariaEspelhos = existente.avaria_espelhos == 1L
+                    avariaFarois = existente.avaria_farois == 1L; avariaDescricao = existente.avaria_descricao ?: ""
+                    posNivelOleo = existente.pos_nivel_oleo == 1L; posNivelAgua = existente.pos_nivel_agua == 1L
+                    posNivelCombustivel = existente.pos_nivel_combustivel == 1L; posNivelArla = existente.pos_nivel_arla == 1L
+                    limpCabineLimpa = existente.limp_cabine_limpa == 1L; limpCarroceriaLimpa = existente.limp_carroceria_limpa == 1L
+                    limpBauVazio = existente.limp_bau_vazio == 1L
+                    funcFreiosOk = existente.func_freios_ok == 1L; funcDirecaoOk = existente.func_direcao_ok == 1L
+                    funcSuspensaoOk = existente.func_suspensao_ok == 1L; funcMotorRuido = existente.func_motor_ruido == 1L
+                    funcCambioOk = existente.func_cambio_ok == 1L
+                    pendManutencaoUrgente = existente.pend_manutencao_urgente == 1L
+                    pendDescricaoManutencao = existente.pend_descricao_manutencao ?: ""
+                    pendAbastecimentoNecessario = existente.pend_abastecimento_necessario == 1L
+                    pendTrocaOleoProxima = existente.pend_troca_oleo_proxima == 1L
+                    pendKmAtual = existente.pend_km_atual?.let { formatarKmExibicao(it.toDoubleOrNull() ?: 0.0) } ?: ""
+                    observacoes = existente.observacoes ?: ""
+                }
+            }
+        } catch (_: Exception) {
+            semViagemAberta = true
+        }
+        carregando = false
+    }
+
     // ★ Marcar / Desmarcar todos os itens positivos (Níveis + Limpeza + Funcionamento)
     // Avarias e Pendências NÃO são marcados automaticamente (são flags de problema)
     fun marcarItensOk(valor: Boolean) {
@@ -109,7 +140,12 @@ actual fun ChecklistPosViagemScreen(
         funcFreiosOk = valor; funcDirecaoOk = valor; funcSuspensaoOk = valor; funcMotorRuido = valor; funcCambioOk = valor
     }
 
-    val totalItens = 21
+    // 12 = só os itens "positivos" (Níveis+Limpeza+Funcionamento) — avarias e
+    // pendências são flags de problema, não entram nessa contagem (mesmo
+    // critério já usado por marcarItensOk/todosPositivosOk mais abaixo).
+    // Antes esse total dizia "21" sem bater com nada real: a barra de
+    // progresso nunca alcançava 100% mesmo com tudo marcado.
+    val totalItens = 12
     val itensMarcados = listOf(
         posNivelOleo, posNivelAgua, posNivelCombustivel, posNivelArla,
         limpCabineLimpa, limpCarroceriaLimpa, limpBauVazio,
@@ -118,7 +154,7 @@ actual fun ChecklistPosViagemScreen(
     val totalAlertas = listOf(avariaCarroceria, avariaCabine, avariaPneus, avariaEspelhos, avariaFarois, pendManutencaoUrgente, pendAbastecimentoNecessario, pendTrocaOleoProxima).count { it }
 
     fun salvarChecklist() {
-        if (viagemAtual == null) return
+        if (viagemAtual == null || jaEnviado) return
         val dataApi = converterDataParaAPI(dataAtualFormatada())
         val pendKmAtualNormalizado = if (pendKmAtual.isNotBlank()) normalizarKmParaEnvio(pendKmAtual) else null
 
@@ -231,39 +267,50 @@ actual fun ChecklistPosViagemScreen(
 
                         Spacer(Modifier.height(12.dp))
 
-                        // ★ Botão Marcar/Desmarcar Itens OK
-                        val todosPositivosOk = itensMarcados == 12
-                        OutlinedButton(
-                            onClick = { marcarItensOk(!todosPositivosOk) },
-                            modifier = Modifier.fillMaxWidth().height(40.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = if (todosPositivosOk) AppColors.Error else Color(0xFF10B981)
-                            ),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (todosPositivosOk) AppColors.Error.copy(alpha = 0.5f) else Color(0xFF10B981).copy(alpha = 0.5f)
-                            )
-                        ) {
-                            Icon(
-                                if (todosPositivosOk) Icons.Default.RemoveDone else Icons.Default.DoneAll,
-                                null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
+                        if (jaEnviado) {
+                            Row(
+                                Modifier.fillMaxWidth().background(Color(0xFF10B981).copy(alpha = 0.12f), RoundedCornerShape(8.dp)).padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Lock, null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Checklist já enviado em ${formatarData(dataEnvio)} — somente leitura", fontSize = 12.sp, color = Color(0xFF10B981), fontWeight = FontWeight.Medium)
+                            }
+                        } else {
+                            // ★ Botão Marcar/Desmarcar Itens OK
+                            val todosPositivosOk = itensMarcados == 12
+                            OutlinedButton(
+                                onClick = { marcarItensOk(!todosPositivosOk) },
+                                modifier = Modifier.fillMaxWidth().height(40.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = if (todosPositivosOk) AppColors.Error else Color(0xFF10B981)
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (todosPositivosOk) AppColors.Error.copy(alpha = 0.5f) else Color(0xFF10B981).copy(alpha = 0.5f)
+                                )
+                            ) {
+                                Icon(
+                                    if (todosPositivosOk) Icons.Default.RemoveDone else Icons.Default.DoneAll,
+                                    null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    if (todosPositivosOk) "Desmarcar Itens OK" else "Marcar Itens OK",
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 13.sp
+                                )
+                            }
+
                             Text(
-                                if (todosPositivosOk) "Desmarcar Itens OK" else "Marcar Itens OK",
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 13.sp
+                                "Avarias e pendências devem ser marcadas individualmente",
+                                fontSize = 10.sp,
+                                color = AppColors.TextSecondary,
+                                modifier = Modifier.padding(top = 4.dp)
                             )
                         }
-
-                        Text(
-                            "Avarias e pendências devem ser marcadas individualmente",
-                            fontSize = 10.sp,
-                            color = AppColors.TextSecondary,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
                     }
                 }
 
@@ -273,54 +320,54 @@ actual fun ChecklistPosViagemScreen(
                 ChecklistSecao(titulo = "Avarias e Danos", icone = Icons.Default.ReportProblem, cor = Color(0xFFD32F2F), expandida = secaoExpandida == 0, onClick = { secaoExpandida = if (secaoExpandida == 0) -1 else 0 }, marcados = listOf(avariaCarroceria, avariaCabine, avariaPneus, avariaEspelhos, avariaFarois).count { it }, total = 5) {
                     Text("Marque os itens que apresentam avaria:", fontSize = 12.sp, color = AppColors.Error, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(4.dp))
-                    ChecklistItem("Avaria na carroceria", avariaCarroceria) { avariaCarroceria = it }
-                    ChecklistItem("Avaria na cabine", avariaCabine) { avariaCabine = it }
-                    ChecklistItem("Avaria nos pneus", avariaPneus) { avariaPneus = it }
-                    ChecklistItem("Avaria nos espelhos", avariaEspelhos) { avariaEspelhos = it }
-                    ChecklistItem("Avaria nos faróis", avariaFarois) { avariaFarois = it }
+                    ChecklistItem("Avaria na carroceria", avariaCarroceria, readOnly = jaEnviado) { avariaCarroceria = it }
+                    ChecklistItem("Avaria na cabine", avariaCabine, readOnly = jaEnviado) { avariaCabine = it }
+                    ChecklistItem("Avaria nos pneus", avariaPneus, readOnly = jaEnviado) { avariaPneus = it }
+                    ChecklistItem("Avaria nos espelhos", avariaEspelhos, readOnly = jaEnviado) { avariaEspelhos = it }
+                    ChecklistItem("Avaria nos faróis", avariaFarois, readOnly = jaEnviado) { avariaFarois = it }
                     if (listOf(avariaCarroceria, avariaCabine, avariaPneus, avariaEspelhos, avariaFarois).any { it }) {
                         Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(value = avariaDescricao, onValueChange = { avariaDescricao = it }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), label = { Text("Descreva as avarias") }, maxLines = 3, colors = ui.darkTextFieldColors())
+                        OutlinedTextField(value = avariaDescricao, onValueChange = { avariaDescricao = it }, readOnly = jaEnviado, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), label = { Text("Descreva as avarias") }, maxLines = 3, colors = ui.darkTextFieldColors())
                     }
                 }
                 Spacer(Modifier.height(8.dp))
 
                 ChecklistSecao(titulo = "Níveis e Fluidos", icone = Icons.Default.WaterDrop, cor = Color(0xFF0097A7), expandida = secaoExpandida == 1, onClick = { secaoExpandida = if (secaoExpandida == 1) -1 else 1 }, marcados = listOf(posNivelOleo, posNivelAgua, posNivelCombustivel, posNivelArla).count { it }, total = 4) {
-                    ChecklistItem("Nível de óleo OK", posNivelOleo) { posNivelOleo = it }
-                    ChecklistItem("Nível de água OK", posNivelAgua) { posNivelAgua = it }
-                    ChecklistItem("Nível de combustível", posNivelCombustivel) { posNivelCombustivel = it }
-                    ChecklistItem("Nível de ARLA 32", posNivelArla) { posNivelArla = it }
+                    ChecklistItem("Nível de óleo OK", posNivelOleo, readOnly = jaEnviado) { posNivelOleo = it }
+                    ChecklistItem("Nível de água OK", posNivelAgua, readOnly = jaEnviado) { posNivelAgua = it }
+                    ChecklistItem("Nível de combustível", posNivelCombustivel, readOnly = jaEnviado) { posNivelCombustivel = it }
+                    ChecklistItem("Nível de ARLA 32", posNivelArla, readOnly = jaEnviado) { posNivelArla = it }
                 }
                 Spacer(Modifier.height(8.dp))
 
                 ChecklistSecao(titulo = "Limpeza", icone = Icons.Default.CleaningServices, cor = Color(0xFF1565C0), expandida = secaoExpandida == 2, onClick = { secaoExpandida = if (secaoExpandida == 2) -1 else 2 }, marcados = listOf(limpCabineLimpa, limpCarroceriaLimpa, limpBauVazio).count { it }, total = 3) {
-                    ChecklistItem("Cabine limpa e organizada", limpCabineLimpa) { limpCabineLimpa = it }
-                    ChecklistItem("Carroceria limpa", limpCarroceriaLimpa) { limpCarroceriaLimpa = it }
-                    ChecklistItem("Baú vazio e limpo", limpBauVazio) { limpBauVazio = it }
+                    ChecklistItem("Cabine limpa e organizada", limpCabineLimpa, readOnly = jaEnviado) { limpCabineLimpa = it }
+                    ChecklistItem("Carroceria limpa", limpCarroceriaLimpa, readOnly = jaEnviado) { limpCarroceriaLimpa = it }
+                    ChecklistItem("Baú vazio e limpo", limpBauVazio, readOnly = jaEnviado) { limpBauVazio = it }
                 }
                 Spacer(Modifier.height(8.dp))
 
                 ChecklistSecao(titulo = "Funcionamento", icone = Icons.Default.Settings, cor = Color(0xFF2E7D32), expandida = secaoExpandida == 3, onClick = { secaoExpandida = if (secaoExpandida == 3) -1 else 3 }, marcados = listOf(funcFreiosOk, funcDirecaoOk, funcSuspensaoOk, funcMotorRuido, funcCambioOk).count { it }, total = 5) {
-                    ChecklistItem("Freios funcionando OK", funcFreiosOk) { funcFreiosOk = it }
-                    ChecklistItem("Direção OK", funcDirecaoOk) { funcDirecaoOk = it }
-                    ChecklistItem("Suspensão OK", funcSuspensaoOk) { funcSuspensaoOk = it }
-                    ChecklistItem("Motor sem ruídos anormais", funcMotorRuido) { funcMotorRuido = it }
-                    ChecklistItem("Câmbio funcionando OK", funcCambioOk) { funcCambioOk = it }
+                    ChecklistItem("Freios funcionando OK", funcFreiosOk, readOnly = jaEnviado) { funcFreiosOk = it }
+                    ChecklistItem("Direção OK", funcDirecaoOk, readOnly = jaEnviado) { funcDirecaoOk = it }
+                    ChecklistItem("Suspensão OK", funcSuspensaoOk, readOnly = jaEnviado) { funcSuspensaoOk = it }
+                    ChecklistItem("Motor sem ruídos anormais", funcMotorRuido, readOnly = jaEnviado) { funcMotorRuido = it }
+                    ChecklistItem("Câmbio funcionando OK", funcCambioOk, readOnly = jaEnviado) { funcCambioOk = it }
                 }
                 Spacer(Modifier.height(8.dp))
 
                 ChecklistSecao(titulo = "Pendências", icone = Icons.Default.PendingActions, cor = Color(0xFFF57F17), expandida = secaoExpandida == 4, onClick = { secaoExpandida = if (secaoExpandida == 4) -1 else 4 }, marcados = listOf(pendManutencaoUrgente, pendAbastecimentoNecessario, pendTrocaOleoProxima).count { it }, total = 3) {
                     Text("Marque as pendências identificadas:", fontSize = 12.sp, color = Color(0xFFF57F17), fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(4.dp))
-                    ChecklistItem("Manutenção urgente necessária", pendManutencaoUrgente) { pendManutencaoUrgente = it }
+                    ChecklistItem("Manutenção urgente necessária", pendManutencaoUrgente, readOnly = jaEnviado) { pendManutencaoUrgente = it }
                     if (pendManutencaoUrgente) {
-                        OutlinedTextField(value = pendDescricaoManutencao, onValueChange = { pendDescricaoManutencao = it }, modifier = Modifier.fillMaxWidth().padding(start = 40.dp), shape = RoundedCornerShape(12.dp), label = { Text("Descreva a manutenção necessária") }, maxLines = 2, colors = ui.darkTextFieldColors())
+                        OutlinedTextField(value = pendDescricaoManutencao, onValueChange = { pendDescricaoManutencao = it }, readOnly = jaEnviado, modifier = Modifier.fillMaxWidth().padding(start = 40.dp), shape = RoundedCornerShape(12.dp), label = { Text("Descreva a manutenção necessária") }, maxLines = 2, colors = ui.darkTextFieldColors())
                         Spacer(Modifier.height(4.dp))
                     }
-                    ChecklistItem("Abastecimento necessário", pendAbastecimentoNecessario) { pendAbastecimentoNecessario = it }
-                    ChecklistItem("Troca de óleo próxima", pendTrocaOleoProxima) { pendTrocaOleoProxima = it }
+                    ChecklistItem("Abastecimento necessário", pendAbastecimentoNecessario, readOnly = jaEnviado) { pendAbastecimentoNecessario = it }
+                    ChecklistItem("Troca de óleo próxima", pendTrocaOleoProxima, readOnly = jaEnviado) { pendTrocaOleoProxima = it }
                     Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(value = pendKmAtual, onValueChange = { pendKmAtual = formatarKmInput(it) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), label = { Text("KM atual do veículo") }, leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFFF57F17)) }, placeholder = { Text("Ex.: 350000.5") }, colors = ui.darkTextFieldColors())
+                    OutlinedTextField(value = pendKmAtual, onValueChange = { pendKmAtual = formatarKmInput(it) }, readOnly = jaEnviado, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), label = { Text("KM atual do veículo") }, leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFFF57F17)) }, placeholder = { Text("Ex.: 350000.5") }, colors = ui.darkTextFieldColors())
                     Text("Digite como aparece no painel. Ex.: 350000.5", fontSize = 12.sp, color = AppColors.Primary, modifier = Modifier.padding(start = 4.dp, top = 2.dp))
                 }
 
@@ -329,17 +376,28 @@ actual fun ChecklistPosViagemScreen(
                     Column(Modifier.padding(16.dp)) {
                         Text("Observações", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(value = observacoes, onValueChange = { observacoes = it }, modifier = Modifier.fillMaxWidth().height(100.dp), shape = RoundedCornerShape(12.dp), placeholder = { Text("Observações adicionais (opcional)", color = Color(0xFF9CA3AF)) }, maxLines = 4, colors = ui.darkTextFieldColors())
+                        OutlinedTextField(value = observacoes, onValueChange = { observacoes = it }, readOnly = jaEnviado, modifier = Modifier.fillMaxWidth().height(100.dp), shape = RoundedCornerShape(12.dp), placeholder = { Text("Observações adicionais (opcional)", color = Color(0xFF9CA3AF)) }, maxLines = 4, colors = ui.darkTextFieldColors())
                     }
                 }
 
                 Spacer(Modifier.height(20.dp))
-                Button(onClick = { salvarChecklist() }, enabled = !salvando, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))) {
-                    if (salvando) { CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp) }
-                    else { Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text("SALVAR CHECKLIST PÓS-VIAGEM", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
+                if (!jaEnviado) {
+                    Button(onClick = { salvarChecklist() }, enabled = !salvando, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))) {
+                        if (salvando) { CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp) }
+                        else { Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text("SALVAR CHECKLIST PÓS-VIAGEM", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
+                    }
                 }
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+}
+
+private fun formatarData(data: String): String {
+    return try {
+        val partes = data.split("-")
+        if (partes.size == 3) "${partes[2]}/${partes[1]}/${partes[0]}" else data
+    } catch (e: Exception) {
+        data
     }
 }

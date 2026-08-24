@@ -48,23 +48,17 @@ actual fun ChecklistPreViagemScreen(
     var semViagemAberta by remember { mutableStateOf(false) }
     var secaoExpandida by remember { mutableStateOf(0) }
 
+    // Checklist já enviado nessa viagem — trava a tela em somente-leitura pra
+    // não deixar refazer/sobrescrever o que já foi registrado.
+    var jaEnviado by remember { mutableStateOf(false) }
+    var dataEnvio by remember { mutableStateOf("") }
+
     // Mensagens de erro/sucesso (dialog modal)
     var erroMsg by remember { mutableStateOf<String?>(null) }
     var sucessoMsg by remember { mutableStateOf<String?>(null) }
 
     fun mostrarMensagem(mensagem: String, erro: Boolean = false) {
         if (erro) erroMsg = mensagem else sucessoMsg = mensagem
-    }
-
-    LaunchedEffect(Unit) {
-        carregando = true
-        try {
-            viagemAtual = repository.getViagemAtual()
-            if (viagemAtual == null) semViagemAberta = true
-        } catch (_: Exception) {
-            semViagemAberta = true
-        }
-        carregando = false
     }
 
     // === DOCUMENTAÇÃO ===
@@ -118,6 +112,47 @@ actual fun ChecklistPreViagemScreen(
 
     var observacoes by rememberSaveable { mutableStateOf("") }
 
+    LaunchedEffect(Unit) {
+        carregando = true
+        try {
+            val v = repository.getViagemAtual()
+            viagemAtual = v
+            if (v == null) {
+                semViagemAberta = true
+            } else {
+                val existente = repository.getChecklistPrePorViagem(v.viagem_id)
+                if (existente != null) {
+                    jaEnviado = true
+                    dataEnvio = existente.data_checklist
+                    docCnhValida = existente.doc_cnh_valida == 1L; docCrlvVeiculo = existente.doc_crlv_veiculo == 1L
+                    docAnttValida = existente.doc_antt_valida == 1L; docSeguroCarga = existente.doc_seguro_carga == 1L
+                    docOrdemColeta = existente.doc_ordem_coleta == 1L
+                    eletFarolDianteiro = existente.elet_farol_dianteiro == 1L; eletFarolTraseiro = existente.elet_farol_traseiro == 1L
+                    eletLuzFreio = existente.elet_luz_freio == 1L; eletSetaDireita = existente.elet_seta_direita == 1L
+                    eletSetaEsquerda = existente.elet_seta_esquerda == 1L; eletLuzRe = existente.elet_luz_re == 1L
+                    eletPainelFuncionando = existente.elet_painel_funcionando == 1L
+                    pneuCalibragemOk = existente.pneu_calibragem_ok == 1L; pneuEstadoConservacao = existente.pneu_estado_conservacao == 1L
+                    pneuEstepeOk = existente.pneu_estepe_ok == 1L; pneuFerramentasTroca = existente.pneu_ferramentas_troca == 1L
+                    fluidoOleoMotor = existente.fluido_oleo_motor == 1L; fluidoAguaRadiador = existente.fluido_agua_radiador == 1L
+                    fluidoFluidoFreio = existente.fluido_fluido_freio == 1L; fluidoArla32 = existente.fluido_arla32 == 1L
+                    fluidoCombustivel = existente.fluido_combustivel == 1L
+                    segExtintorValidade = existente.seg_extintor_validade == 1L; segTriangulo = existente.seg_triangulo == 1L
+                    segMacacoChaveRoda = existente.seg_macaco_chave_roda == 1L; segConesFaixa = existente.seg_cones_faixa == 1L
+                    segEpiCompleto = existente.seg_epi_completo == 1L
+                    carrLonasCordas = existente.carr_lonas_cordas == 1L; carrPortasBau = existente.carr_portas_bau == 1L
+                    carrAssoalhoEstado = existente.carr_assoalho_estado == 1L; carrTravasLacres = existente.carr_travas_lacres == 1L
+                    cabBancosCintos = existente.cab_bancos_cintos == 1L; cabEspelhosRetrovisores = existente.cab_espelhos_retrovisores == 1L
+                    cabLimpadorParabrisa = existente.cab_limpador_parabrisa == 1L; cabArCondicionado = existente.cab_ar_condicionado == 1L
+                    cabFreioEstacionamento = existente.cab_freio_estacionamento == 1L
+                    observacoes = existente.observacoes ?: ""
+                }
+            }
+        } catch (_: Exception) {
+            semViagemAberta = true
+        }
+        carregando = false
+    }
+
     // ★ Marcar / Desmarcar Todos
     fun marcarTodos(valor: Boolean) {
         docCnhValida = valor; docCrlvVeiculo = valor; docAnttValida = valor; docSeguroCarga = valor; docOrdemColeta = valor
@@ -141,7 +176,7 @@ actual fun ChecklistPreViagemScreen(
     ).count { it }
 
     fun salvarChecklist() {
-        if (viagemAtual == null) return
+        if (viagemAtual == null || jaEnviado) return
         val dataApi = converterDataParaAPI(dataAtualFormatada())
 
         scope.launch {
@@ -264,31 +299,42 @@ actual fun ChecklistPreViagemScreen(
 
                         Spacer(Modifier.height(12.dp))
 
-                        // ★ Botão Marcar/Desmarcar Todos
-                        val todosOk = itensMarcados == totalItens
-                        OutlinedButton(
-                            onClick = { marcarTodos(!todosOk) },
-                            modifier = Modifier.fillMaxWidth().height(40.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = if (todosOk) AppColors.Error else AppColors.Secondary
-                            ),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (todosOk) AppColors.Error.copy(alpha = 0.5f) else AppColors.Secondary.copy(alpha = 0.5f)
-                            )
-                        ) {
-                            Icon(
-                                if (todosOk) Icons.Default.RemoveDone else Icons.Default.DoneAll,
-                                null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                if (todosOk) "Desmarcar Todos" else "Marcar Todos",
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 13.sp
-                            )
+                        if (jaEnviado) {
+                            Row(
+                                Modifier.fillMaxWidth().background(AppColors.Secondary.copy(alpha = 0.12f), RoundedCornerShape(8.dp)).padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Lock, null, tint = AppColors.Secondary, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Checklist já enviado em ${formatarData(dataEnvio)} — somente leitura", fontSize = 12.sp, color = AppColors.Secondary, fontWeight = FontWeight.Medium)
+                            }
+                        } else {
+                            // ★ Botão Marcar/Desmarcar Todos
+                            val todosOk = itensMarcados == totalItens
+                            OutlinedButton(
+                                onClick = { marcarTodos(!todosOk) },
+                                modifier = Modifier.fillMaxWidth().height(40.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = if (todosOk) AppColors.Error else AppColors.Secondary
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (todosOk) AppColors.Error.copy(alpha = 0.5f) else AppColors.Secondary.copy(alpha = 0.5f)
+                                )
+                            ) {
+                                Icon(
+                                    if (todosOk) Icons.Default.RemoveDone else Icons.Default.DoneAll,
+                                    null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    if (todosOk) "Desmarcar Todos" else "Marcar Todos",
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 13.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -296,59 +342,59 @@ actual fun ChecklistPreViagemScreen(
                 Spacer(Modifier.height(16.dp))
 
                 ChecklistSecao(titulo = "Documentação", icone = Icons.Default.Description, cor = Color(0xFF1565C0), expandida = secaoExpandida == 0, onClick = { secaoExpandida = if (secaoExpandida == 0) -1 else 0 }, marcados = listOf(docCnhValida, docCrlvVeiculo, docAnttValida, docSeguroCarga, docOrdemColeta).count { it }, total = 5) {
-                    ChecklistItem("CNH válida e dentro da validade", docCnhValida) { docCnhValida = it }
-                    ChecklistItem("CRLV do veículo em dia", docCrlvVeiculo) { docCrlvVeiculo = it }
-                    ChecklistItem("ANTT válida", docAnttValida) { docAnttValida = it }
-                    ChecklistItem("Seguro da carga", docSeguroCarga) { docSeguroCarga = it }
-                    ChecklistItem("Ordem de coleta / manifesto", docOrdemColeta) { docOrdemColeta = it }
+                    ChecklistItem("CNH válida e dentro da validade", docCnhValida, readOnly = jaEnviado) { docCnhValida = it }
+                    ChecklistItem("CRLV do veículo em dia", docCrlvVeiculo, readOnly = jaEnviado) { docCrlvVeiculo = it }
+                    ChecklistItem("ANTT válida", docAnttValida, readOnly = jaEnviado) { docAnttValida = it }
+                    ChecklistItem("Seguro da carga", docSeguroCarga, readOnly = jaEnviado) { docSeguroCarga = it }
+                    ChecklistItem("Ordem de coleta / manifesto", docOrdemColeta, readOnly = jaEnviado) { docOrdemColeta = it }
                 }
                 Spacer(Modifier.height(8.dp))
                 ChecklistSecao(titulo = "Parte Elétrica", icone = Icons.Default.ElectricalServices, cor = Color(0xFFF57F17), expandida = secaoExpandida == 1, onClick = { secaoExpandida = if (secaoExpandida == 1) -1 else 1 }, marcados = listOf(eletFarolDianteiro, eletFarolTraseiro, eletLuzFreio, eletSetaDireita, eletSetaEsquerda, eletLuzRe, eletPainelFuncionando).count { it }, total = 7) {
-                    ChecklistItem("Farol dianteiro", eletFarolDianteiro) { eletFarolDianteiro = it }
-                    ChecklistItem("Farol traseiro", eletFarolTraseiro) { eletFarolTraseiro = it }
-                    ChecklistItem("Luz de freio", eletLuzFreio) { eletLuzFreio = it }
-                    ChecklistItem("Seta direita", eletSetaDireita) { eletSetaDireita = it }
-                    ChecklistItem("Seta esquerda", eletSetaEsquerda) { eletSetaEsquerda = it }
-                    ChecklistItem("Luz de ré", eletLuzRe) { eletLuzRe = it }
-                    ChecklistItem("Painel funcionando", eletPainelFuncionando) { eletPainelFuncionando = it }
+                    ChecklistItem("Farol dianteiro", eletFarolDianteiro, readOnly = jaEnviado) { eletFarolDianteiro = it }
+                    ChecklistItem("Farol traseiro", eletFarolTraseiro, readOnly = jaEnviado) { eletFarolTraseiro = it }
+                    ChecklistItem("Luz de freio", eletLuzFreio, readOnly = jaEnviado) { eletLuzFreio = it }
+                    ChecklistItem("Seta direita", eletSetaDireita, readOnly = jaEnviado) { eletSetaDireita = it }
+                    ChecklistItem("Seta esquerda", eletSetaEsquerda, readOnly = jaEnviado) { eletSetaEsquerda = it }
+                    ChecklistItem("Luz de ré", eletLuzRe, readOnly = jaEnviado) { eletLuzRe = it }
+                    ChecklistItem("Painel funcionando", eletPainelFuncionando, readOnly = jaEnviado) { eletPainelFuncionando = it }
                 }
                 Spacer(Modifier.height(8.dp))
                 ChecklistSecao(titulo = "Pneus e Rodas", icone = Icons.Default.TireRepair, cor = Color(0xFF2E7D32), expandida = secaoExpandida == 2, onClick = { secaoExpandida = if (secaoExpandida == 2) -1 else 2 }, marcados = listOf(pneuCalibragemOk, pneuEstadoConservacao, pneuEstepeOk, pneuFerramentasTroca).count { it }, total = 4) {
-                    ChecklistItem("Calibragem OK", pneuCalibragemOk) { pneuCalibragemOk = it }
-                    ChecklistItem("Estado de conservação OK", pneuEstadoConservacao) { pneuEstadoConservacao = it }
-                    ChecklistItem("Estepe em condições", pneuEstepeOk) { pneuEstepeOk = it }
-                    ChecklistItem("Ferramentas de troca", pneuFerramentasTroca) { pneuFerramentasTroca = it }
+                    ChecklistItem("Calibragem OK", pneuCalibragemOk, readOnly = jaEnviado) { pneuCalibragemOk = it }
+                    ChecklistItem("Estado de conservação OK", pneuEstadoConservacao, readOnly = jaEnviado) { pneuEstadoConservacao = it }
+                    ChecklistItem("Estepe em condições", pneuEstepeOk, readOnly = jaEnviado) { pneuEstepeOk = it }
+                    ChecklistItem("Ferramentas de troca", pneuFerramentasTroca, readOnly = jaEnviado) { pneuFerramentasTroca = it }
                 }
                 Spacer(Modifier.height(8.dp))
                 ChecklistSecao(titulo = "Fluidos e Níveis", icone = Icons.Default.WaterDrop, cor = Color(0xFF0097A7), expandida = secaoExpandida == 3, onClick = { secaoExpandida = if (secaoExpandida == 3) -1 else 3 }, marcados = listOf(fluidoOleoMotor, fluidoAguaRadiador, fluidoFluidoFreio, fluidoArla32, fluidoCombustivel).count { it }, total = 5) {
-                    ChecklistItem("Óleo do motor", fluidoOleoMotor) { fluidoOleoMotor = it }
-                    ChecklistItem("Água do radiador", fluidoAguaRadiador) { fluidoAguaRadiador = it }
-                    ChecklistItem("Fluido de freio", fluidoFluidoFreio) { fluidoFluidoFreio = it }
-                    ChecklistItem("ARLA 32", fluidoArla32) { fluidoArla32 = it }
-                    ChecklistItem("Combustível suficiente", fluidoCombustivel) { fluidoCombustivel = it }
+                    ChecklistItem("Óleo do motor", fluidoOleoMotor, readOnly = jaEnviado) { fluidoOleoMotor = it }
+                    ChecklistItem("Água do radiador", fluidoAguaRadiador, readOnly = jaEnviado) { fluidoAguaRadiador = it }
+                    ChecklistItem("Fluido de freio", fluidoFluidoFreio, readOnly = jaEnviado) { fluidoFluidoFreio = it }
+                    ChecklistItem("ARLA 32", fluidoArla32, readOnly = jaEnviado) { fluidoArla32 = it }
+                    ChecklistItem("Combustível suficiente", fluidoCombustivel, readOnly = jaEnviado) { fluidoCombustivel = it }
                 }
                 Spacer(Modifier.height(8.dp))
                 ChecklistSecao(titulo = "Equipamentos de Segurança", icone = Icons.Default.HealthAndSafety, cor = Color(0xFFD32F2F), expandida = secaoExpandida == 4, onClick = { secaoExpandida = if (secaoExpandida == 4) -1 else 4 }, marcados = listOf(segExtintorValidade, segTriangulo, segMacacoChaveRoda, segConesFaixa, segEpiCompleto).count { it }, total = 5) {
-                    ChecklistItem("Extintor na validade", segExtintorValidade) { segExtintorValidade = it }
-                    ChecklistItem("Triângulo de sinalização", segTriangulo) { segTriangulo = it }
-                    ChecklistItem("Macaco e chave de roda", segMacacoChaveRoda) { segMacacoChaveRoda = it }
-                    ChecklistItem("Cones / faixa refletiva", segConesFaixa) { segConesFaixa = it }
-                    ChecklistItem("EPI completo", segEpiCompleto) { segEpiCompleto = it }
+                    ChecklistItem("Extintor na validade", segExtintorValidade, readOnly = jaEnviado) { segExtintorValidade = it }
+                    ChecklistItem("Triângulo de sinalização", segTriangulo, readOnly = jaEnviado) { segTriangulo = it }
+                    ChecklistItem("Macaco e chave de roda", segMacacoChaveRoda, readOnly = jaEnviado) { segMacacoChaveRoda = it }
+                    ChecklistItem("Cones / faixa refletiva", segConesFaixa, readOnly = jaEnviado) { segConesFaixa = it }
+                    ChecklistItem("EPI completo", segEpiCompleto, readOnly = jaEnviado) { segEpiCompleto = it }
                 }
                 Spacer(Modifier.height(8.dp))
                 ChecklistSecao(titulo = "Carroceria / Baú", icone = Icons.Default.Inventory2, cor = Color(0xFF6A1B9A), expandida = secaoExpandida == 5, onClick = { secaoExpandida = if (secaoExpandida == 5) -1 else 5 }, marcados = listOf(carrLonasCordas, carrPortasBau, carrAssoalhoEstado, carrTravasLacres).count { it }, total = 4) {
-                    ChecklistItem("Lonas e cordas", carrLonasCordas) { carrLonasCordas = it }
-                    ChecklistItem("Portas do baú", carrPortasBau) { carrPortasBau = it }
-                    ChecklistItem("Assoalho em bom estado", carrAssoalhoEstado) { carrAssoalhoEstado = it }
-                    ChecklistItem("Travas e lacres", carrTravasLacres) { carrTravasLacres = it }
+                    ChecklistItem("Lonas e cordas", carrLonasCordas, readOnly = jaEnviado) { carrLonasCordas = it }
+                    ChecklistItem("Portas do baú", carrPortasBau, readOnly = jaEnviado) { carrPortasBau = it }
+                    ChecklistItem("Assoalho em bom estado", carrAssoalhoEstado, readOnly = jaEnviado) { carrAssoalhoEstado = it }
+                    ChecklistItem("Travas e lacres", carrTravasLacres, readOnly = jaEnviado) { carrTravasLacres = it }
                 }
                 Spacer(Modifier.height(8.dp))
                 ChecklistSecao(titulo = "Cabine", icone = Icons.Default.AirlineSeatReclineExtra, cor = Color(0xFF00695C), expandida = secaoExpandida == 6, onClick = { secaoExpandida = if (secaoExpandida == 6) -1 else 6 }, marcados = listOf(cabBancosCintos, cabEspelhosRetrovisores, cabLimpadorParabrisa, cabArCondicionado, cabFreioEstacionamento).count { it }, total = 5) {
-                    ChecklistItem("Bancos e cintos de segurança", cabBancosCintos) { cabBancosCintos = it }
-                    ChecklistItem("Espelhos retrovisores", cabEspelhosRetrovisores) { cabEspelhosRetrovisores = it }
-                    ChecklistItem("Limpador de para-brisa", cabLimpadorParabrisa) { cabLimpadorParabrisa = it }
-                    ChecklistItem("Ar condicionado", cabArCondicionado) { cabArCondicionado = it }
-                    ChecklistItem("Freio de estacionamento", cabFreioEstacionamento) { cabFreioEstacionamento = it }
+                    ChecklistItem("Bancos e cintos de segurança", cabBancosCintos, readOnly = jaEnviado) { cabBancosCintos = it }
+                    ChecklistItem("Espelhos retrovisores", cabEspelhosRetrovisores, readOnly = jaEnviado) { cabEspelhosRetrovisores = it }
+                    ChecklistItem("Limpador de para-brisa", cabLimpadorParabrisa, readOnly = jaEnviado) { cabLimpadorParabrisa = it }
+                    ChecklistItem("Ar condicionado", cabArCondicionado, readOnly = jaEnviado) { cabArCondicionado = it }
+                    ChecklistItem("Freio de estacionamento", cabFreioEstacionamento, readOnly = jaEnviado) { cabFreioEstacionamento = it }
                 }
 
                 Spacer(Modifier.height(16.dp))
@@ -356,18 +402,29 @@ actual fun ChecklistPreViagemScreen(
                     Column(Modifier.padding(16.dp)) {
                         Text("Observações", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(value = observacoes, onValueChange = { observacoes = it }, modifier = Modifier.fillMaxWidth().height(100.dp), shape = RoundedCornerShape(12.dp), placeholder = { Text("Observações adicionais (opcional)", color = Color(0xFF9CA3AF)) }, maxLines = 4, colors = ui.darkTextFieldColors())
+                        OutlinedTextField(value = observacoes, onValueChange = { observacoes = it }, readOnly = jaEnviado, modifier = Modifier.fillMaxWidth().height(100.dp), shape = RoundedCornerShape(12.dp), placeholder = { Text("Observações adicionais (opcional)", color = Color(0xFF9CA3AF)) }, maxLines = 4, colors = ui.darkTextFieldColors())
                     }
                 }
 
                 Spacer(Modifier.height(20.dp))
-                Button(onClick = { salvarChecklist() }, enabled = !salvando, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)) {
-                    if (salvando) { CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp) }
-                    else { Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text("SALVAR CHECKLIST PRÉ-VIAGEM", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
+                if (!jaEnviado) {
+                    Button(onClick = { salvarChecklist() }, enabled = !salvando, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)) {
+                        if (salvando) { CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp) }
+                        else { Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text("SALVAR CHECKLIST PRÉ-VIAGEM", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
+                    }
                 }
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+}
+
+private fun formatarData(data: String): String {
+    return try {
+        val partes = data.split("-")
+        if (partes.size == 3) "${partes[2]}/${partes[1]}/${partes[0]}" else data
+    } catch (e: Exception) {
+        data
     }
 }
 
@@ -397,9 +454,14 @@ fun ChecklistSecao(titulo: String, icone: ImageVector, cor: Color, expandida: Bo
 }
 
 @Composable
-fun ChecklistItem(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange, colors = CheckboxDefaults.colors(checkedColor = AppColors.Secondary, uncheckedColor = Color(0xFFBDBDBD)))
+fun ChecklistItem(label: String, checked: Boolean, readOnly: Boolean = false, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .let { if (readOnly) it else it.clickable { onCheckedChange(!checked) } }
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = checked, onCheckedChange = if (readOnly) null else onCheckedChange, colors = CheckboxDefaults.colors(checkedColor = AppColors.Secondary, uncheckedColor = Color(0xFFBDBDBD)))
         Spacer(Modifier.width(4.dp))
         Text(label, fontSize = 14.sp, color = if (checked) AppColors.TextPrimary else AppColors.TextSecondary, fontWeight = if (checked) FontWeight.Medium else FontWeight.Normal)
         if (checked) { Spacer(Modifier.weight(1f)); Icon(Icons.Default.Check, null, tint = AppColors.Secondary, modifier = Modifier.size(18.dp)) }
