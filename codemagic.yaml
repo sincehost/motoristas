@@ -51,6 +51,11 @@ workflows:
         script: |
           cd iosApp
 
+          echo "===== DIAGNÓSTICO: build settings de assinatura (Release) ====="
+          xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -configuration Release -showBuildSettings 2>&1 \
+            | grep -i "CODE_SIGN\|PROVISIONING_PROFILE\|DEVELOPMENT_TEAM\|PRODUCT_BUNDLE_IDENTIFIER" || true
+          echo "================================================================="
+
           # DEVELOPMENT_TEAM continua explícito aqui porque Config.xcconfig
           # deixa TEAM_ID vazio de propósito no repositório (só é preenchido
           # via essa variável de ambiente do build). CODE_SIGN_STYLE NÃO
