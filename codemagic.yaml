@@ -25,8 +25,18 @@ workflows:
           cd iosApp
           pod install
 
-      - name: Set up code signing (certificado + provisioning profile automáticos via App Store Connect)
+      - name: Set up code signing (cria certificado + perfil de distribuição se ainda não existirem)
         script: |
+          # Primeiro app iOS publicado por aqui — ainda não existe certificado
+          # nem provisioning profile de distribuição. `use-profiles` sozinho só
+          # ENCONTRA perfil já existente (por isso dava "No matching profiles
+          # found"); `fetch-signing-files --create` cria o que faltar (cert +
+          # perfil), e só depois `use-profiles` aplica isso ao projeto Xcode.
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --platform IOS \
+            --type IOS_APP_STORE \
+            --create
+
           xcode-project use-profiles
 
       - name: Incrementa o número de build automaticamente (evita "build já usado")
