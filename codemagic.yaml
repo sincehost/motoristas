@@ -3,9 +3,18 @@ workflows:
     name: iOS Workflow
     instance_type: mac_mini_m2
     max_build_duration: 60
+    integrations:
+      app_store_connect: codemagic_api_key
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: br.com.lfsystem.app.Motorista
+      vars:
+        BUNDLE_ID: "br.com.lfsystem.app.Motorista"
       xcode: latest
       cocoapods: default
+      groups:
+        - app_store_credentials # define TEAM_ID nesse grupo, nas variáveis de ambiente do Codemagic
     scripts:
       - name: Set up environment
         script: |
@@ -16,51 +25,77 @@ workflows:
           cd iosApp
           pod install
 
-      - name: Build iOS with SQLite3
+      - name: Set up code signing (certificado + provisioning profile automáticos via App Store Connect)
+        script: |
+          xcode-project use-profiles
+
+      - name: Incrementa o número de build automaticamente (evita "build já usado")
         script: |
           cd iosApp
-          
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-app-store-build-number "$BUNDLE_ID" || echo 0)
+          agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
+
+      - name: Archive (Release, assinado)
+        script: |
+          cd iosApp
+
           xcodebuild -workspace iosApp.xcworkspace \
             -scheme iosApp \
-            -configuration Debug \
+            -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath $(PWD)/build \
+            -archivePath $(PWD)/build/iosApp.xcarchive \
             OTHER_LDFLAGS='$(inherited) -lsqlite3' \
             LIBRARY_SEARCH_PATHS='$(inherited) /usr/lib' \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            build
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            archive
 
-      - name: Create IPA
+      - name: Exporta o .ipa assinado pra App Store
         script: |
           cd iosApp
+
+          cat > ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>$TEAM_ID</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>uploadSymbols</key>
+              <true/>
+              <key>compileBitcode</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
+
           mkdir -p $HOME/builds/output
-          
-          # O app se chama Motorista.app, não iosApp.app
-          APP_PATH="build/Build/Products/Debug-iphoneos/Motorista.app"
-          
-          if [ -d "$APP_PATH" ]; then
-            echo "✅ App encontrado: $APP_PATH"
-            cp -r "$APP_PATH" $HOME/builds/output/
-            cd $HOME/builds/output
-            mkdir Payload
-            mv Motorista.app Payload/
-            zip -r Motorista.ipa Payload
-            rm -rf Payload
-            echo "🎉 IPA CRIADO COM SUCESSO!"
-            ls -lh *.ipa
-          else
-            echo "❌ App não encontrado em: $APP_PATH"
-            echo "Procurando apps..."
-            find build -name "*.app" -type d
-            exit 1
-          fi
+
+          xcodebuild -exportArchive \
+            -archivePath $(PWD)/build/iosApp.xcarchive \
+            -exportPath $HOME/builds/output \
+            -exportOptionsPlist ExportOptions.plist
+
+          echo "🎉 IPA exportado:"
+          ls -lh $HOME/builds/output/*.ipa
 
     artifacts:
       - $HOME/builds/output/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
     publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # Deixe false até validar algumas builds no TestFlight. Quando quiser
+        # que o Codemagic já mande pra revisão da Apple automaticamente,
+        # troque pra true.
+        submit_to_app_store: false
       email:
         recipients:
           - lucas.felipe68@gmail.com
