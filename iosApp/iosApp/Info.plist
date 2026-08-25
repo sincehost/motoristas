@@ -5,6 +5,14 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 
+	<!-- GENERATE_INFOPLIST_FILE=YES gera essas chaves em tempo de build a
+	     partir das build settings, então normalmente não precisam estar
+	     aqui — mas ferramentas externas (Codemagic code_signing_manager.rb)
+	     leem esse arquivo bruto direto do disco, sem passar pelo Xcode, e
+	     quebram (NoMethodError) quando CFBundleIdentifier não existe aqui. -->
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
 	<key>CFBundleDevelopmentRegion</key>
 	<string>pt-BR</string>
 	<key>CFBundleLocalizations</key>
