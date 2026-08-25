@@ -4,7 +4,7 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     integrations:
-      app_store_connect: codemagic_api_key
+      app_store_connect: Codmagic01
     environment:
       # Sem bloco `ios_signing` aqui de propósito: ele dispara uma checagem
       # automática de assinatura ANTES de qualquer script rodar, e essa
