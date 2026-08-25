@@ -51,6 +51,11 @@ workflows:
         script: |
           cd iosApp
 
+          # Sem CODE_SIGN_STYLE/DEVELOPMENT_TEAM aqui de propósito: o passo
+          # "Set up code signing" (xcode-project use-profiles) já configurou
+          # o projeto com Manual + o perfil de distribuição específico:
+          # sobrescrever pra Automatic aqui fazia o Xcode ignorar isso e
+          # procurar (sem sucesso) um perfil de Development sozinho.
           xcodebuild -workspace iosApp.xcworkspace \
             -scheme iosApp \
             -configuration Release \
@@ -59,8 +64,6 @@ workflows:
             -archivePath $(PWD)/build/iosApp.xcarchive \
             OTHER_LDFLAGS='$(inherited) -lsqlite3' \
             LIBRARY_SEARCH_PATHS='$(inherited) /usr/lib' \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic \
             archive
 
       - name: Exporta o .ipa assinado pra App Store
