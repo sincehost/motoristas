@@ -39,7 +39,7 @@ workflows:
           # criar tudo via linha de comando numa VM efêmera, que não conseguia
           # persistir a chave privada entre os passos ("Cannot save Signing
           # Certificates without certificate private key").
-          xcode-project use-profiles
+          xcode-project use-profiles --verbose
 
       - name: Incrementa o número de build automaticamente (evita "build já usado")
         script: |
