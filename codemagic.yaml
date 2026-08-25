@@ -28,18 +28,15 @@ workflows:
           cd iosApp
           pod install
 
-      - name: Set up code signing (cria certificado + perfil de distribuição se ainda não existirem)
+      - name: Set up code signing (usa certificado + perfil já cadastrados no Codemagic)
         script: |
-          # Primeiro app iOS publicado por aqui — ainda não existe certificado
-          # nem provisioning profile de distribuição. `use-profiles` sozinho só
-          # ENCONTRA perfil já existente (por isso dava "No matching profiles
-          # found"); `fetch-signing-files --create` cria o que faltar (cert +
-          # perfil), e só depois `use-profiles` aplica isso ao projeto Xcode.
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --platform IOS \
-            --type IOS_APP_STORE \
-            --create
-
+          # Certificado ("trakvia-ios-distribution") e provisioning profile
+          # ("Trakvia App Store") foram gerados manualmente em Code signing
+          # identities (Team settings), já com a chave privada guardada
+          # corretamente pelo próprio Codemagic — evita o problema de tentar
+          # criar tudo via linha de comando numa VM efêmera, que não conseguia
+          # persistir a chave privada entre os passos ("Cannot save Signing
+          # Certificates without certificate private key").
           xcode-project use-profiles
 
       - name: Incrementa o número de build automaticamente (evita "build já usado")
