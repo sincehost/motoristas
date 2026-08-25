@@ -6,12 +6,14 @@ workflows:
     integrations:
       app_store_connect: Codmagic01
     environment:
-      # Sem bloco `ios_signing` aqui de propósito: ele dispara uma checagem
-      # automática de assinatura ANTES de qualquer script rodar, e essa
-      # checagem só sabe usar perfil já existente — como é o primeiro app
-      # iOS, não existia nenhum, e isso falhava antes do meu passo "Set up
-      # code signing" (que sabe criar) ter chance de rodar. Toda a
-      # assinatura fica só por conta do script abaixo.
+      # Certificado ("trakvia-ios-distribution") e perfil ("Trakvia App
+      # Store") já existem em Code signing identities (Team settings) —
+      # esse bloco é o que puxa os dois pro ambiente do build ANTES dos
+      # scripts rodarem. Antes disso dava erro porque nada existia ainda
+      # pra encontrar; agora que existem, deve casar certinho.
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: br.com.lfsystem.app.Motorista
       vars:
         BUNDLE_ID: "br.com.lfsystem.app.Motorista"
       xcode: latest
