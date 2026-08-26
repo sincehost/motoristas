@@ -9,13 +9,28 @@ import database.AppRepository
 import database.DatabaseDriverFactory
 import platform.Foundation.NSUserDefaults
 import screens.NetworkMonitor
+import util.Keychain
 
 fun MainViewController() = ComposeUIViewController {
     val repository = remember {
         // Iniciar monitoramento de rede (equivalente ao Android)
         NetworkMonitor.iniciar()
 
-        // Configurar storage da URL da API usando NSUserDefaults
+        // Token de sessão vai pro Keychain (não NSUserDefaults) — o token
+        // Bearer dá acesso a todos os dados do tenant, e NSUserDefaults é
+        // texto puro que entra em backup do iTunes/iCloud e é legível por
+        // qualquer processo com acesso ao sandbox do app. api_url não é
+        // sensível, continua em NSUserDefaults normalmente.
+        // Migra automaticamente o valor antigo em texto puro, se existir,
+        // pra não forçar relogin de quem já estava logado antes desta
+        // correção.
+        val legacyPrefs = NSUserDefaults.standardUserDefaults
+        legacyPrefs.stringForKey("auth_token")?.let { tokenAntigo ->
+            Keychain.set("auth_token", tokenAntigo)
+            legacyPrefs.removeObjectForKey("auth_token")
+            legacyPrefs.synchronize()
+        }
+
         ApiClient.setStorage(object : ApiUrlStorage {
             private val prefs = NSUserDefaults.standardUserDefaults
 
@@ -29,12 +44,11 @@ fun MainViewController() = ComposeUIViewController {
             }
 
             override fun saveToken(token: String) {
-                prefs.setObject(token, forKey = "auth_token")
-                prefs.synchronize()
+                Keychain.set("auth_token", token)
             }
 
             override fun getToken(): String? {
-                return prefs.stringForKey("auth_token")
+                return Keychain.get("auth_token")
             }
         })
 

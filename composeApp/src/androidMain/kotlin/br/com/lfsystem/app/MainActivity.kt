@@ -26,6 +26,8 @@ import push.PushTokenManager
 import screens.NetworkMonitor
 import util.BiometricAuth
 import util.SyncNotificationHelper
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 
 // FragmentActivity (não ComponentActivity puro) — BiometricPrompt na versão
 // da lib usada aqui (androidx.biometric 1.1.0) exige um FragmentActivity de
@@ -114,8 +116,37 @@ class MainActivity : FragmentActivity() {
             }
         }
 
-        // Configurar storage da URL da API
-        val prefs = applicationContext.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        // Configurar storage da URL da API e do token — criptografado via
+        // Android Keystore (EncryptedSharedPreferences), não texto puro.
+        // Antes, o token Bearer (acesso a todos os dados do tenant) ficava
+        // legível por qualquer processo com acesso ao sandbox do app
+        // (extração forense, dispositivo rooteado). Migra automaticamente o
+        // valor do arquivo antigo em texto puro, se existir, pra não forçar
+        // relogin de quem já estava logado antes desta correção.
+        val legacyPrefs = applicationContext.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+        val securePrefs = try {
+            val masterKey = MasterKey.Builder(applicationContext)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            EncryptedSharedPreferences.create(
+                applicationContext,
+                "app_prefs_secure",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            // Nunca travar o app por falha no Keystore — cai pro storage antigo.
+            null
+        }
+        if (securePrefs != null && legacyPrefs.contains("auth_token")) {
+            securePrefs.edit()
+                .putString("api_url", legacyPrefs.getString("api_url", null))
+                .putString("auth_token", legacyPrefs.getString("auth_token", null))
+                .apply()
+            legacyPrefs.edit().clear().apply()
+        }
+        val prefs = securePrefs ?: legacyPrefs
         ApiClient.setStorage(object : ApiUrlStorage {
             override fun saveApiUrl(url: String) {
                 prefs.edit().putString("api_url", url).apply()
