@@ -132,6 +132,13 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+        # Sem "beta_groups", o Codemagic tentava submeter pra revisão de beta
+        # EXTERNA (que exige "Beta App Description" preenchida) mesmo só
+        # tendo um grupo interno configurado — e falhava, deixando o build
+        # sem ser adicionado a grupo nenhum. Apontar direto pro grupo interno
+        # evita esse caminho: grupo interno nunca precisa de revisão de beta.
+        beta_groups:
+          - teste trakvia
         # Deixe false até validar algumas builds no TestFlight. Quando quiser
         # que o Codemagic já mande pra revisão da Apple automaticamente,
         # troque pra true.
