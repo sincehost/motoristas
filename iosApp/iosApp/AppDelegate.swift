@@ -17,20 +17,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         UNUserNotificationCenter.current().delegate = self
 
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
-
-        // FORÇA UMA VEZ SÓ: descarta qualquer token FCM antigo (o Firebase
-        // guarda isso no Keychain, que sobrevive a fechar/abrir o app e a
-        // atualizações via TestFlight — por isso instalações que já tinham
-        // rodado com aps-environment=development continuavam presas num
-        // registro velho mesmo depois da correção pra production). Sem
-        // isso o app nunca reemite um token novo sozinho.
-        // TODO: remover esta chamada a deleteToken depois que essa build
-        // rodar nos aparelhos já instalados (ver conversa sobre push).
-        Messaging.messaging().deleteToken { _ in
-            DispatchQueue.main.async {
-                application.registerForRemoteNotifications()
-            }
-        }
+        application.registerForRemoteNotifications()
         return true
     }
 
