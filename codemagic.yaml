@@ -41,24 +41,13 @@ workflows:
           # Certificates without certificate private key").
           xcode-project use-profiles --verbose
 
-      - name: Incrementa o número de build automaticamente (evita "build já usado")
-        script: |
-          cd iosApp
-          # As tentativas anteriores (get-latest-app-store-build-number,
-          # get-latest-build-number, $CM_BUILD_NUMBER) falharam ou vieram vazias
-          # nesse ambiente, sempre colidindo com um build já enviado
-          # (ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE). Usar data/hora (UTC, até o
-          # minuto) como número de build garante que é sempre maior que qualquer
-          # build anterior, sem depender de nenhuma variável ou consulta externa.
-          agvtool new-version -all $(date -u +%Y%m%d%H%M)
-
       - name: Archive (Release, assinado)
         script: |
           cd iosApp
 
           echo "===== DIAGNÓSTICO: build settings de assinatura (Release) ====="
           xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -configuration Release -showBuildSettings 2>&1 \
-            | grep -i "CODE_SIGN\|PROVISIONING_PROFILE\|DEVELOPMENT_TEAM\|PRODUCT_BUNDLE_IDENTIFIER" || true
+            | grep -i "CODE_SIGN\|PROVISIONING_PROFILE\|DEVELOPMENT_TEAM\|PRODUCT_BUNDLE_IDENTIFIER\|CURRENT_PROJECT_VERSION" || true
           echo "================================================================="
 
           # O diagnóstico anterior mostrou que o projeto continuava com
@@ -70,6 +59,18 @@ workflows:
           # tipo de certificado que já confirmamos existir (Code signing
           # identities: certificado "trakvia-ios-distribution" / perfil
           # "Trakvia App Store").
+          #
+          # CURRENT_PROJECT_VERSION também é forçado aqui pelo mesmo motivo:
+          # Config.xcconfig tem CURRENT_PROJECT_VERSION=1 fixo, e o projeto não
+          # está configurado com VERSIONING_SYSTEM=apple-generic — então
+          # `agvtool new-version` (tentado antes, em passos separados) não tinha
+          # efeito nenhum, e todo build ia sempre com versão "1", colidindo
+          # com o build já enviado (ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE).
+          # Passar na linha de comando tem prioridade sobre o xcconfig e
+          # garante um valor sempre maior que qualquer build anterior.
+          BUILD_NUMBER=$(date -u +%Y%m%d%H%M)
+          echo "Build number desta vez: $BUILD_NUMBER"
+
           xcodebuild -workspace iosApp.xcworkspace \
             -scheme iosApp \
             -configuration Release \
@@ -82,6 +83,7 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="Trakvia App Store" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             archive
 
       - name: Exporta o .ipa assinado pra App Store
