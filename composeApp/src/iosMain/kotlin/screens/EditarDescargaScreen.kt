@@ -159,7 +159,7 @@ actual fun EditarDescargaScreen(
                 data = converterDataParaExibicao(descarga.data_descarga)
                 placa = descarga.placa
                 ordemDescarga = descarga.ordem_descarga.toString()
-                val valorFormatado = formatarValor(((descarga.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
+                val valorFormatado = formatarValor((util.parseDoubleComLog(descarga.valor, "descarga.valor") * 100).roundToLong().toString())
                 valor = TextFieldValue(valorFormatado, selection = TextRange(valorFormatado.length))
                 fotoBase64 = descarga.foto
                 modoOffline = false

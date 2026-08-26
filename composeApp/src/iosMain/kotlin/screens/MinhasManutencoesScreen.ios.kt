@@ -542,7 +542,7 @@ private fun formatarData(data: String): String {
 
 private fun formatarValor(valor: String): String {
     return try {
-        val numero = valor.replace(",", ".").toDoubleOrNull() ?: 0.0
+        val numero = util.parseDoubleComLog(valor.replace(",", "."), "manutencao.valor (listagem)")
         // Arredonda em centavos ANTES de separar inteiro/decimal — a versão
         // anterior truncava (`.toInt()`), então erro de ponto flutuante
         // (ex: 10.09999999) virava "10,09" em vez de "10,10".

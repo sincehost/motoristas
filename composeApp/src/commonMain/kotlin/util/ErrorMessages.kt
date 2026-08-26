@@ -64,8 +64,30 @@ fun mensagemErroAmigavel(erro: String?): String {
         msg.contains("network", ignoreCase = true) || msg.contains("conectividade", ignoreCase = true) ->
             "Problema de conexão. Verifique sua internet e tente novamente."
 
-        else -> msg
+        else -> {
+            // Exceção fora do catálogo conhecido — nunca mostra o texto
+            // técnico cru pro motorista (poderia ser qualquer coisa: nome de
+            // classe Java/Kotlin, stack trace parcial, etc.). Fica só no log.
+            LogWriter.log("⚠️ mensagemErroAmigavel: sem tradução conhecida para: $msg")
+            "Ocorreu um erro inesperado. Tente novamente."
+        }
     }
+}
+
+/**
+ * Parse defensivo de um valor numérico vindo do servidor (ex: ao abrir uma
+ * tela de edição de um lançamento já salvo). Se vier corrompido/não
+ * numérico, o comportamento visível pro motorista continua o mesmo de
+ * antes ("0,00"/vazio) — mas agora fica registrado no log qual campo e
+ * qual valor bruto falharam, em vez de mascarar silenciosamente como se
+ * o valor real fosse zero.
+ */
+fun parseDoubleComLog(valor: String?, campo: String): Double {
+    val v = valor?.toDoubleOrNull()
+    if (v == null) {
+        LogWriter.log("⚠️ Valor inválido ao editar campo '$campo': '$valor' — exibindo 0,00")
+    }
+    return v ?: 0.0
 }
 
 /**

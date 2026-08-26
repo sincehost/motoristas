@@ -623,7 +623,7 @@ private fun formatarData(data: String): String {
 
 private fun formatarValor(valor: String): String {
     return try {
-        val numero = valor.replace(",", ".").toDoubleOrNull() ?: 0.0
+        val numero = util.parseDoubleComLog(valor.replace(",", "."), "manutencao.valor (listagem)")
         String.format(java.util.Locale.US, "%,.2f", numero).replace(",", "X").replace(".", ",").replace("X", ".")
     } catch (e: Exception) {
         valor

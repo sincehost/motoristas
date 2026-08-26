@@ -251,7 +251,7 @@ actual fun EditarManutencaoScreen(
                 tipoManutencao = manutencao.tipo_manutencao
                 descricaoServico = manutencao.descricao_servico ?: ""
                 localManutencao = manutencao.local_manutencao ?: ""
-                val valorFormatado = formatarValor(((manutencao.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
+                val valorFormatado = formatarValor((util.parseDoubleComLog(manutencao.valor, "manutencao.valor") * 100).roundToLong().toString())
                 valor = TextFieldValue(valorFormatado, selection = TextRange(0, valorFormatado.length))
                 val kmTrocaOleoRaw = manutencao.km_troca_oleo ?: ""
                 val kmTrocaOleoTexto = kmTrocaOleoRaw.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmTrocaOleoRaw

@@ -932,7 +932,10 @@ private fun formatarDataBRParaExibicao(data: String): String {
 
 private fun formatarDecimalParaExibicao(valor: String): String {
     return try {
-        val decimal = valor.toDoubleOrNull() ?: return ""
+        val decimal = valor.toDoubleOrNull() ?: run {
+            util.LogWriter.log("⚠️ Valor inválido do servidor ao editar: '$valor' — exibindo vazio")
+            return ""
+        }
         val symbols = java.text.DecimalFormatSymbols(java.util.Locale("pt", "BR"))
         symbols.decimalSeparator = ','
         symbols.groupingSeparator = '.'

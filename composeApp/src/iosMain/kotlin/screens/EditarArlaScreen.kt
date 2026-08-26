@@ -161,14 +161,14 @@ actual fun EditarArlaScreen(
             if (response.status == "ok" && response.arla != null) {
                 val arla = response.arla
                 data = converterDataParaExibicao(arla.data_arla)
-                val valorFormatado = formatarValor(((arla.valor.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
+                val valorFormatado = formatarValor((util.parseDoubleComLog(arla.valor, "arla.valor") * 100).roundToLong().toString())
                 valor = TextFieldValue(valorFormatado, selection = TextRange(0, valorFormatado.length))
                 // Servidor devolve decimal puro ("15.50", ponto) — precisa
                 // virar a máscara BR ("15,50") igual todo campo de valor/
                 // litros do app, senão reenviar sem editar manda formato
                 // errado de volta pro endpoint (que lê "," como decimal e
                 // "." como separador de milhar, inflando o valor ~100x).
-                val litrosFormatado = formatarValor(((arla.litros.toDoubleOrNull() ?: 0.0) * 100).roundToLong().toString())
+                val litrosFormatado = formatarValor((util.parseDoubleComLog(arla.litros, "arla.litros") * 100).roundToLong().toString())
                 litros = TextFieldValue(litrosFormatado, selection = TextRange(0, litrosFormatado.length))
                 posto = arla.posto
                 val kmPostoTexto = arla.km_posto.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: arla.km_posto
