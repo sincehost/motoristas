@@ -64,11 +64,7 @@ class SyncManager(private val repository: AppRepository) {
             } catch (e: Exception) {
                 val msg = e.message ?: ""
 
-                // Detectar token expirado/inválido
-                val isAuthError = msg.contains("401", ignoreCase = true) ||
-                        msg.contains("unauthorized", ignoreCase = true) ||
-                        msg.contains("token", ignoreCase = true) && msg.contains("invalid", ignoreCase = true)
-                if (isAuthError) {
+                if (util.isErroDeAutenticacao(msg)) {
                     LogWriter.log("🔒 $label: Token expirado/inválido — requer re-login")
                     screens.AppEvents.emitir(screens.AppEvent.TokenExpirado)
                     throw e // Não fazer retry em erro de autenticação

@@ -802,6 +802,12 @@ actual fun IniciarViagemScreen(
                                         if (!semConexao) {
                                             // Erro técnico inesperado — não salvar offline
                                             loading = false
+                                            if (util.isErroDeAutenticacao(e.message)) {
+                                                // Sessão expirada fora do fluxo de sync em
+                                                // segundo plano (que já tratava isso) —
+                                                // força logout igual ao SyncManager.comRetry.
+                                                AppEvents.emitir(AppEvent.TokenExpirado)
+                                            }
                                             mostrarMensagem(util.mensagemErroAmigavel(e.message), isErro = true)
                                             return@launch
                                         }

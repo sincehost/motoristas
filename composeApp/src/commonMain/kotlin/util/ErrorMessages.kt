@@ -69,6 +69,24 @@ fun mensagemErroAmigavel(erro: String?): String {
 }
 
 /**
+ * true quando a mensagem indica token/sessão expirado ou inválido.
+ *
+ * Antes, essa detecção só existia dentro de SyncManager.comRetry (usada pra
+ * emitir AppEvent.TokenExpirado, que força logout) — chamadas diretas de tela
+ * (iniciar viagem, finalizar viagem, salvar abastecimento/arla/descarga/
+ * manutenção antes de cair pro offline) não passavam por ali, então uma
+ * sessão expirada durante uso ativo aparecia como erro de validação genérico
+ * em vez de forçar novo login. Centralizado aqui pra ser usado nos dois
+ * lugares.
+ */
+fun isErroDeAutenticacao(erro: String?): Boolean {
+    val msg = erro ?: return false
+    return msg.contains("401", ignoreCase = true) ||
+            msg.contains("unauthorized", ignoreCase = true) ||
+            (msg.contains("token", ignoreCase = true) && msg.contains("invalid", ignoreCase = true))
+}
+
+/**
  * true quando a mensagem indica claramente falta de conectividade (vs. um
  * erro de validação/regra de negócio) — usado por telas que decidem entre
  * "salvar local e sincronizar depois" ou "mostrar erro de validação".
