@@ -56,14 +56,15 @@ workflows:
             | grep -i "CODE_SIGN\|PROVISIONING_PROFILE\|DEVELOPMENT_TEAM\|PRODUCT_BUNDLE_IDENTIFIER" || true
           echo "================================================================="
 
-          # DEVELOPMENT_TEAM continua explícito aqui porque Config.xcconfig
-          # deixa TEAM_ID vazio de propósito no repositório (só é preenchido
-          # via essa variável de ambiente do build). CODE_SIGN_STYLE NÃO
-          # entra mais: o passo "Set up code signing" (xcode-project
-          # use-profiles) já configurou o projeto com Manual + o perfil de
-          # distribuição específico — sobrescrever pra Automatic fazia o
-          # Xcode ignorar isso e procurar (sem sucesso) um perfil de
-          # Development sozinho.
+          # O diagnóstico anterior mostrou que o projeto continuava com
+          # CODE_SIGN_STYLE=Automatic e CODE_SIGN_IDENTITY="Apple
+          # Development" mesmo depois do use-profiles rodar — as mudanças
+          # dele não estavam persistindo no project.pbxproj a tempo do
+          # archive. Em vez de depender disso, força a assinatura manual
+          # direto na linha de comando, usando o nome exato do perfil e o
+          # tipo de certificado que já confirmamos existir (Code signing
+          # identities: certificado "trakvia-ios-distribution" / perfil
+          # "Trakvia App Store").
           xcodebuild -workspace iosApp.xcworkspace \
             -scheme iosApp \
             -configuration Release \
@@ -73,6 +74,9 @@ workflows:
             OTHER_LDFLAGS='$(inherited) -lsqlite3' \
             LIBRARY_SEARCH_PATHS='$(inherited) /usr/lib' \
             DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="Trakvia App Store" \
             archive
 
       - name: Exporta o .ipa assinado pra App Store
@@ -89,7 +93,12 @@ workflows:
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>signingStyle</key>
-              <string>automatic</string>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>br.com.lfsystem.app.Motorista</key>
+                  <string>Trakvia App Store</string>
+              </dict>
               <key>uploadSymbols</key>
               <true/>
               <key>compileBitcode</key>
