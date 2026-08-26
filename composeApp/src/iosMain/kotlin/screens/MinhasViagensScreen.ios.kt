@@ -902,6 +902,8 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         LinhaResumo("ARLA:", formatarMoeda(resumo!!.valor_arla))
                         LinhaResumo("Descarga:", formatarMoeda(resumo!!.valor_descarga))
                         LinhaResumo("Comissão:", formatarMoeda(resumo!!.comissao))
+                        LinhaResumo("Imposto:", formatarMoeda(resumo!!.valor_imposto))
+                        LinhaResumo("Pedágio:", formatarMoeda(resumo!!.valor_pedagio))
 
                         if (outrasDespesas.isNotEmpty()) {
                             val totalOutras = outrasDespesas.sumOf { it.valor }
@@ -1535,6 +1537,8 @@ private fun exportarResumoPdfIos(res: ResumoViagem, outrasDespesas: List<OutraDe
             drawItem("ARLA:", formatarMoeda(res.valor_arla))
             drawItem("Descarga:", formatarMoeda(res.valor_descarga))
             drawItem("Comissão:", formatarMoeda(res.comissao))
+            drawItem("Imposto:", formatarMoeda(res.valor_imposto))
+            drawItem("Pedágio:", formatarMoeda(res.valor_pedagio))
 
             if (outrasDespesas.isNotEmpty()) {
                 drawSection("Outras Despesas", "#FF6F00")

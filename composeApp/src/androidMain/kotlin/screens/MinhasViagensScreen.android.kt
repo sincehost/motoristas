@@ -963,6 +963,8 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
             drawItem("ARLA:", formatarMoeda(res.valor_arla))
             drawItem("Descarga:", formatarMoeda(res.valor_descarga))
             drawItem("Comissão:", formatarMoeda(res.comissao))
+            drawItem("Imposto:", formatarMoeda(res.valor_imposto))
+            drawItem("Pedágio:", formatarMoeda(res.valor_pedagio))
 
             if (outrasDespesas.isNotEmpty()) {
                 drawSection("Outras Despesas", "#FF6F00")
@@ -1126,6 +1128,8 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         LinhaResumo("ARLA:", formatarMoeda(resumo!!.valor_arla))
                         LinhaResumo("Descarga:", formatarMoeda(resumo!!.valor_descarga))
                         LinhaResumo("Comissão:", formatarMoeda(resumo!!.comissao))
+                        LinhaResumo("Imposto:", formatarMoeda(resumo!!.valor_imposto))
+                        LinhaResumo("Pedágio:", formatarMoeda(resumo!!.valor_pedagio))
 
                         // Outras despesas — detalhadas por tipo com separação visual
                         if (outrasDespesas.isNotEmpty()) {

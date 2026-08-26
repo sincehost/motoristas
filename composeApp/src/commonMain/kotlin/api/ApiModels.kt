@@ -243,6 +243,13 @@ data class ResumoViagem(
     val valor_arla: Double = 0.0,
     val valor_descarga: Double = 0.0,
     val comissao: Double = 0.0,
+    // Servidor sempre mandou esses dois (fora/api/viagem/resumo.php) e já os
+    // soma dentro de total_despesas — mas como não existiam aqui, o
+    // deserializador descartava silenciosamente (ignoreUnknownKeys=true) e a
+    // tela nunca mostrava a linha, só o total já com eles embutidos. Motorista
+    // via "Total Despesas" maior que a soma das linhas visíveis, sem explicação.
+    val valor_imposto: Double = 0.0,
+    val valor_pedagio: Double = 0.0,
     val porcentagem_oleo: Double = 0.0,
     val total_despesas: Double = 0.0,
     val valor_frete: Double = 0.0,
