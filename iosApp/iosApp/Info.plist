@@ -13,6 +13,12 @@
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 
+	<!-- Nome exibido na tela inicial, TestFlight e App Store — PRODUCT_NAME
+	     (Config.xcconfig) ficou como "Motorista" por motivo histórico do
+	     projeto, mas o nome público do app é "Trakvia". -->
+	<key>CFBundleDisplayName</key>
+	<string>Trakvia</string>
+
 	<key>CFBundleDevelopmentRegion</key>
 	<string>pt-BR</string>
 	<key>CFBundleLocalizations</key>
