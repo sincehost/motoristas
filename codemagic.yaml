@@ -44,14 +44,13 @@ workflows:
       - name: Incrementa o número de build automaticamente (evita "build já usado")
         script: |
           cd iosApp
-          # As duas variantes de consulta via API (get-latest-app-store-build-number
-          # e get-latest-build-number) vinham falhando silenciosamente (o "|| echo 0"
-          # mascarava o erro real) e sempre devolvendo 1, colidindo com builds
-          # anteriores (ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE). $CM_BUILD_NUMBER é
-          # um contador interno do Codemagic que só cresce a cada build (sucesso ou
-          # falha) desse workflow — sempre maior que qualquer número já enviado,
-          # sem depender de consulta à App Store Connect.
-          agvtool new-version -all $CM_BUILD_NUMBER
+          # As tentativas anteriores (get-latest-app-store-build-number,
+          # get-latest-build-number, $CM_BUILD_NUMBER) falharam ou vieram vazias
+          # nesse ambiente, sempre colidindo com um build já enviado
+          # (ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE). Usar data/hora (UTC, até o
+          # minuto) como número de build garante que é sempre maior que qualquer
+          # build anterior, sem depender de nenhuma variável ou consulta externa.
+          agvtool new-version -all $(date -u +%Y%m%d%H%M)
 
       - name: Archive (Release, assinado)
         script: |
