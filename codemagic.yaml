@@ -44,7 +44,12 @@ workflows:
       - name: Incrementa o número de build automaticamente (evita "build já usado")
         script: |
           cd iosApp
-          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-app-store-build-number "$BUNDLE_ID" || echo 0)
+          # get-latest-app-store-build-number só olha versão publicada na App
+          # Store pública — como o app ainda só foi enviado pro TestFlight,
+          # esse comando não acha nada, cai no fallback "|| echo 0" e reusa
+          # o número 1, colidindo com o build anterior. get-latest-build-number
+          # olha qualquer build já enviado (TestFlight ou App Store).
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-build-number "$BUNDLE_ID" || echo 0)
           agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
 
       - name: Archive (Release, assinado)
