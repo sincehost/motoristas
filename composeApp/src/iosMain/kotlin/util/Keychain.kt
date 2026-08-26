@@ -6,8 +6,10 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
 import platform.CoreFoundation.CFDictionaryRef
+import platform.CoreFoundation.CFStringRef
 import platform.CoreFoundation.CFTypeRefVar
 import platform.CoreFoundation.kCFBooleanTrue
+import platform.Foundation.CFBridgingRelease
 import platform.Foundation.NSData
 import platform.Foundation.NSMutableDictionary
 import platform.Foundation.NSString
@@ -41,11 +43,21 @@ import platform.Security.kSecValueData
 object Keychain {
     private const val SERVICE = "br.com.lfsystem.app.Motorista"
 
+    // As constantes do Security framework (kSecClass, kSecAttrService...) chegam
+    // no Kotlin como CFStringRef (CPointer<__CFString>), não como NSString —
+    // usá-las direto como forKey de um NSMutableDictionary não compila
+    // ("NSCopyingProtocol was expected"). CFBridgingRelease é a ponte oficial
+    // (toll-free bridging) entre CoreFoundation e Foundation; seguro aqui porque
+    // essas chaves são constantes estáticas do framework, não objetos com
+    // contagem de referência que precisem ser retidos antes.
+    @Suppress("UNCHECKED_CAST")
+    private fun cfKey(ref: CFStringRef?): NSString = CFBridgingRelease(ref) as NSString
+
     private fun baseQuery(key: String): NSMutableDictionary {
         return NSMutableDictionary().apply {
-            setObject(kSecClassGenericPassword, forKey = kSecClass)
-            setObject(SERVICE, forKey = kSecAttrService)
-            setObject(key, forKey = kSecAttrAccount)
+            setObject(kSecClassGenericPassword, forKey = cfKey(kSecClass))
+            setObject(SERVICE, forKey = cfKey(kSecAttrService))
+            setObject(key, forKey = cfKey(kSecAttrAccount))
         }
     }
 
@@ -55,15 +67,15 @@ object Keychain {
         // se a chave já existir; mais simples que fazer update condicional.
         delete(key)
         val query = baseQuery(key).apply {
-            setObject(data, forKey = kSecValueData)
+            setObject(data, forKey = cfKey(kSecValueData))
         }
         SecItemAdd(query as CFDictionaryRef, null)
     }
 
     fun get(key: String): String? {
         val query = baseQuery(key).apply {
-            setObject(kCFBooleanTrue, forKey = kSecReturnData)
-            setObject(kSecMatchLimitOne, forKey = kSecMatchLimit)
+            setObject(kCFBooleanTrue, forKey = cfKey(kSecReturnData))
+            setObject(kSecMatchLimitOne, forKey = cfKey(kSecMatchLimit))
         }
         return memScoped {
             val result = alloc<CFTypeRefVar>()
