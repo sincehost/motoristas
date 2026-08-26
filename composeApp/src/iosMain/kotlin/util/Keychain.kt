@@ -5,6 +5,7 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
+import platform.CoreFoundation.CFDictionaryRef
 import platform.CoreFoundation.CFTypeRefVar
 import platform.CoreFoundation.kCFBooleanTrue
 import platform.Foundation.NSData
@@ -56,7 +57,7 @@ object Keychain {
         val query = baseQuery(key).apply {
             setObject(data, forKey = kSecValueData)
         }
-        SecItemAdd(query, null)
+        SecItemAdd(query as CFDictionaryRef, null)
     }
 
     fun get(key: String): String? {
@@ -66,7 +67,7 @@ object Keychain {
         }
         return memScoped {
             val result = alloc<CFTypeRefVar>()
-            val status = SecItemCopyMatching(query, result.ptr)
+            val status = SecItemCopyMatching(query as CFDictionaryRef, result.ptr)
             if (status != errSecSuccess) return@memScoped null
             val data = result.value as? NSData ?: return@memScoped null
             NSString.create(data, NSUTF8StringEncoding) as String?
@@ -74,6 +75,6 @@ object Keychain {
     }
 
     fun delete(key: String) {
-        SecItemDelete(baseQuery(key))
+        SecItemDelete(baseQuery(key) as CFDictionaryRef)
     }
 }

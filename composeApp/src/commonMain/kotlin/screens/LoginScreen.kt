@@ -474,8 +474,17 @@ fun LoginScreen(
                                                 repository.salvarTiposCombustivel(
                                                     sync.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) }
                                                 )
+                                            } else {
+                                                // Login prossegue mesmo assim (não bloqueia o motorista),
+                                                // mas antes essa falha ficava totalmente invisível — se
+                                                // acontecesse aqui, o motorista logava normalmente com
+                                                // destinos/equipamentos/tipos vazios, sem nenhum indício
+                                                // do porquê (parecia "sumiço" de dados de cadastro).
+                                                util.LogWriter.log("⚠️ syncDados após login retornou status != ok: ${sync.mensagem}")
                                             }
-                                        } catch (_: Exception) {}
+                                        } catch (e: Exception) {
+                                            util.LogWriter.log("⚠️ syncDados após login falhou: ${e.message}")
+                                        }
 
                                         onLoginSuccess()
                                     } else {
