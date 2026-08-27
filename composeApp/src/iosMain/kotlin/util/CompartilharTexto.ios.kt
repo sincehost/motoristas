@@ -5,9 +5,10 @@ import androidx.compose.runtime.remember
 import platform.Foundation.NSString
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIApplication
-import platform.UIKit.UIDevice
-import platform.UIKit.UIUserInterfaceIdiomPad
 
+// Sem guard de iPad de propósito: o app é TARGETED_DEVICE_FAMILY = "1"
+// (só iPhone) no Xcode, então o popover do UIActivityViewController — que
+// só é obrigatório em iPad — nunca entra em jogo aqui.
 @Composable
 actual fun rememberCompartilharTexto(): (titulo: String, texto: String) -> Unit {
     return remember {
@@ -19,12 +20,6 @@ actual fun rememberCompartilharTexto(): (titulo: String, texto: String) -> Unit 
                 )
                 val rootVC = UIApplication.sharedApplication.keyWindow?.rootViewController
                 if (rootVC != null) {
-                    // No iPad o UIActivityViewController precisa de um sourceView
-                    // pro popover, senão o app trava ao tentar abrir (crash
-                    // conhecido do UIKit, não específico deste app).
-                    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-                        activityVC.popoverPresentationController?.sourceView = rootVC.view
-                    }
                     rootVC.presentViewController(activityVC, animated = true, completion = null)
                 } else {
                     LogWriter.log("⚠️ [iOS] Compartilhar pendências: sem rootViewController disponível")
