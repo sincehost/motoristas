@@ -454,7 +454,8 @@ fun PendenciasSyncScreen(
                     onClick = {
                         val nome = repository.getMotoristaLogado()?.nome ?: "-"
                         val texto = montarRelatorioTexto(itens, nome)
-                        compartilharTexto("Pendências de sincronização - Trakvia", texto)
+                        val fotos = itens.flatMap { it.fotos.map { (_, base64) -> base64 } }
+                        compartilharTexto("Pendências de sincronização - Trakvia", texto, fotos)
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -616,6 +617,15 @@ private fun PendenciaCard(
                     Icon(Icons.Default.DeleteForever, "Excluir todos deste tipo", tint = AppColors.Error)
                 }
             }
+            // Indica que o card inteiro é tocável (abre "Ver detalhes", com
+            // os campos preenchidos e a foto) — sem isso, só o ícone de
+            // lixeira chamava atenção e o resto do card parecia decorativo.
+            Icon(
+                Icons.Default.ChevronRight,
+                "Ver detalhes",
+                tint = AppColors.TextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
