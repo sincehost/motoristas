@@ -58,8 +58,14 @@ fun mensagemErroAmigavel(erro: String?): String {
 
         msg.contains("JsonDecodingException", ignoreCase = true) ||
         msg.contains("SerializationException", ignoreCase = true) ||
+        msg.contains("MissingFieldException", ignoreCase = true) ||
         msg.contains("Unexpected JSON", ignoreCase = true) ->
-            "Não foi possível processar a resposta do servidor. Tente novamente."
+            // Sintoma típico de incompatibilidade entre a versão do app e a
+            // API (campo novo que o app antigo não entende, ou campo que o
+            // app espera e a API não manda mais) — mensagem diferenciada
+            // porque "tente novamente" não resolve nada nesse caso; só
+            // atualizar o app ou esperar a API voltar a ser compatível.
+            "Não foi possível processar a resposta do servidor. Isso pode acontecer se o aplicativo estiver desatualizado — verifique se há uma atualização disponível na loja de aplicativos."
 
         msg.contains("network", ignoreCase = true) || msg.contains("conectividade", ignoreCase = true) ->
             "Problema de conexão. Verifique sua internet e tente novamente."

@@ -232,6 +232,12 @@ deleteViagensSincronizadas:
 DELETE FROM Viagem WHERE sincronizado = 1;
 deleteViagemById:
 DELETE FROM Viagem WHERE id = ?;
+
+-- Recuperação de emergência: apaga TODAS as viagens ainda não sincronizadas
+-- de uma vez (usado quando a tela de Pendências não consegue nem carregar
+-- uma delas por dado incompatível, e não há como escolher uma por uma).
+deleteViagensNaoSincronizadas:
+DELETE FROM Viagem WHERE sincronizado = 0;
 -- ===============================
 -- CONTAGEM TOTAL DE PENDENTES
 -- ===============================
@@ -293,6 +299,9 @@ DELETE FROM Arla WHERE viagem_id = ?;
 
 deleteArlasSincronizadas:
 DELETE FROM Arla WHERE sincronizado = 1;
+
+deleteArlasNaoSincronizadas:
+DELETE FROM Arla WHERE sincronizado = 0;
 
 -- ===============================
 -- TABELA DE ABASTECIMENTO (para sincronizar)
@@ -361,6 +370,9 @@ DELETE FROM Abastecimento WHERE viagem_id = ?;
 
 deleteAbastecimentosSincronizados:
 DELETE FROM Abastecimento WHERE sincronizado = 1;
+
+deleteAbastecimentosNaoSincronizados:
+DELETE FROM Abastecimento WHERE sincronizado = 0;
 
 
 -- ===============================
@@ -471,6 +483,9 @@ DELETE FROM Manutencao WHERE viagem_id = ?;
 deleteManutencoesSincronizadas:
 DELETE FROM Manutencao WHERE sincronizado = 1;
 
+deleteManutencoesNaoSincronizadas:
+DELETE FROM Manutencao WHERE sincronizado = 0;
+
 getLastInsertedManutencaoId:
 SELECT last_insert_rowid();
 
@@ -538,6 +553,9 @@ DELETE FROM FinalizacaoViagem WHERE viagem_id = ?;
 
 deleteFinalizacoesSincronizadas:
 DELETE FROM FinalizacaoViagem WHERE sincronizado = 1;
+
+deleteFinalizacoesNaoSincronizadas:
+DELETE FROM FinalizacaoViagem WHERE sincronizado = 0;
 
 -- ===============================
 -- TABELA DE DESCARGA (para sincronizar)
@@ -639,6 +657,9 @@ DELETE FROM Descarga WHERE viagem_id = ?;
 deleteDescargasSincronizadas:
 DELETE FROM Descarga WHERE sincronizado = 1;
 
+deleteDescargasNaoSincronizadas:
+DELETE FROM Descarga WHERE sincronizado = 0;
+
 -- ===============================
 -- QUERIES DE ATUALIZAÇÃO DE IDs DE VIAGENS
 -- ===============================
@@ -739,6 +760,9 @@ DELETE FROM OutraDespesa WHERE viagem_id = ?;
 
 deleteOutrasDespesasSincronizadas:
 DELETE FROM OutraDespesa WHERE sincronizado = 1;
+
+deleteOutrasDespesasNaoSincronizadas:
+DELETE FROM OutraDespesa WHERE sincronizado = 0;
 
 atualizarViagemIdOutrasDespesas:
 UPDATE OutraDespesa
@@ -899,6 +923,9 @@ DELETE FROM ChecklistPreViagem WHERE viagem_id = ?;
 deleteChecklistsPreSincronizados:
 DELETE FROM ChecklistPreViagem WHERE sincronizado = 1;
 
+deleteChecklistsPreNaoSincronizados:
+DELETE FROM ChecklistPreViagem WHERE sincronizado = 0;
+
 getChecklistPrePorViagem:
 SELECT * FROM ChecklistPreViagem WHERE viagem_id = :viagem_id ORDER BY id DESC LIMIT 1;
 
@@ -947,6 +974,9 @@ DELETE FROM ChecklistPosViagem WHERE viagem_id = ?;
 
 deleteChecklistsPosSincronizados:
 DELETE FROM ChecklistPosViagem WHERE sincronizado = 1;
+
+deleteChecklistsPosNaoSincronizados:
+DELETE FROM ChecklistPosViagem WHERE sincronizado = 0;
 
 getChecklistPosPorViagem:
 SELECT * FROM ChecklistPosViagem WHERE viagem_id = :viagem_id ORDER BY id DESC LIMIT 1;

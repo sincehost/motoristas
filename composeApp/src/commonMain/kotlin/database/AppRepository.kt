@@ -358,6 +358,19 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         }
     }
 
+    /**
+     * Recuperação de emergência: apaga TODAS as viagens pendentes de uma vez,
+     * sem precisar ler/decodificar cada uma primeiro. Usado quando a tela de
+     * Pendências não consegue nem montar a lista desse tipo (dado local
+     * incompatível com o app atual) — nesse caso não há como oferecer exclusão
+     * item a item, então essa é a única forma de destravar sem reinstalar.
+     * Dependentes (abastecimento, arla etc.) dessas viagens NÃO são apagados
+     * aqui de propósito — cada categoria tem seu próprio botão de emergência.
+     */
+    fun excluirTodasViagensPendentes() {
+        queries.deleteViagensNaoSincronizadas()
+    }
+
     // Guarda o último viagem_id retornado pelo servidor após sincronização
     fun salvarUltimaViagemServidor(viagemIdServidor: Long) {
         queries.salvarUltimaViagemServidor(viagemIdServidor)
@@ -492,6 +505,11 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         queries.deleteArlaById(id)
     }
 
+    /** Recuperação de emergência — ver [excluirTodasViagensPendentes]. */
+    fun excluirTodasArlasPendentes() {
+        queries.deleteArlasNaoSincronizadas()
+    }
+
     fun limparArlasSincronizadas() {
         queries.deleteArlasSincronizadas()
     }
@@ -548,6 +566,11 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     fun excluirAbastecimentoLocal(id: Long) {
         queries.deleteAbastecimentoById(id)
+    }
+
+    /** Recuperação de emergência — ver [excluirTodasViagensPendentes]. */
+    fun excluirTodosAbastecimentosPendentes() {
+        queries.deleteAbastecimentosNaoSincronizados()
     }
 
     fun limparAbastecimentosSincronizados() {
@@ -652,6 +675,11 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         queries.deleteManutencaoById(id)
     }
 
+    /** Recuperação de emergência — ver [excluirTodasViagensPendentes]. */
+    fun excluirTodasManutencoesPendentes() {
+        queries.deleteManutencoesNaoSincronizadas()
+    }
+
     fun limparManutencoesSincronizadas() {
         queries.deleteManutencoesSincronizadas()
     }
@@ -706,6 +734,11 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         queries.deleteFinalizacaoById(id)
     }
 
+    /** Recuperação de emergência — ver [excluirTodasViagensPendentes]. */
+    fun excluirTodasFinalizacoesPendentes() {
+        queries.deleteFinalizacoesNaoSincronizadas()
+    }
+
     fun limparFinalizacoesSincronizadas() {
         queries.deleteFinalizacoesSincronizadas()
     }
@@ -748,6 +781,11 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     fun excluirDescargaLocal(id: Long) {
         queries.deleteDescargaById(id)
+    }
+
+    /** Recuperação de emergência — ver [excluirTodasViagensPendentes]. */
+    fun excluirTodasDescargasPendentes() {
+        queries.deleteDescargasNaoSincronizadas()
     }
 
     fun limparDescargasSincronizadas() {
@@ -861,6 +899,11 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         queries.deleteOutraDespesaById(id)
     }
 
+    /** Recuperação de emergência — ver [excluirTodasViagensPendentes]. */
+    fun excluirTodasOutrasDespesasPendentes() {
+        queries.deleteOutrasDespesasNaoSincronizadas()
+    }
+
     fun limparOutrasDespesasSincronizadas() {
         queries.deleteOutrasDespesasSincronizadas()
     }
@@ -925,6 +968,11 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         queries.deleteChecklistPreById(id)
     }
 
+    /** Recuperação de emergência — ver [excluirTodasViagensPendentes]. */
+    fun excluirTodosChecklistsPrePendentes() {
+        queries.deleteChecklistsPreNaoSincronizados()
+    }
+
     fun limparChecklistsPreSincronizados() {
         queries.deleteChecklistsPreSincronizados()
     }
@@ -982,6 +1030,11 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     fun excluirChecklistPosLocal(id: Long) {
         queries.deleteChecklistPosById(id)
+    }
+
+    /** Recuperação de emergência — ver [excluirTodasViagensPendentes]. */
+    fun excluirTodosChecklistsPosPendentes() {
+        queries.deleteChecklistsPosNaoSincronizados()
     }
 
     fun limparChecklistsPosSincronizados() {
