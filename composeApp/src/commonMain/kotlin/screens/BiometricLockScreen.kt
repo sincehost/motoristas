@@ -2,6 +2,7 @@ package screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Logout
@@ -11,6 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,6 +37,9 @@ fun BiometricLockScreen(
     var erro by remember { mutableStateOf<String?>(null) }
     var autenticando by remember { mutableStateOf(false) }
     var mostrarConfirmacaoSair by remember { mutableStateOf(false) }
+    var mostrarDialogSenha by remember { mutableStateOf(false) }
+    var senhaDigitada by remember { mutableStateOf("") }
+    var erroSenha by remember { mutableStateOf<String?>(null) }
 
     fun tentarAutenticar() {
         autenticando = true
@@ -49,9 +55,67 @@ fun BiometricLockScreen(
 
     LaunchedEffect(Unit) { tentarAutenticar() }
 
-    // Mesmo diálogo/aviso do logout real do Dashboard — se o motorista não
-    // conseguir desbloquear (ex.: sensor com problema), a única saída não
-    // pode ser um bypass silencioso que finge que nada aconteceu.
+    // Fallback pra quando a biometria do aparelho não funciona (sensor com
+    // defeito, Face ID não configurado após troca de celular, etc.) — o
+    // motorista já tem sessão local válida, só precisa provar identidade
+    // sem depender do sensor.
+    if (mostrarDialogSenha) {
+        AppAlertDialog(
+            onDismissRequest = { mostrarDialogSenha = false; senhaDigitada = ""; erroSenha = null },
+            containerColor = AppColors.Surface,
+            title = { Text("Digite sua senha", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text(
+                        "Use a senha da sua conta para continuar sem a biometria.",
+                        fontSize = 13.sp,
+                        color = AppColors.TextSecondary
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = senhaDigitada,
+                        onValueChange = { senhaDigitada = it; erroSenha = null },
+                        label = { Text("Senha") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        isError = erroSenha != null,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (erroSenha != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(erroSenha ?: "", color = AppColors.Error, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val motorista = repository.getMotoristaLogado()
+                    val confere = motorista != null && repository.verificarCredenciaisOffline(
+                        cnpj = motorista.cnpj,
+                        usuario = motorista.usuario,
+                        senha = senhaDigitada
+                    )
+                    if (confere) {
+                        mostrarDialogSenha = false
+                        senhaDigitada = ""
+                        erroSenha = null
+                        onUnlocked()
+                    } else {
+                        erroSenha = "Senha incorreta"
+                    }
+                }) { Text("Entrar") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { mostrarDialogSenha = false; senhaDigitada = ""; erroSenha = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Se o motorista não conseguir desbloquear de nenhuma forma, a única
+    // saída não pode ser um bypass silencioso que finge que nada aconteceu.
     if (mostrarConfirmacaoSair) {
         AppAlertDialog(
             onDismissRequest = { mostrarConfirmacaoSair = false },
@@ -110,7 +174,11 @@ fun BiometricLockScreen(
                     Text("Tentar novamente")
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = { mostrarDialogSenha = true }) {
+                Text("Usar senha em vez disso", color = AppColors.Primary, fontSize = 13.sp)
+            }
+            Spacer(Modifier.height(8.dp))
             TextButton(onClick = { mostrarConfirmacaoSair = true }) {
                 Text("Sair e entrar com outra conta", color = AppColors.TextSecondary, fontSize = 13.sp)
             }
