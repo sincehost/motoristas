@@ -901,8 +901,10 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         LinhaResumo("Diesel Aparelho:", formatarMoeda(resumo!!.valor_diesel_aparelho))
                         LinhaResumo("ARLA:", formatarMoeda(resumo!!.valor_arla))
                         LinhaResumo("Descarga:", formatarMoeda(resumo!!.valor_descarga))
-                        LinhaResumo("Comissão:", formatarMoeda(resumo!!.comissao))
-                        LinhaResumo("Imposto:", formatarMoeda(resumo!!.valor_imposto))
+                        // Comissão NÃO é despesa operacional — é o ganho do motorista,
+                        // por isso não entra mais aqui (fica em destaque perto do
+                        // Frete, abaixo). Imposto é conta da empresa, não aparece mais
+                        // pro motorista.
                         LinhaResumo("Pedágio:", formatarMoeda(resumo!!.valor_pedagio))
 
                         if (outrasDespesas.isNotEmpty()) {
@@ -948,7 +950,14 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         }
 
                         LinhaResumo("Total Frete:", formatarMoeda(resumo!!.saldo_frete))
-                        LinhaResumoDestaque("Saldo Viagem:", formatarMoeda(resumo!!.saldo_viagem), if (resumo!!.saldo_viagem >= 0) AppColors.Secondary else AppColors.Error)
+                        // Comissão em destaque, separada do resultado da operação —
+                        // é a resposta pra "quanto eu vou ganhar nessa viagem". Não
+                        // aparece pra motorista de salário fixo (comissão sempre 0
+                        // nesse caso, e o salário não é por viagem).
+                        if (resumo!!.comissao > 0) {
+                            LinhaResumoDestaque("Sua Comissão:", formatarMoeda(resumo!!.comissao), AppColors.Secondary)
+                        }
+                        LinhaResumoDestaque("Resultado da Viagem:", formatarMoeda(resumo!!.saldo_viagem), if (resumo!!.saldo_viagem >= 0) AppColors.Secondary else AppColors.Error)
 
                         if (resumo!!.descricao.isNotEmpty()) {
                             Spacer(Modifier.height(16.dp))
@@ -1536,8 +1545,6 @@ private fun exportarResumoPdfIos(res: ResumoViagem, outrasDespesas: List<OutraDe
             drawItem("Diesel Aparelho:", formatarMoeda(res.valor_diesel_aparelho))
             drawItem("ARLA:", formatarMoeda(res.valor_arla))
             drawItem("Descarga:", formatarMoeda(res.valor_descarga))
-            drawItem("Comissão:", formatarMoeda(res.comissao))
-            drawItem("Imposto:", formatarMoeda(res.valor_imposto))
             drawItem("Pedágio:", formatarMoeda(res.valor_pedagio))
 
             if (outrasDespesas.isNotEmpty()) {
@@ -1568,10 +1575,13 @@ private fun exportarResumoPdfIos(res: ResumoViagem, outrasDespesas: List<OutraDe
                 drawItem("Frete Retorno:", formatarMoeda(res.valor_frete_retorno))
             }
             drawItem("Total Frete:", formatarMoeda(res.saldo_frete))
+            if (res.comissao > 0) {
+                drawItem("Sua Comissão:", formatarMoeda(res.comissao))
+            }
 
             y += 8.0
             val corSaldo = if (res.saldo_viagem >= 0) "#10B981" else "#EF4444"
-            desenharTexto("SALDO: ${formatarMoeda(res.saldo_viagem)}", left, 16.0, true, corHexPdf(corSaldo))
+            desenharTexto("RESULTADO DA VIAGEM: ${formatarMoeda(res.saldo_viagem)}", left, 16.0, true, corHexPdf(corSaldo))
         }
 
         val nomeArquivo = "resumo_viagem_${viagemId}_${res.destino_nome.replace(" ", "_").take(20)}.pdf"
