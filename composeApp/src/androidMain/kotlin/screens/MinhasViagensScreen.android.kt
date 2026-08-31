@@ -939,7 +939,9 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
             }
 
             drawSection("Dados da Viagem", "#07275A")
-            drawItem("Peso da Carga:", formatarPesoView(res.pesocarga.toDoubleOrNull()?.toLong()?.toString() ?: res.pesocarga.filter { it.isDigit() }) + " kg")
+            if (res.pesocarga.isNotBlank()) {
+                drawItem("Peso da Carga:", formatarPesoView(res.pesocarga.toDoubleOrNull()?.toLong()?.toString() ?: res.pesocarga.filter { it.isDigit() }) + " kg")
+            }
             drawItem("KM Início:", formatarKmExibicao(res.km_inicio))
             drawItem("KM Chegada:", formatarKmExibicao(res.km_chegada))
             drawItem("KM da Rota:", "${formatarKmExibicao(res.km_da_rota)} km")
@@ -1061,7 +1063,13 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
 
                         LinhaResumo("Rota:", resumo!!.destino_nome)
                         LinhaResumo("Ordem de Frete:", resumo!!.numerobd)
-                        LinhaResumo("Peso da Carga:", formatarPesoView(resumo!!.pesocarga.toDoubleOrNull()?.toLong()?.toString() ?: resumo!!.pesocarga.filter { it.isDigit() }) + " kg")
+                        // Rota Contínua não coleta peso da carga no Iniciar Viagem —
+                        // fica sempre vazio pra essas viagens, então só mostra a linha
+                        // quando tem valor real (cobre os dois modos sem precisar saber
+                        // qual é: Rota Fixa sempre preenche, Rota Contínua nunca).
+                        if (resumo!!.pesocarga.isNotBlank()) {
+                            LinhaResumo("Peso da Carga:", formatarPesoView(resumo!!.pesocarga.toDoubleOrNull()?.toLong()?.toString() ?: resumo!!.pesocarga.filter { it.isDigit() }) + " kg")
+                        }
                         LinhaResumo("Data Início:", formatarData(resumo!!.data_viagem))
                         LinhaResumoDataChegada(resumo!!.data_chegada)
                         LinhaResumo("KM Início:", formatarKmExibicao(resumo!!.km_inicio))
