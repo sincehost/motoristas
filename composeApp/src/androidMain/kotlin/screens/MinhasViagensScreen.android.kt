@@ -992,14 +992,14 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                 drawItem("Frete Retorno:", formatarMoeda(res.valor_frete_retorno))
             }
             drawItem("Total Frete:", formatarMoeda(res.saldo_frete))
+            // "Resultado da Viagem" (lucro/prejuízo da empresa) não aparece pro
+            // motorista de propósito — quem paga a conta é o administrador, e a
+            // comissão dele não depende desse resultado (é sempre % do frete).
             if (res.comissao > 0) {
-                drawItem("Sua Comissão:", formatarMoeda(res.comissao))
+                y += 8f
+                paint.textSize = 16f; paint.isFakeBoldText = true; paint.color = android.graphics.Color.parseColor("#10B981")
+                canvas.drawText("SUA COMISSÃO: ${formatarMoeda(res.comissao)}", left, y, paint)
             }
-
-            y += 8f
-            val saldoColor = if (res.saldo_viagem >= 0) "#10B981" else "#EF4444"
-            paint.textSize = 16f; paint.isFakeBoldText = true; paint.color = android.graphics.Color.parseColor(saldoColor)
-            canvas.drawText("RESULTADO DA VIAGEM: ${formatarMoeda(res.saldo_viagem)}", left, y, paint)
 
             document.finishPage(page)
 
@@ -1187,14 +1187,16 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         }
 
                         LinhaResumo("Total Frete:", formatarMoeda(resumo!!.saldo_frete))
-                        // Comissão em destaque, separada do resultado da operação —
-                        // é a resposta pra "quanto eu vou ganhar nessa viagem". Não
-                        // aparece pra motorista de salário fixo (comissão sempre 0
-                        // nesse caso, e o salário não é por viagem).
+                        // Comissão em destaque — é a resposta pra "quanto eu vou ganhar
+                        // nessa viagem". Não aparece pra motorista de salário fixo
+                        // (comissão sempre 0 nesse caso, e o salário não é por viagem).
+                        // "Resultado da Viagem" (lucro/prejuízo da empresa) não aparece
+                        // aqui de propósito — quem paga a conta é o administrador, e a
+                        // comissão do motorista não depende desse resultado (é sempre
+                        // % do frete). Fica só no admin.
                         if (resumo!!.comissao > 0) {
                             LinhaResumoDestaque("Sua Comissão:", formatarMoeda(resumo!!.comissao), AppColors.Secondary)
                         }
-                        LinhaResumoDestaque("Resultado da Viagem:", formatarMoeda(resumo!!.saldo_viagem), if (resumo!!.saldo_viagem >= 0) AppColors.Secondary else AppColors.Error)
 
                         if (resumo!!.descricao.isNotEmpty()) {
                             Spacer(Modifier.height(16.dp))

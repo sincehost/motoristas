@@ -950,14 +950,16 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         }
 
                         LinhaResumo("Total Frete:", formatarMoeda(resumo!!.saldo_frete))
-                        // Comissão em destaque, separada do resultado da operação —
-                        // é a resposta pra "quanto eu vou ganhar nessa viagem". Não
-                        // aparece pra motorista de salário fixo (comissão sempre 0
-                        // nesse caso, e o salário não é por viagem).
+                        // Comissão em destaque — é a resposta pra "quanto eu vou ganhar
+                        // nessa viagem". Não aparece pra motorista de salário fixo
+                        // (comissão sempre 0 nesse caso, e o salário não é por viagem).
+                        // "Resultado da Viagem" (lucro/prejuízo da empresa) não aparece
+                        // aqui de propósito — quem paga a conta é o administrador, e a
+                        // comissão do motorista não depende desse resultado (é sempre
+                        // % do frete). Fica só no admin.
                         if (resumo!!.comissao > 0) {
                             LinhaResumoDestaque("Sua Comissão:", formatarMoeda(resumo!!.comissao), AppColors.Secondary)
                         }
-                        LinhaResumoDestaque("Resultado da Viagem:", formatarMoeda(resumo!!.saldo_viagem), if (resumo!!.saldo_viagem >= 0) AppColors.Secondary else AppColors.Error)
 
                         if (resumo!!.descricao.isNotEmpty()) {
                             Spacer(Modifier.height(16.dp))
@@ -1575,13 +1577,13 @@ private fun exportarResumoPdfIos(res: ResumoViagem, outrasDespesas: List<OutraDe
                 drawItem("Frete Retorno:", formatarMoeda(res.valor_frete_retorno))
             }
             drawItem("Total Frete:", formatarMoeda(res.saldo_frete))
+            // "Resultado da Viagem" (lucro/prejuízo da empresa) não aparece pro
+            // motorista de propósito — quem paga a conta é o administrador, e a
+            // comissão dele não depende desse resultado (é sempre % do frete).
             if (res.comissao > 0) {
-                drawItem("Sua Comissão:", formatarMoeda(res.comissao))
+                y += 8.0
+                desenharTexto("SUA COMISSÃO: ${formatarMoeda(res.comissao)}", left, 16.0, true, corHexPdf("#10B981"))
             }
-
-            y += 8.0
-            val corSaldo = if (res.saldo_viagem >= 0) "#10B981" else "#EF4444"
-            desenharTexto("RESULTADO DA VIAGEM: ${formatarMoeda(res.saldo_viagem)}", left, 16.0, true, corHexPdf(corSaldo))
         }
 
         val nomeArquivo = "resumo_viagem_${viagemId}_${res.destino_nome.replace(" ", "_").take(20)}.pdf"
