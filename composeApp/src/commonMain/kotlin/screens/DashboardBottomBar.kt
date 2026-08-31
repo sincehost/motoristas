@@ -279,7 +279,8 @@ fun BottomNavigationBar(
 @Composable
 fun DespesasMenuOverlay(
     onDismiss: () -> Unit,
-    onNavigate: (Screen) -> Unit
+    onNavigate: (Screen) -> Unit,
+    rotaContinua: Boolean = false
 ) {
     Box(
         modifier = Modifier
@@ -315,6 +316,11 @@ fun DespesasMenuOverlay(
                 }
                 DespesaMenuItem("Descarga", Icons.Default.Inventory, Color(0xFF8B5CF6)) {
                     onDismiss(); onNavigate(Screen.ADICIONAR_DESCARGA)
+                }
+                if (rotaContinua) {
+                    DespesaMenuItem("Adicionar Frete", Icons.Default.LocalShipping, Color(0xFFF59E0B)) {
+                        onDismiss(); onNavigate(Screen.ADICIONAR_FRETE)
+                    }
                 }
                 HorizontalDivider()
                 DespesaMenuItem("Outras Despesas", Icons.Default.MoreHoriz, Color(0xFFFF6F00)) {

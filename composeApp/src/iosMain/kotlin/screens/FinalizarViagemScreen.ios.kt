@@ -41,8 +41,8 @@ import util.CameraHelper
 import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
-import util.formatarKmInput
-import util.normalizarKmParaEnvio
+import util.formatarKmVeiculo
+import util.normalizarKmVeiculoParaEnvio
 import util.kmParaDouble
 import util.formatarKmExibicao
 import util.mensagemErroAmigavel
@@ -219,6 +219,15 @@ actual fun FinalizarViagemScreen(
         }
         carregando = false
     }
+
+    // Característica fixa do veículo desta viagem (não do motorista
+    // digitando) — ver util/KmUtils.kt e migracao_hodometro_decimal.sql.
+    val hodometroTemDecimal = remember(viagemAtual?.placa) {
+        repository.hodometroTemDecimal(viagemAtual?.placa ?: "")
+    }
+    // Rota Contínua: frete de retorno já é coberto pelos fretes cadastrados
+    // durante a viagem ("Adicionar Frete") — essa etapa some no Finalizar.
+    val rotaContinua = remember { repository.isRotaContinua() }
 
     // Campos do formulário
     var kmChegada by remember { mutableStateOf(TextFieldValue("")) }
@@ -461,7 +470,7 @@ actual fun FinalizarViagemScreen(
     // Função finalizar viagem (chamada após confirmação)
     fun finalizarViagem() {
         val dataChegadaAPI = converterDataParaAPI(dataChegada)
-        val kmChegadaNormalizado = normalizarKmParaEnvio(kmChegada.text)
+        val kmChegadaNormalizado = normalizarKmVeiculoParaEnvio(kmChegada.text, hodometroTemDecimal)
         val viagemId = viagemAtual!!.viagem_id
 
         scope.launch {
@@ -792,7 +801,7 @@ actual fun FinalizarViagemScreen(
                         OutlinedTextField(
                             value = kmChegada,
                             onValueChange = { newValue ->
-                                val formatted = formatarKmInput(newValue.text)
+                                val formatted = formatarKmVeiculo(newValue.text, hodometroTemDecimal)
                                 kmChegada = TextFieldValue(
                                     text = formatted,
                                     selection = TextRange(formatted.length)
@@ -800,13 +809,13 @@ actual fun FinalizarViagemScreen(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            keyboardOptions = KeyboardOptions(keyboardType = if (hodometroTemDecimal) KeyboardType.Decimal else KeyboardType.Number),
                             leadingIcon = {
                                 Icon(Icons.Default.Speed, null, tint = Color(0xFF10B981))
                             },
-                            placeholder = { Text("Ex.: 115750.5", color = Color(0xFF9CA3AF)) })
+                            placeholder = { Text(if (hodometroTemDecimal) "Ex.: 115750.5" else "Ex.: 115750", color = Color(0xFF9CA3AF)) })
                         Text(
-                            "Digite como aparece no painel. Ex.: 115750.5",
+                            if (hodometroTemDecimal) "Digite como aparece no painel. Ex.: 115750.5" else "Digite como aparece no painel. Ex.: 115750",
                             fontSize = 12.sp,
                             color = AppColors.Primary,
                             modifier = Modifier.padding(start = 4.dp, top = 2.dp)
@@ -865,6 +874,11 @@ actual fun FinalizarViagemScreen(
                         
 
                         Spacer(Modifier.height(20.dp))
+
+                        // Rota Contínua: frete de retorno já é coberto pelos fretes
+                        // cadastrados durante a viagem ("Adicionar Frete") — essa
+                        // etapa inteira some, mantendo só KM final/foto/observação.
+                        if (!rotaContinua) {
 
                         // Frete de Retorno
                         Text(
@@ -1055,10 +1069,12 @@ actual fun FinalizarViagemScreen(
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         prefix = { Text("R$ ") },
                                         placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
-                                    
+
                                 }
                             }
                         }
+
+                        } // fim if (!rotaContinua) — Frete de Retorno
 
                         Spacer(Modifier.height(24.dp))
 

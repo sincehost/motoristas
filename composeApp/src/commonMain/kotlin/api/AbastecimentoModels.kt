@@ -90,6 +90,47 @@ data class SalvarArlaResponse(
     val mensagem: String? = null
 )
 
+// ========== FRETE (Rota Contínua) ==========
+@Serializable
+data class SalvarFreteRequest(
+    val motorista_id: String,
+    val viagem_id: Int,
+    val tipo: String,
+    val numero_identificacao: String,
+    val valor: String,
+    val foto_base64: String? = null
+)
+
+@Serializable
+data class SalvarFreteResponse(
+    val status: String,
+    val mensagem: String? = null,
+    val frete_id: String? = null
+)
+
+@Serializable
+data class ListarFretesRequest(
+    val motorista_id: String,
+    val viagem_id: Int
+)
+
+@Serializable
+data class ListarFretesResponse(
+    val status: String,
+    val mensagem: String? = null,
+    val fretes: List<FreteDto> = emptyList()
+)
+
+@Serializable
+data class FreteDto(
+    val id: String,
+    val tipo: String,
+    val numero_identificacao: String,
+    val valor: Double,
+    val foto: String? = null,
+    val data_cadastro: String
+)
+
 // ===============================
 // FINALIZAR VIAGEM
 // ===============================

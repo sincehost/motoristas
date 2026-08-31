@@ -317,6 +317,22 @@ object ApiClient {
         }.body()
     }
 
+    suspend fun salvarFrete(request: SalvarFreteRequest): SalvarFreteResponse {
+        return client.post("${getBaseUrl()}/frete/salvar.php") {
+            contentType(ContentType.Application.Json)
+            withAuth()
+            setBody(request)
+        }.body()
+    }
+
+    suspend fun listarFretes(request: ListarFretesRequest): ListarFretesResponse {
+        return client.post("${getBaseUrl()}/frete/listar.php") {
+            contentType(ContentType.Application.Json)
+            withAuth()
+            setBody(request)
+        }.body()
+    }
+
     suspend fun detalheArla(request: DetalheArlaRequest): DetalheArlaResponse {
         return client.post("${getBaseUrl()}/arla/detalhe.php") {
             contentType(ContentType.Application.Json)
@@ -603,7 +619,18 @@ data class SyncDadosResponse(
     val formas_pagamento: List<FormaPagamentoDto> = emptyList(),
     val tipos_despesa: List<TipoDespesaDto> = emptyList(),
     val tipos_combustivel: List<TipoCombustivelDto> = emptyList(),
+    val configuracoes: ConfiguracaoEmpresaDto = ConfiguracaoEmpresaDto(),
     val mensagem: String? = null
+)
+
+/**
+ * Configs de admin_config.php?tab=app que precisam chegar no client — hoje
+ * só tipo_operacao ("fixa" | "continua"). Default "fixa" = comportamento de
+ * sempre, pra servidor antigo (sem a coluna ainda) não quebrar nada.
+ */
+@Serializable
+data class ConfiguracaoEmpresaDto(
+    val tipo_operacao: String = "fixa"
 )
 
 @Serializable
@@ -632,7 +659,11 @@ data class EquipamentoDto(
     val placa: String,
     val km: String = "",
     // "veiculo" | "implemento" | null (ainda não classificado no servidor).
-    val categoria: String? = null
+    val categoria: String? = null,
+    // Se o painel do hodômetro desse veículo mostra 1 casa decimal (true)
+    // ou só número inteiro (false). Default true = comportamento de sempre,
+    // pra servidor antigo (sem essa coluna ainda) não quebrar nada.
+    val hodometro_tem_decimal: Boolean = true
 )
 
 @Serializable
@@ -665,7 +696,10 @@ data class ViagemRequest(
     val cte: String,
     val numerobd2: String? = null,
     val cte2: String? = null,
-    val destino_id: Int,
+    // null em Rota Contínua (destino_livre é usado no lugar) — ver
+    // migracao_tipo_operacao.sql / viagem/inserir.php.
+    val destino_id: Int? = null,
+    val destino_livre: String? = null,
     val data_viagem: String,
     val km_inicio: String,
     val placa: String,
@@ -675,7 +709,8 @@ data class ViagemRequest(
     val veiculo_id: Int? = null,
     val implemento1_id: Int? = null,
     val implemento2_id: Int? = null,
-    val pesocarga: String,
+    // null em Rota Contínua (peso não é obrigatório nesse modo).
+    val pesocarga: String? = null,
     val valorfrete: String? = null,
     val foto_painel_saida: String? = null
 )

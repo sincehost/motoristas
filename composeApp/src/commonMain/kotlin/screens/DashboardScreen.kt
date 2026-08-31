@@ -139,6 +139,14 @@ fun DashboardScreen(
                                 AppEvents.emitir(AppEvent.DadosPendentesAlterados)
                             }
                         )
+                        Screen.ADICIONAR_FRETE -> AdicionarFreteScreen(
+                            repository = repository,
+                            onVoltar = { voltar() },
+                            onSucesso = {
+                                voltar()
+                                AppEvents.emitir(AppEvent.DadosPendentesAlterados)
+                            }
+                        )
                         Screen.FINALIZAR_VIAGEM -> FinalizarViagemScreen(
                             repository = repository,
                             onVoltar = { voltar() },
@@ -434,7 +442,8 @@ private fun DashboardContent(
     if (mostrarMenuDespesas) {
         DespesasMenuOverlay(
             onDismiss = { mostrarMenuDespesas = false },
-            onNavigate = { screen -> onNavigate(screen) }
+            onNavigate = { screen -> onNavigate(screen) },
+            rotaContinua = remember { repository.isRotaContinua() }
         )
     }
 
@@ -703,6 +712,7 @@ private fun DashboardMenuItems(
             if (sync.status == "ok") {
                 repository.salvarDestinos(sync.destinos.map { it.id to it.nome })
                 repository.salvarEquipamentos(sync.equipamentos)
+                repository.salvarConfiguracaoEmpresa(sync.configuracoes.tipo_operacao)
                 repository.salvarFormasPagamento(sync.formas_pagamento.map { Triple(it.id, it.nome, it.codigo) })
                 repository.salvarTiposDespesa(sync.tipos_despesa.map { TipoDespesaSync(it.id, it.nome, it.icone, it.cor) })
                 repository.salvarTiposCombustivel(sync.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) })

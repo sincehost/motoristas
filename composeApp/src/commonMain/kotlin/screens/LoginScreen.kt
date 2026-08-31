@@ -465,6 +465,7 @@ fun LoginScreen(
                                                     sync.destinos.map { it.id to it.nome }
                                                 )
                                                 repository.salvarEquipamentos(sync.equipamentos)
+                                                repository.salvarConfiguracaoEmpresa(sync.configuracoes.tipo_operacao)
                                                 repository.salvarFormasPagamento(
                                                     sync.formas_pagamento.map { Triple(it.id, it.nome, it.codigo) }
                                                 )

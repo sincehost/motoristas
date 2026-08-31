@@ -10,6 +10,7 @@ import br.com.lfsystem.app.database.TipoCombustivel
 import br.com.lfsystem.app.database.Viagem
 
 import br.com.lfsystem.app.database.Arla
+import br.com.lfsystem.app.database.Frete
 import br.com.lfsystem.app.database.Abastecimento
 import br.com.lfsystem.app.database.ViagemAtual
 import api.ApiClient
@@ -26,8 +27,50 @@ data class TipoCombustivelSync(val id: String, val nome: String, val requerHoras
 
 class AppRepository(driverFactory: DatabaseDriverFactory) {
 
-    private val database = AppDatabase(driverFactory.createDriver())
+    private val driver = driverFactory.createDriver()
+    private val database = AppDatabase(driver)
     private val queries = database.appDatabaseQueries
+
+    init {
+        // Migração leve e idempotente: banco já instalado no celular não tem
+        // essa coluna ainda (adicionada depois do lançamento). Roda em toda
+        // abertura do app, mas só tem efeito uma vez — se a coluna já existe
+        // (banco novo criado direto com ela, ou já migrado antes), o SQLite
+        // recusa com "duplicate column name" e a exceção é só ignorada.
+        try {
+            driver.execute(null, "ALTER TABLE Equipamento ADD COLUMN hodometro_tem_decimal INTEGER NOT NULL DEFAULT 1", 0)
+        } catch (_: Exception) {
+        }
+        // Tabela nova (Rota Fixa x Rota Contínua) — banco já instalado não
+        // tem ela ainda. "IF NOT EXISTS" já é idempotente por natureza, não
+        // precisa nem de try/catch pra chamada repetida.
+        try {
+            driver.execute(
+                null,
+                "CREATE TABLE IF NOT EXISTS ConfiguracaoEmpresa (id INTEGER PRIMARY KEY, tipo_operacao TEXT NOT NULL DEFAULT 'fixa')",
+                0
+            )
+        } catch (_: Exception) {
+        }
+        try {
+            driver.execute(
+                null,
+                """CREATE TABLE IF NOT EXISTS Frete (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    motorista_id TEXT NOT NULL,
+                    viagem_id INTEGER NOT NULL,
+                    tipo TEXT NOT NULL DEFAULT 'Normal',
+                    numero_identificacao TEXT NOT NULL DEFAULT '',
+                    valor TEXT NOT NULL,
+                    foto TEXT,
+                    sincronizado INTEGER NOT NULL DEFAULT 0,
+                    ultimo_erro TEXT
+                )""",
+                0
+            )
+        } catch (_: Exception) {
+        }
+    }
 
     // ===============================
     // MOTORISTA
@@ -143,9 +186,36 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
                 placa = e.placa,
                 km = e.km,
                 categoria = e.categoria,
-                ativo = 1
+                ativo = 1,
+                hodometro_tem_decimal = if (e.hodometro_tem_decimal) 1 else 0
             )
         }
+    }
+
+    /**
+     * Se o painel do hodômetro dessa placa mostra casa decimal ou não — usar
+     * em QUALQUER campo de KM ligado a um veículo (Início, Chegada, posto,
+     * óleo, pneu, checklist), junto com util/KmUtils.kt. Default true
+     * (com decimal) se a placa não estiver no cache local por algum motivo —
+     * mesmo default do servidor, nunca trava o motorista por causa disso.
+     */
+    fun hodometroTemDecimal(placa: String): Boolean {
+        return queries.getHodometroTemDecimalPorPlaca(placa).executeAsOneOrNull()?.let { it == 1L } ?: true
+    }
+
+    // ===============================
+    // CONFIGURAÇÃO DA EMPRESA (Rota Fixa | Rota Contínua)
+    // ===============================
+
+    /** "fixa" por padrão se nunca sincronizou ainda — fallback seguro, mantém o comportamento de sempre. */
+    fun getTipoOperacao(): String {
+        return queries.getConfiguracaoEmpresa().executeAsOneOrNull()?.tipo_operacao ?: "fixa"
+    }
+
+    fun isRotaContinua(): Boolean = getTipoOperacao() == "continua"
+
+    fun salvarConfiguracaoEmpresa(tipoOperacao: String) {
+        queries.insertConfiguracaoEmpresa(tipoOperacao)
     }
 
     /**
@@ -444,6 +514,7 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
             queries.deleteViagensSincronizadas()
             queries.deleteAbastecimentosSincronizados()
             queries.deleteArlasSincronizadas()
+            queries.deleteFretesSincronizados()
             queries.deleteDescargasSincronizadas()
             queries.deleteManutencoesSincronizadas()
             queries.deleteFinalizacoesSincronizadas()
@@ -512,6 +583,58 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     fun limparArlasSincronizadas() {
         queries.deleteArlasSincronizadas()
+    }
+
+    // ===============================
+    // FRETE (Rota Contínua — mesmo padrão de ARLA)
+    // ===============================
+
+    fun getFretesParaSincronizar(): List<Frete> {
+        return queries.getFretesNaoSincronizados().executeAsList()
+    }
+
+    /** Fretes já cadastrados na viagem (local + já sincronizados), pra tela "Adicionar Frete" listar. */
+    fun getFretesPorViagemId(viagemId: Long): List<Frete> {
+        return queries.getFretesPorViagemId(viagemId).executeAsList()
+    }
+
+    fun salvarFrete(
+        motoristaId: String,
+        viagemId: Long,
+        tipo: String,
+        numeroIdentificacao: String,
+        valor: String,
+        foto: String?
+    ) {
+        queries.insertFrete(
+            motoristaId,
+            viagemId,
+            tipo,
+            numeroIdentificacao,
+            valor,
+            foto
+        )
+    }
+
+    fun marcarFreteSincronizado(id: Long) {
+        queries.marcarFreteSincronizado(id)
+    }
+
+    fun marcarFreteErro(id: Long, erro: String?) {
+        queries.marcarFreteErro(erro, id)
+    }
+
+    fun excluirFreteLocal(id: Long) {
+        queries.deleteFreteById(id)
+    }
+
+    /** Recuperação de emergência — ver [excluirTodasViagensPendentes]. */
+    fun excluirTodosFretesPendentes() {
+        queries.deleteFretesNaoSincronizados()
+    }
+
+    fun limparFretesSincronizados() {
+        queries.deleteFretesSincronizados()
     }
 
 // ===============================

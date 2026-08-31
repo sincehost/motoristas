@@ -30,7 +30,23 @@ CREATE TABLE Equipamento (
     -- 'veiculo' | 'implemento' | NULL (ainda não classificado no servidor).
     -- Usado pra separar os dois seletores na hora de montar a composição.
     categoria TEXT,
-    ativo INTEGER NOT NULL DEFAULT 1
+    ativo INTEGER NOT NULL DEFAULT 1,
+    -- Se o painel do hodômetro desse veículo mostra 1 casa decimal (1) ou
+    -- só número inteiro (0) — controla como os campos de KM ligados a essa
+    -- placa se comportam pro motorista (ver util/KmUtils.kt). Default 1 =
+    -- comportamento de sempre.
+    hodometro_tem_decimal INTEGER NOT NULL DEFAULT 1
+);
+
+-- ===============================
+-- CONFIGURAÇÕES DA EMPRESA (singleton, igual Motorista) — hoje só
+-- tipo_operacao (Rota Fixa | Rota Contínua), ver admin_config.php?tab=app
+-- e sync.php. Default 'fixa' se nunca sincronizou ainda (fallback seguro:
+-- comportamento de sempre até o primeiro sync confirmar o contrário).
+-- ===============================
+CREATE TABLE ConfiguracaoEmpresa (
+    id INTEGER PRIMARY KEY,
+    tipo_operacao TEXT NOT NULL DEFAULT 'fixa'
 );
 
 -- ===============================
@@ -138,8 +154,8 @@ getImplementos:
 SELECT * FROM Equipamento WHERE ativo = 1 AND categoria = 'implemento' ORDER BY placa;
 
 insertEquipamento:
-INSERT OR REPLACE INTO Equipamento (servidor_id, placa, km, categoria, ativo)
-VALUES (?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO Equipamento (servidor_id, placa, km, categoria, ativo, hodometro_tem_decimal)
+VALUES (?, ?, ?, ?, ?, ?);
 
 deleteAllEquipamentos:
 DELETE FROM Equipamento;
@@ -150,6 +166,22 @@ DELETE FROM Equipamento;
 -- por isso é só aviso, o servidor continua sendo a validação definitiva).
 getKmEquipamentoPorPlaca:
 SELECT km FROM Equipamento WHERE placa = ? LIMIT 1;
+
+-- Usado pelos campos de KM (Início, Chegada, posto, óleo, pneu, checklist)
+-- pra saber se o painel dessa placa tem casa decimal ou não (ver
+-- util/KmUtils.kt) — decide sozinho, sem o motorista pensar no ".".
+getHodometroTemDecimalPorPlaca:
+SELECT hodometro_tem_decimal FROM Equipamento WHERE placa = ? LIMIT 1;
+
+-- ===============================
+-- QUERIES DE CONFIGURAÇÃO DA EMPRESA
+-- ===============================
+getConfiguracaoEmpresa:
+SELECT * FROM ConfiguracaoEmpresa LIMIT 1;
+
+insertConfiguracaoEmpresa:
+INSERT OR REPLACE INTO ConfiguracaoEmpresa (id, tipo_operacao)
+VALUES (1, ?);
 
 -- ===============================
 -- QUERIES DE FORMAS DE PAGAMENTO
@@ -242,7 +274,7 @@ DELETE FROM Viagem WHERE sincronizado = 0;
 -- CONTAGEM TOTAL DE PENDENTES
 -- ===============================
 countTotalPendentes:
-SELECT (SELECT COUNT(*) FROM Viagem WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Arla WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Abastecimento WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Manutencao WHERE sincronizado = 0) + (SELECT COUNT(*) FROM FinalizacaoViagem WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Descarga WHERE sincronizado = 0) + (SELECT COUNT(*) FROM OutraDespesa WHERE sincronizado = 0) + (SELECT COUNT(*) FROM ChecklistPreViagem WHERE sincronizado = 0) + (SELECT COUNT(*) FROM ChecklistPosViagem WHERE sincronizado = 0);
+SELECT (SELECT COUNT(*) FROM Viagem WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Arla WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Abastecimento WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Manutencao WHERE sincronizado = 0) + (SELECT COUNT(*) FROM FinalizacaoViagem WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Descarga WHERE sincronizado = 0) + (SELECT COUNT(*) FROM OutraDespesa WHERE sincronizado = 0) + (SELECT COUNT(*) FROM ChecklistPreViagem WHERE sincronizado = 0) + (SELECT COUNT(*) FROM ChecklistPosViagem WHERE sincronizado = 0) + (SELECT COUNT(*) FROM Frete WHERE sincronizado = 0);
 
 -- ===============================
 -- TABELA DE ARLA (para sincronizar)
@@ -302,6 +334,66 @@ DELETE FROM Arla WHERE sincronizado = 1;
 
 deleteArlasNaoSincronizadas:
 DELETE FROM Arla WHERE sincronizado = 0;
+
+-- ===============================
+-- TABELA DE FRETE (para sincronizar) — Rota Contínua: vários fretes numa
+-- mesma viagem, cadastrados pelo motorista durante o trajeto (ver
+-- migracao_fretes_rota_continua.sql). Mesmo padrão offline-first de Arla.
+-- ===============================
+CREATE TABLE Frete (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    motorista_id TEXT NOT NULL,
+    viagem_id INTEGER NOT NULL,
+    tipo TEXT NOT NULL DEFAULT 'Normal',
+    numero_identificacao TEXT NOT NULL DEFAULT '',
+    valor TEXT NOT NULL,
+    foto TEXT,
+    sincronizado INTEGER NOT NULL DEFAULT 0,
+    ultimo_erro TEXT
+);
+-- ===============================
+-- QUERIES DE FRETE
+-- ===============================
+getAllFretes:
+SELECT * FROM Frete ORDER BY id DESC;
+
+getFretesPorViagemId:
+SELECT * FROM Frete WHERE viagem_id = ? ORDER BY id DESC;
+
+getFretesNaoSincronizados:
+SELECT * FROM Frete WHERE sincronizado = 0;
+
+countFretesNaoSincronizados:
+SELECT COUNT(*) FROM Frete WHERE sincronizado = 0;
+
+insertFrete:
+INSERT INTO Frete (
+    motorista_id,
+    viagem_id,
+    tipo,
+    numero_identificacao,
+    valor,
+    foto,
+    sincronizado
+) VALUES (?, ?, ?, ?, ?, ?, 0);
+
+marcarFreteSincronizado:
+UPDATE Frete SET sincronizado = 1 WHERE id = ?;
+
+marcarFreteErro:
+UPDATE Frete SET ultimo_erro = ? WHERE id = ?;
+
+deleteFreteById:
+DELETE FROM Frete WHERE id = ?;
+
+deletarFretesPorViagemId:
+DELETE FROM Frete WHERE viagem_id = ?;
+
+deleteFretesSincronizados:
+DELETE FROM Frete WHERE sincronizado = 1;
+
+deleteFretesNaoSincronizados:
+DELETE FROM Frete WHERE sincronizado = 0;
 
 -- ===============================
 -- TABELA DE ABASTECIMENTO (para sincronizar)

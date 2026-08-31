@@ -48,8 +48,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import util.rememberCameraState
 import util.rememberSaveableTextField
 import util.ImageCompressor
-import util.formatarKmInput
-import util.normalizarKmParaEnvio
+import util.formatarKmVeiculo
+import util.normalizarKmVeiculoParaEnvio
 import util.kmParaDouble
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -120,12 +120,20 @@ actual fun IniciarViagemScreen(
     var numerobd2 by rememberSaveable { mutableStateOf("") }
     var cte2 by rememberSaveable { mutableStateOf("") }
 
+    // Rota Fixa (padrão) x Rota Contínua — ver admin_config.php?tab=app.
+    // Em Rota Contínua: destino vira texto livre, Peso da Carga/Valor do
+    // Frete somem (viram opcionais). Nada disso muda pra quem está em
+    // Rota Fixa — fica tudo exatamente como sempre foi.
+    val rotaContinua = remember { repository.isRotaContinua() }
+
     var destinoExpandido by remember { mutableStateOf(false) }
     // destinoSelecionado: salva id e nome como strings separadas
     var destinoSelecionadoId by rememberSaveable { mutableStateOf(-1L) }
     var destinoSelecionadoNome by rememberSaveable { mutableStateOf("") }
     val destinoSelecionado: Pair<Long, String>? =
         if (destinoSelecionadoId >= 0) Pair(destinoSelecionadoId, destinoSelecionadoNome) else null
+    // Só usado quando rotaContinua — texto digitado livremente pelo motorista.
+    var destinoLivre by rememberSaveable { mutableStateOf("") }
 
     var placaExpandida by remember { mutableStateOf(false) }
     var veiculoSelecionadoId by rememberSaveable { mutableStateOf(-1L) }
@@ -380,27 +388,40 @@ actual fun IniciarViagemScreen(
 
                         Spacer(Modifier.height(12.dp))
 
-                        ExposedDropdownMenuBox(expanded = destinoExpandido, onExpandedChange = { destinoExpandido = it }) {
+                        if (rotaContinua) {
                             OutlinedTextField(
-                                value = destinoSelecionado?.second ?: "",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Rota *") },
+                                value = destinoLivre,
+                                onValueChange = { destinoLivre = it },
+                                label = { Text("Destino *") },
+                                placeholder = { Text("Digite o destino da viagem") },
                                 leadingIcon = { Icon(Icons.Default.Route, null, tint = AppColors.Primary) },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = destinoExpandido) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp)
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
+                                singleLine = true
                             )
-                            ExposedDropdownMenu(expanded = destinoExpandido, onDismissRequest = { destinoExpandido = false }) {
-                                destinos.forEach { destino ->
-                                    DropdownMenuItem(
-                                        text = { Text(destino.nome) },
-                                        onClick = {
-                                            destinoSelecionadoId = destino.servidor_id
-                                            destinoSelecionadoNome = destino.nome
-                                            destinoExpandido = false
-                                        }
-                                    )
+                        } else {
+                            ExposedDropdownMenuBox(expanded = destinoExpandido, onExpandedChange = { destinoExpandido = it }) {
+                                OutlinedTextField(
+                                    value = destinoSelecionado?.second ?: "",
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Rota *") },
+                                    leadingIcon = { Icon(Icons.Default.Route, null, tint = AppColors.Primary) },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = destinoExpandido) },
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                                    colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp)
+                                )
+                                ExposedDropdownMenu(expanded = destinoExpandido, onDismissRequest = { destinoExpandido = false }) {
+                                    destinos.forEach { destino ->
+                                        DropdownMenuItem(
+                                            text = { Text(destino.nome) },
+                                            onClick = {
+                                                destinoSelecionadoId = destino.servidor_id
+                                                destinoSelecionadoNome = destino.nome
+                                                destinoExpandido = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -547,25 +568,31 @@ actual fun IniciarViagemScreen(
 
                         Spacer(Modifier.height(12.dp))
 
+                        // Característica fixa do veículo (não do motorista digitando) —
+                        // ver util/KmUtils.kt e migracao_hodometro_decimal.sql.
+                        val hodometroTemDecimal = remember(placaSelecionada) {
+                            if (placaSelecionada.isNotBlank()) repository.hodometroTemDecimal(placaSelecionada) else true
+                        }
+
                         OutlinedTextField(
                             value = kmInicio,
                             onValueChange = { newValue ->
-                                val formatted = formatarKmInput(newValue.text)
+                                val formatted = formatarKmVeiculo(newValue.text, hodometroTemDecimal)
                                 kmInicio = TextFieldValue(
                                     text = formatted,
                                     selection = TextRange(formatted.length)
                                 )
                             },
                             label = { Text("KM de Início *") },
-                            placeholder = { Text("Ex.: 115670.5") },
+                            placeholder = { Text(if (hodometroTemDecimal) "Ex.: 115670.5" else "Ex.: 115670") },
                             leadingIcon = { Icon(Icons.Default.Speed, null, tint = AppColors.Primary) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            keyboardOptions = KeyboardOptions(keyboardType = if (hodometroTemDecimal) KeyboardType.Decimal else KeyboardType.Number),
                             singleLine = true
                         )
                         Text(
-                            "Digite como aparece no painel. Ex.: 115670.5",
+                            if (hodometroTemDecimal) "Digite como aparece no painel. Ex.: 115670.5" else "Digite como aparece no painel. Ex.: 115670",
                             fontSize = 12.sp,
                             color = AppColors.Primary,
                             modifier = Modifier.padding(start = 4.dp, top = 2.dp)
@@ -647,49 +674,54 @@ actual fun IniciarViagemScreen(
 
                         Spacer(Modifier.height(16.dp))
 
-                        OutlinedTextField(
-                            value = pesoCarga,
-                            onValueChange = { newValue ->
-                                val digits = newValue.text.filter { c -> c.isDigit() }.take(5)
-                                val formatted = formatarPeso(digits)
+                        // Rota Contínua: peso e frete não fazem sentido no início da
+                        // viagem (frete vem de "Adicionar Frete" durante o trajeto) —
+                        // somem da tela e deixam de ser obrigatórios.
+                        if (!rotaContinua) {
+                            OutlinedTextField(
+                                value = pesoCarga,
+                                onValueChange = { newValue ->
+                                    val digits = newValue.text.filter { c -> c.isDigit() }.take(5)
+                                    val formatted = formatarPeso(digits)
 
-                                // Atualiza com cursor sempre no final
-                                pesoCarga = TextFieldValue(
-                                    text = formatted,
-                                    selection = TextRange(formatted.length)
-                                )
-                            },
-                            label = { Text("Peso da Carga (kg) *") },
-                            leadingIcon = { Icon(Icons.Default.Scale, null, tint = AppColors.Primary) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true
-                        )
+                                    // Atualiza com cursor sempre no final
+                                    pesoCarga = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(formatted.length)
+                                    )
+                                },
+                                label = { Text("Peso da Carga (kg) *") },
+                                leadingIcon = { Icon(Icons.Default.Scale, null, tint = AppColors.Primary) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
 
-                        Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(12.dp))
 
-                        OutlinedTextField(
-                            value = valorFrete,
-                            onValueChange = { newValue ->
-                                // Remove tudo exceto dígitos
-                                val digits = newValue.text.filter { c -> c.isDigit() }.take(9)
-                                val formatted = formatarValor(digits)
+                            OutlinedTextField(
+                                value = valorFrete,
+                                onValueChange = { newValue ->
+                                    // Remove tudo exceto dígitos
+                                    val digits = newValue.text.filter { c -> c.isDigit() }.take(9)
+                                    val formatted = formatarValor(digits)
 
-                                // Atualiza com cursor sempre no final
-                                valorFrete = TextFieldValue(
-                                    text = formatted,
-                                    selection = TextRange(formatted.length)
-                                )
-                            },
-                            label = { Text("Valor do Frete (R\$)") },
-                            leadingIcon = { Icon(Icons.Default.AttachMoney, null, tint = AppColors.Primary) },
-                            placeholder = { Text("0,00") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true
-                        )
+                                    // Atualiza com cursor sempre no final
+                                    valorFrete = TextFieldValue(
+                                        text = formatted,
+                                        selection = TextRange(formatted.length)
+                                    )
+                                },
+                                label = { Text("Valor do Frete (R\$)") },
+                                leadingIcon = { Icon(Icons.Default.AttachMoney, null, tint = AppColors.Primary) },
+                                placeholder = { Text("0,00") },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
+                        }
 
                         Spacer(Modifier.height(24.dp))
 
@@ -698,19 +730,28 @@ actual fun IniciarViagemScreen(
                                 scope.launch {
                                     if (numerobd.isBlank()) { mostrarMensagem("Informe a Ordem de Frete", isErro = true); return@launch }
                                     if (cte.isBlank()) { mostrarMensagem("Informe o Nº do CTE", isErro = true); return@launch }
-                                    if (destinoSelecionado == null) { mostrarMensagem("Selecione uma Rota", isErro = true); return@launch }
+                                    if (rotaContinua) {
+                                        if (destinoLivre.isBlank()) { mostrarMensagem("Informe o destino", isErro = true); return@launch }
+                                    } else {
+                                        if (destinoSelecionado == null) { mostrarMensagem("Selecione uma Rota", isErro = true); return@launch }
+                                    }
                                     if (placaSelecionada.isBlank()) { mostrarMensagem("Selecione a Placa", isErro = true); return@launch }
                                     if (dataViagem.isBlank()) { mostrarMensagem("Informe a Data da Viagem", isErro = true); return@launch }
                                     if (kmInicio.text.isBlank()) { mostrarMensagem("Informe o KM de Início", isErro = true); return@launch }
-                                    if (pesoCarga.text.isBlank()) { mostrarMensagem("Informe o Peso da Carga", isErro = true); return@launch }
-                                    
-                                    // Validação do valor do frete - não pode ser vazio, 0,00 ou apenas zeros
-                                    val freteDigits = valorFrete.text.replace(".", "").replace(",", "").replace(" ", "")
-                                    if (valorFrete.text.isBlank() || freteDigits.toLongOrNull() == 0L || freteDigits.isEmpty()) {
-                                        mostrarMensagem("O valor do frete não pode ser R\$ 0,00. Informe um valor válido.", isErro = true)
-                                        return@launch
+
+                                    // Peso da Carga e Valor do Frete não são exigidos em Rota
+                                    // Contínua (frete vem de "Adicionar Frete" durante a viagem).
+                                    if (!rotaContinua) {
+                                        if (pesoCarga.text.isBlank()) { mostrarMensagem("Informe o Peso da Carga", isErro = true); return@launch }
+
+                                        // Validação do valor do frete - não pode ser vazio, 0,00 ou apenas zeros
+                                        val freteDigits = valorFrete.text.replace(".", "").replace(",", "").replace(" ", "")
+                                        if (valorFrete.text.isBlank() || freteDigits.toLongOrNull() == 0L || freteDigits.isEmpty()) {
+                                            mostrarMensagem("O valor do frete não pode ser R\$ 0,00. Informe um valor válido.", isErro = true)
+                                            return@launch
+                                        }
                                     }
-                                    
+
                                     if (cameraState.base64 == null) { mostrarMensagem("Tire a foto do painel de saída", isErro = true); return@launch }
 
                                     loading = true
@@ -724,7 +765,7 @@ actual fun IniciarViagemScreen(
                                     }.format(java.util.Date())
 
                                     val dataViagemAPI = converterDataParaAPI(dataViagem)
-                                    val kmInicioNormalizado = normalizarKmParaEnvio(kmInicio.text)
+                                    val kmInicioNormalizado = normalizarKmVeiculoParaEnvio(kmInicio.text, hodometroTemDecimal)
 
                                     // Envia o valor mascarado em BR ("17.000,00") direto, igual todo
                                     // outro campo de valor do app — é o servidor que converte pra
@@ -733,6 +774,15 @@ actual fun IniciarViagemScreen(
                                     // não tinha separador de milhar, inflando em 100x (17000.00 virava
                                     // 1700000 ao remover o "." como se fosse separador de milhar).
                                     val valorFreteParaAPI = valorFrete.text
+
+                                    // Rota Contínua: sem destino_id (manda destino_livre), sem
+                                    // peso obrigatório. Rota Fixa: comportamento de sempre.
+                                    // destinoNomeEfetivo/destinoIdLocal alimentam o cache local
+                                    // (ViagemAtual/Viagem), que exige um destino_id — 0 é sentinela,
+                                    // nunca usado por um destino real (IDs do servidor começam em 1).
+                                    val destinoNomeEfetivo = if (rotaContinua) destinoLivre else destinoSelecionado!!.second
+                                    val destinoIdLocal = if (rotaContinua) 0L else destinoSelecionado!!.first
+                                    val pesoCargaParaApi = if (rotaContinua) null else pesoCarga.text
 
                                     // PRIMEIRO: Tentar API
                                     try {
@@ -744,15 +794,16 @@ actual fun IniciarViagemScreen(
                                                 cte = cte,
                                                 numerobd2 = numerobd2.ifBlank { null },
                                                 cte2 = cte2.ifBlank { null },
-                                                destino_id = destinoSelecionado!!.first.toInt(),
+                                                destino_id = if (rotaContinua) null else destinoSelecionado!!.first.toInt(),
+                                                destino_livre = if (rotaContinua) destinoLivre else null,
                                                 data_viagem = dataViagemAPI,
                                                 km_inicio = kmInicioNormalizado,
                                                 placa = placaSelecionada,
                                                 veiculo_id = veiculoSelecionadoId.takeIf { it > 0 }?.toInt(),
                                                 implemento1_id = if (implemento1Visivel) implemento1Id.takeIf { it > 0 }?.toInt() else null,
                                                 implemento2_id = if (implemento2Visivel) implemento2Id.takeIf { it > 0 }?.toInt() else null,
-                                                pesocarga = pesoCarga.text,
-                                                valorfrete = valorFreteParaAPI,
+                                                pesocarga = pesoCargaParaApi,
+                                                valorfrete = if (rotaContinua) null else valorFreteParaAPI,
                                                 foto_painel_saida = cameraState.base64
                                             )
                                         )
@@ -762,7 +813,7 @@ actual fun IniciarViagemScreen(
                                             val viagemIdReal = response.viagem_id ?: 0
                                             repository.salvarViagemAtualComComposicao(
                                                 viagemId = viagemIdReal.toLong(),
-                                                destino = destinoSelecionado!!.second,
+                                                destino = destinoNomeEfetivo,
                                                 dataInicio = dataViagemAPI,
                                                 kmInicio = kmInicioNormalizado,
                                                 placa = placaSelecionada,
@@ -817,13 +868,13 @@ actual fun IniciarViagemScreen(
                                             cte = cte,
                                             numerobd2 = numerobd2.ifBlank { null },
                                             cte2 = cte2.ifBlank { null },
-                                            destinoId = destinoSelecionado!!.first,
-                                            destinoNome = destinoSelecionado!!.second,
+                                            destinoId = destinoIdLocal,
+                                            destinoNome = destinoNomeEfetivo,
                                             placa = placaSelecionada,
                                             dataViagem = dataViagemAPI,
                                             kmInicio = kmInicioNormalizado,
-                                            pesoCarga = pesoCarga.text,
-                                            valorFrete = valorFreteParaAPI,
+                                            pesoCarga = pesoCargaParaApi ?: "",
+                                            valorFrete = if (rotaContinua) null else valorFreteParaAPI,
                                             fotoPainelSaida = cameraState.base64,
                                             dataCriacao = dataCriacao,
                                             veiculoId = veiculoSelecionadoId.takeIf { it > 0 },
@@ -836,7 +887,7 @@ actual fun IniciarViagemScreen(
                                         val idLocal = viagens.lastOrNull()?.id ?: java.lang.System.currentTimeMillis()
                                         repository.salvarViagemAtualComComposicao(
                                             viagemId = -idLocal,
-                                            destino = destinoSelecionado!!.second,
+                                            destino = destinoNomeEfetivo,
                                             dataInicio = dataViagemAPI,
                                             kmInicio = kmInicioNormalizado,
                                             placa = placaSelecionada,

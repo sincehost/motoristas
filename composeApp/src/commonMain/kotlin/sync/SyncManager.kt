@@ -253,6 +253,18 @@ class SyncManager(private val repository: AppRepository) {
         }
 
         // ========================================
+        // PASSO 4b: SINCRONIZAR FRETES (Rota Contínua)
+        // ========================================
+        val fretes = repository.getFretesParaSincronizar()
+        LogWriter.log("📤 Sincronizando ${fretes.size} fretes...")
+        for (frete in fretes) {
+            val resultado = sincronizarFrete(frete, motorista, null)
+            if (resultado.sucesso) sucessos++ else erros.add(resultado.erro)
+            progresso++
+            onStatusUpdate(SyncStatus(state = SyncState.SYNCING, progress = progresso, total = totalItens))
+        }
+
+        // ========================================
         // PASSO 5: SINCRONIZAR DESCARGAS
         // ========================================
         val descargas = repository.getDescargasParaSincronizar()
@@ -452,6 +464,7 @@ class SyncManager(private val repository: AppRepository) {
                         if (syncResp.status == "ok") {
                             repository.salvarDestinos(syncResp.destinos.map { it.id to it.nome })
                             repository.salvarEquipamentos(syncResp.equipamentos)
+                            repository.salvarConfiguracaoEmpresa(syncResp.configuracoes.tipo_operacao)
                             repository.salvarFormasPagamento(syncResp.formas_pagamento.map { Triple(it.id, it.nome, it.codigo) })
                             repository.salvarTiposDespesa(syncResp.tipos_despesa.map { TipoDespesaSync(it.id, it.nome, it.icone, it.cor) })
                             repository.salvarTiposCombustivel(syncResp.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) })
@@ -538,6 +551,7 @@ class SyncManager(private val repository: AppRepository) {
         return repository.getViagensParaSincronizar().size +
                 repository.getAbastecimentosParaSincronizar().size +
                 repository.getArlasParaSincronizar().size +
+                repository.getFretesParaSincronizar().size +
                 repository.getDescargasParaSincronizar().size +
                 repository.getManutencoesParaSincronizar().size +
                 repository.getFinalizacoesParaSincronizar().size +
@@ -817,6 +831,61 @@ class SyncManager(private val repository: AppRepository) {
             LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             repository.marcarArlaErro(arla.id, util.mensagemErroAmigavel(e.message))
             SyncItemResult(sucesso = false, erro = "ARLA: ${util.mensagemErroAmigavel(e.message)}")
+        }
+    }
+
+    private suspend fun sincronizarFrete(
+        frete: br.com.lfsystem.app.database.Frete,
+        motorista: Motorista?,
+        fallbackViagemId: Long? = null
+    ): SyncItemResult {
+        return try {
+            val viagemIdParaEnviar = resolverViagemId(frete.viagem_id, fallbackViagemId, "FRETE")
+
+            if (viagemIdParaEnviar <= 0) {
+                LogWriter.log("  ⏳ FRETE viagem_id ainda não resolvido ($viagemIdParaEnviar), aguardando próximo sync")
+                return SyncItemResult(sucesso = false, erro = "Frete: aguardando viagem ser sincronizada primeiro")
+            }
+
+            LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            LogWriter.log("📤 SINCRONIZANDO FRETE - ID: ${frete.id}")
+            LogWriter.log("   viagem_id: $viagemIdParaEnviar")
+            LogWriter.log("   tipo: ${frete.tipo}")
+            LogWriter.log("   numero_identificacao: ${frete.numero_identificacao}")
+            LogWriter.log("   valor: ${frete.valor}")
+
+            val resp = comRetry("FRETE") { ApiClient.salvarFrete(
+                SalvarFreteRequest(
+                    motorista_id = motorista?.motorista_id ?: "",
+                    viagem_id = viagemIdParaEnviar.toInt(),
+                    tipo = frete.tipo,
+                    numero_identificacao = frete.numero_identificacao,
+                    valor = frete.valor,
+                    foto_base64 = frete.foto
+                )
+            )}
+
+            LogWriter.log("📥 RESPOSTA SERVIDOR FRETE:")
+            LogWriter.log("   status: ${resp.status}")
+            LogWriter.log("   mensagem: ${resp.mensagem ?: "sem mensagem"}")
+            LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+            if (resp.status == "ok") {
+                repository.marcarFreteSincronizado(frete.id)
+                repository.marcarFreteErro(frete.id, null)
+                SyncItemResult(sucesso = true)
+            } else {
+                LogWriter.log("❌ FRETE REJEITADO: ${resp.mensagem}")
+                repository.marcarFreteErro(frete.id, resp.mensagem)
+                SyncItemResult(sucesso = false, erro = "Frete: ${resp.mensagem}")
+            }
+        } catch (e: Exception) {
+            LogWriter.log("❌ EXCEÇÃO SINCRONIZAR FRETE:")
+            LogWriter.log("   ${e::class.simpleName}: ${e.message}")
+            e.printStackTrace()
+            LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            repository.marcarFreteErro(frete.id, util.mensagemErroAmigavel(e.message))
+            SyncItemResult(sucesso = false, erro = "Frete: ${util.mensagemErroAmigavel(e.message)}")
         }
     }
 

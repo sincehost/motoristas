@@ -26,6 +26,7 @@ import br.com.lfsystem.app.database.ChecklistPosViagem
 import br.com.lfsystem.app.database.ChecklistPreViagem
 import br.com.lfsystem.app.database.Descarga
 import br.com.lfsystem.app.database.FinalizacaoViagem
+import br.com.lfsystem.app.database.Frete
 import br.com.lfsystem.app.database.Manutencao
 import br.com.lfsystem.app.database.OutraDespesa
 import br.com.lfsystem.app.database.Viagem
@@ -108,6 +109,14 @@ private fun detalhesArla(ar: Arla): List<Pair<String, String>> = listOf(
 )
 private fun fotosArla(ar: Arla): List<Pair<String, String>> =
     listOfNotNull(ar.foto?.takeIf { it.isNotBlank() }?.let { "Cupom/foto" to it })
+
+private fun detalhesFrete(f: Frete): List<Pair<String, String>> = listOf(
+    "Tipo" to f.tipo,
+    "Número/identificação" to f.numero_identificacao.ifBlank { "-" },
+    "Valor" to f.valor
+)
+private fun fotosFrete(f: Frete): List<Pair<String, String>> =
+    listOfNotNull(f.foto?.takeIf { it.isNotBlank() }?.let { "Comprovante" to it })
 
 private fun detalhesDescarga(d: Descarga): List<Pair<String, String>> = listOf(
     "Data" to d.data_,
@@ -280,6 +289,25 @@ fun PendenciasSyncScreen(
                     }
                 } catch (e: Exception) {
                     add(itemFalhaDeCategoria("ARLA", e) { repository.excluirTodasArlasPendentes() })
+                }
+
+                try {
+                    repository.getFretesParaSincronizar().forEach { f ->
+                        try {
+                            add(PendenciaItem(
+                                tipo = "Frete",
+                                descricao = "${f.tipo} — R$ ${f.valor}",
+                                erro = f.ultimo_erro,
+                                detalhes = detalhesFrete(f),
+                                fotos = fotosFrete(f),
+                                onDescartar = { repository.excluirFreteLocal(f.id) }
+                            ))
+                        } catch (e: Exception) {
+                            add(itemErroAoExibir("Frete", e) { repository.excluirFreteLocal(f.id) })
+                        }
+                    }
+                } catch (e: Exception) {
+                    add(itemFalhaDeCategoria("Frete", e) { repository.excluirTodosFretesPendentes() })
                 }
 
                 try {

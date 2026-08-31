@@ -120,7 +120,11 @@ fun isErroDeAutenticacao(erro: String?): Boolean {
  * "salvar local e sincronizar depois" ou "mostrar erro de validação".
  */
 fun isErroDeConectividade(erro: String?): Boolean {
-    val msg = erro ?: return false
+    // null também conta como "sem conexão" — no iOS (Ktor/Darwin), algumas
+    // falhas de rede chegam com NSError sem `.message` legível em vez de um
+    // texto reconhecível, e isso NÃO pode cair no ramo de "erro técnico" (que
+    // bloqueia o salvamento offline da viagem e só mostra erro pro motorista).
+    val msg = erro ?: return true
     return msg.contains("Unable to resolve host", ignoreCase = true) ||
             msg.contains("No address associated with hostname", ignoreCase = true) ||
             msg.contains("UnknownHostException", ignoreCase = true) ||
@@ -131,5 +135,13 @@ fun isErroDeConectividade(erro: String?): Boolean {
             msg.contains("ConnectException", ignoreCase = true) ||
             msg.contains("timeout", ignoreCase = true) ||
             msg.contains("timed out", ignoreCase = true) ||
-            msg.contains("SocketTimeout", ignoreCase = true)
+            msg.contains("SocketTimeout", ignoreCase = true) ||
+            // Mensagens nativas do iOS (NSURLErrorDomain via Ktor/Darwin) —
+            // não tinham nenhuma cobertura aqui, por isso "sem internet" no
+            // iOS caía no ramo de erro técnico em vez de salvar offline.
+            msg.contains("Internet connection appears to be offline", ignoreCase = true) ||
+            msg.contains("could not connect to the server", ignoreCase = true) ||
+            msg.contains("network connection was lost", ignoreCase = true) ||
+            msg.contains("A data connection is not currently allowed", ignoreCase = true) ||
+            msg.contains("NSURLErrorDomain", ignoreCase = true)
 }
