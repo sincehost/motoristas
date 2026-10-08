@@ -11,6 +11,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -161,10 +163,17 @@ fun BottomNavigationBar(
         )
     }
 
+    // Barra flutuante: afastada das bordas, com cantos arredondados e sombra,
+    // em vez de encostada/esticada de ponta a ponta na tela.
     NavigationBar(
         containerColor = if (isDark()) Color(0xFF1A1A2E) else AppColors.Primary,
-        tonalElevation = 8.dp,
-        modifier = Modifier.height(88.dp)
+        tonalElevation = 0.dp,
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 16.dp)
+            .height(72.dp)
+            .shadow(elevation = 16.dp, shape = RoundedCornerShape(28.dp), clip = false)
+            .clip(RoundedCornerShape(28.dp))
     ) {
         // 1. Iniciar Viagem
         NavigationBarItem(
