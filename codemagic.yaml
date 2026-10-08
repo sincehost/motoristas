@@ -23,8 +23,10 @@ workflows:
         BUNDLE_ID: "br.com.lfsystem.app.Motorista"
       xcode: latest
       cocoapods: default
-      groups:
-        - app_store_credentials # define TEAM_ID nesse grupo, nas variáveis de ambiente do Codemagic
+      # groups removido: a UI do Codemagic nao deixava criar o grupo
+      # "app_store_credentials" direto no dropdown. Sem "groups:" aqui, a
+      # variavel TEAM_ID so precisa existir no app (sem grupo nenhum) pra
+      # ja ficar disponivel nesse workflow.
     scripts:
       - name: Set up environment
         script: |
