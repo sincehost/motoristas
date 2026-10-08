@@ -10,15 +10,12 @@ workflows:
     integrations:
       app_store_connect: Codmagic novo
     environment:
-      # ios_signing de volta: antes falhava porque não existia NENHUM
-      # certificado em Code signing identities (conferido na tela — "No
-      # certificates shared with the team") e a integração Developer
-      # Portal estava desconectada. Os dois já foram corrigidos (certificado
-      # "trakvia-ios-distribution" criado, integração "Codmagic novo"
-      # conectada), então esse bloco agora tem o que precisa pra funcionar.
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: br.com.lfsystem.app.Motorista
+      # ios_signing removido de novo: ele roda a validacao automatica ANTES
+      # de qualquer script, e travava o build inteiro quando o perfil salvo
+      # nao batia com o certificado atual. Em vez de depender dessa
+      # validacao previa, o passo "Set up code signing" agora busca/cria o
+      # perfil certo explicitamente com `app-store-connect
+      # fetch-signing-files`, que roda depois e resolve isso sozinho.
       vars:
         BUNDLE_ID: "br.com.lfsystem.app.Motorista"
         # Team ID fixo aqui porque a conta pessoal do Codemagic nao deixa
@@ -37,16 +34,24 @@ workflows:
           cd iosApp
           pod install
 
-      - name: Set up code signing (usa certificado + perfil já cadastrados no Codemagic)
+      - name: Set up code signing (busca/cria perfil valido via API)
         script: |
-          # Certificado ("trakvia-ios-distribution") e provisioning profile
-          # ("Trakvia App Store") foram gerados manualmente em Code signing
-          # identities (Team settings), já com a chave privada guardada
-          # corretamente pelo próprio Codemagic — evita o problema de tentar
-          # criar tudo via linha de comando numa VM efêmera, que não conseguia
-          # persistir a chave privada entre os passos ("Cannot save Signing
-          # Certificates without certificate private key").
-          xcode-project use-profiles --verbose
+          # O perfil "Trakvia App Store" salvo em Code signing identities
+          # ficou vinculado ao certificado ANTIGO (o que nao tinha mais
+          # chave privada) — por isso toda tentativa de assinatura (manual
+          # ou com -allowProvisioningUpdates) falhava. Em vez de depender
+          # desse perfil salvo, usa o app-store-connect CLI (parte do
+          # codemagic-cli-tools, ja usa a integracao "Codmagic novo"
+          # conectada) pra buscar um perfil App Store valido pro bundle, ou
+          # CRIAR um novo do zero vinculado ao certificado atual
+          # ("trakvia-ios-distribution") se nenhum servir. Isso instala o
+          # perfil certo localmente sem precisar de conta Apple logada na
+          # maquina (diferente de -allowProvisioningUpdates, que precisa).
+          app-store-connect fetch-signing-files \
+            "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create \
+            --verbose
 
       - name: Archive (Release, assinado)
         script: |
@@ -57,15 +62,13 @@ workflows:
             | grep -i "CODE_SIGN\|PROVISIONING_PROFILE\|DEVELOPMENT_TEAM\|PRODUCT_BUNDLE_IDENTIFIER\|CURRENT_PROJECT_VERSION" || true
           echo "================================================================="
 
-          # Assinatura manual com nome de perfil exato ("Trakvia App Store")
-          # ficou frágil demais: dependia do perfil na Apple estar vinculado
-          # ao certificado certo, e toda vez que um dos dois era recriado os
-          # dois saiam de sincronia ("No profile for team... found"). Com o
-          # ios_signing + integração conectada, -allowProvisioningUpdates
-          # deixa o Xcode buscar/criar o perfil certo sozinho via API, sem
-          # depender de nome batendo em três lugares diferentes.
+          # CODE_SIGN_STYLE=Automatic (sem -allowProvisioningUpdates — essa
+          # flag exige conta Apple logada na máquina, dava "No Accounts").
+          # O perfil certo já foi buscado/criado e instalado localmente no
+          # passo anterior (fetch-signing-files), então o Xcode só precisa
+          # achar o que já está instalado, sem negociar nada ao vivo.
           #
-          # CURRENT_PROJECT_VERSION continua forçado aqui pelo mesmo motivo:
+          # CURRENT_PROJECT_VERSION é forçado aqui por outro motivo:
           # Config.xcconfig tem CURRENT_PROJECT_VERSION=1 fixo, e o projeto não
           # está configurado com VERSIONING_SYSTEM=apple-generic — então
           # `agvtool new-version` (tentado antes, em passos separados) não tinha
@@ -82,7 +85,6 @@ workflows:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -archivePath $(PWD)/build/iosApp.xcarchive \
-            -allowProvisioningUpdates \
             OTHER_LDFLAGS='$(inherited) -lsqlite3' \
             LIBRARY_SEARCH_PATHS='$(inherited) /usr/lib' \
             DEVELOPMENT_TEAM="$TEAM_ID" \
@@ -118,8 +120,7 @@ workflows:
           xcodebuild -exportArchive \
             -archivePath $(PWD)/build/iosApp.xcarchive \
             -exportPath $HOME/builds/output \
-            -exportOptionsPlist ExportOptions.plist \
-            -allowProvisioningUpdates
+            -exportOptionsPlist ExportOptions.plist
 
           echo "🎉 IPA exportado:"
           ls -lh $HOME/builds/output/*.ipa
