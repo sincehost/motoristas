@@ -10,12 +10,10 @@ workflows:
     integrations:
       app_store_connect: Codmagic novo
     environment:
-      # ios_signing removido de novo: ele roda a validacao automatica ANTES
-      # de qualquer script, e travava o build inteiro quando o perfil salvo
-      # nao batia com o certificado atual. Em vez de depender dessa
-      # validacao previa, o passo "Set up code signing" agora busca/cria o
-      # perfil certo explicitamente com `app-store-connect
-      # fetch-signing-files`, que roda depois e resolve isso sozinho.
+      # ios_signing removido: ele roda a validacao automatica ANTES de
+      # qualquer script e travava o build inteiro quando o perfil salvo nao
+      # batia com o certificado atual. A assinatura e feita manualmente nos
+      # scripts abaixo, usando o que ja esta em Code signing identities.
       vars:
         BUNDLE_ID: "br.com.lfsystem.app.Motorista"
         # Team ID fixo aqui porque a conta pessoal do Codemagic nao deixa
@@ -34,24 +32,17 @@ workflows:
           cd iosApp
           pod install
 
-      - name: Set up code signing (busca/cria perfil valido via API)
+      - name: Set up code signing (usa certificado + perfil já cadastrados no Codemagic)
         script: |
-          # O perfil "Trakvia App Store" salvo em Code signing identities
-          # ficou vinculado ao certificado ANTIGO (o que nao tinha mais
-          # chave privada) — por isso toda tentativa de assinatura (manual
-          # ou com -allowProvisioningUpdates) falhava. Em vez de depender
-          # desse perfil salvo, usa o app-store-connect CLI (parte do
-          # codemagic-cli-tools, ja usa a integracao "Codmagic novo"
-          # conectada) pra buscar um perfil App Store valido pro bundle, ou
-          # CRIAR um novo do zero vinculado ao certificado atual
-          # ("trakvia-ios-distribution") se nenhum servir. Isso instala o
-          # perfil certo localmente sem precisar de conta Apple logada na
-          # maquina (diferente de -allowProvisioningUpdates, que precisa).
-          app-store-connect fetch-signing-files \
-            "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create \
-            --verbose
+          # Volta pro caminho manual: tanto -allowProvisioningUpdates ("No
+          # Accounts") quanto fetch-signing-files --create ("Cannot save
+          # Signing Certificates without certificate private key") exigem
+          # algo que uma VM efemera nao tem (conta logada / persistir chave
+          # nova). O certificado "trakvia-ios-distribution" e o perfil
+          # "Trakvia App Store" ja existem em Code signing identities —
+          # xcode-project use-profiles so instala o que ja esta la, sem
+          # tentar criar nada novo.
+          xcode-project use-profiles --verbose
 
       - name: Archive (Release, assinado)
         script: |
@@ -62,11 +53,13 @@ workflows:
             | grep -i "CODE_SIGN\|PROVISIONING_PROFILE\|DEVELOPMENT_TEAM\|PRODUCT_BUNDLE_IDENTIFIER\|CURRENT_PROJECT_VERSION" || true
           echo "================================================================="
 
-          # CODE_SIGN_STYLE=Automatic (sem -allowProvisioningUpdates — essa
-          # flag exige conta Apple logada na máquina, dava "No Accounts").
-          # O perfil certo já foi buscado/criado e instalado localmente no
-          # passo anterior (fetch-signing-files), então o Xcode só precisa
-          # achar o que já está instalado, sem negociar nada ao vivo.
+          # Assinatura manual com nome exato do perfil — já usada antes e é
+          # a que chegou mais longe. Único requisito pra funcionar: o
+          # perfil "Trakvia App Store" precisa estar vinculado ao
+          # certificado ATUAL ("trakvia-ios-distribution", o de 08/10/2027)
+          # no Apple Developer Portal. Confira isso ANTES de rodar o build
+          # (Codemagic → Code signing identities → iOS provisioning
+          # profiles → campo "Certificate" tem que estar com ✓, não com X).
           #
           # CURRENT_PROJECT_VERSION é forçado aqui por outro motivo:
           # Config.xcconfig tem CURRENT_PROJECT_VERSION=1 fixo, e o projeto não
@@ -88,7 +81,9 @@ workflows:
             OTHER_LDFLAGS='$(inherited) -lsqlite3' \
             LIBRARY_SEARCH_PATHS='$(inherited) /usr/lib' \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="Trakvia App Store" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             archive
 
@@ -106,7 +101,12 @@ workflows:
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>signingStyle</key>
-              <string>automatic</string>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>br.com.lfsystem.app.Motorista</key>
+                  <string>Trakvia App Store</string>
+              </dict>
               <key>uploadSymbols</key>
               <true/>
               <key>compileBitcode</key>
