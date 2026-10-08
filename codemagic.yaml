@@ -10,10 +10,17 @@ workflows:
     integrations:
       app_store_connect: Codmagic novo
     environment:
-      # ios_signing removido: ele roda a validacao automatica ANTES de
-      # qualquer script e travava o build inteiro quando o perfil salvo nao
-      # batia com o certificado atual. A assinatura e feita manualmente nos
-      # scripts abaixo, usando o que ja esta em Code signing identities.
+      # ios_signing de volta: o xcode-project use-profiles sozinho nao
+      # estava instalando nada (0 perfis, 0 certificados na maquina, varias
+      # vezes seguidas) mesmo com certificado+perfil corretos e vinculados
+      # em Code signing identities. Suspeita: esse bloco e o que de fato
+      # injeta as identidades do Team settings no ambiente do build — sem
+      # ele, use-profiles nao tem o que instalar. Testando com tudo
+      # corretamente configurado dessa vez (antes falhava porque nao
+      # existia certificado nenhum).
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: br.com.lfsystem.app.Motorista
       vars:
         BUNDLE_ID: "br.com.lfsystem.app.Motorista"
         # Team ID fixo aqui porque a conta pessoal do Codemagic nao deixa
