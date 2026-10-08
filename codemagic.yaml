@@ -1,12 +1,11 @@
 workflows:
   ios-workflow:
     name: iOS Workflow
-    # Trocado de mac_mini_m2 pra m1 pra testar se a fila em "queued" era
-    # falta de maquina M2 disponivel no plano free. Se o build comecar a
-    # rodar com m1, era isso. Confere no dropdown "Instance type" do editor
-    # do workflow no Codemagic quais maquinas estao disponiveis no seu
-    # plano antes de trocar de novo.
-    instance_type: mac_mini_m1
+    # Build ficava preso em "queued" com mac_mini_m2 (fila por falta de
+    # maquina M2 livre no plano). O dropdown "Instance type" no Codemagic
+    # mostrou Mac mini M4 como a maquina disponivel nesse plano — trocado
+    # pra essa.
+    instance_type: mac_mini_m4
     max_build_duration: 60
     integrations:
       app_store_connect: Codmagic novo
