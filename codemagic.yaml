@@ -6,14 +6,15 @@ workflows:
     integrations:
       app_store_connect: Codmagic01
     environment:
-      # Certificado ("trakvia-ios-distribution") e perfil ("Trakvia App
-      # Store") já existem em Code signing identities (Team settings) —
-      # esse bloco é o que puxa os dois pro ambiente do build ANTES dos
-      # scripts rodarem. Antes disso dava erro porque nada existia ainda
-      # pra encontrar; agora que existem, deve casar certinho.
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: br.com.lfsystem.app.Motorista
+      # ios_signing removido: isso aciona a assinatura AUTOMÁTICA do
+      # Codemagic via API (Developer Portal), que é um mecanismo separado
+      # de "Code signing identities" (Team settings) — não é ele quem
+      # disponibiliza o certificado/perfil pros scripts. Quem faz isso é o
+      # `xcode-project use-profiles` lá embaixo, no passo "Set up code
+      # signing", que lê direto do Team settings. Com os dois configurados
+      # ao mesmo tempo, o ios_signing falhava sozinho tentando casar
+      # certificado/perfil via API ("No matching profiles found..."),
+      # mesmo com tudo certo no Team settings e no Apple Developer.
       vars:
         BUNDLE_ID: "br.com.lfsystem.app.Motorista"
       xcode: latest
