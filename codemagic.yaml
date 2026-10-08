@@ -21,12 +21,12 @@ workflows:
       # mesmo com tudo certo no Team settings e no Apple Developer.
       vars:
         BUNDLE_ID: "br.com.lfsystem.app.Motorista"
+        # Team ID fixo aqui porque a conta pessoal do Codemagic nao deixa
+        # criar grupo nem variavel global (ambos bloqueados na UI). Nao e
+        # segredo — e so um identificador, nao da acesso a nada sozinho.
+        TEAM_ID: "5PC89KBGRN"
       xcode: latest
       cocoapods: default
-      # groups removido: a UI do Codemagic nao deixava criar o grupo
-      # "app_store_credentials" direto no dropdown. Sem "groups:" aqui, a
-      # variavel TEAM_ID so precisa existir no app (sem grupo nenhum) pra
-      # ja ficar disponivel nesse workflow.
     scripts:
       - name: Set up environment
         script: |
