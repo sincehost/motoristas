@@ -42,7 +42,19 @@ workflows:
           # "Trakvia App Store" ja existem em Code signing identities —
           # xcode-project use-profiles so instala o que ja esta la, sem
           # tentar criar nada novo.
+          #
+          # Marcadores de echo aqui porque o log desse passo no Codemagic
+          # as vezes mostra so o final do passo anterior (Install Pods) em
+          # vez do proprio output — com os >>> fica impossivel confundir.
+          echo ">>> INICIO use-profiles >>>"
           xcode-project use-profiles --verbose
+          echo ">>> FIM use-profiles >>>"
+
+          echo ">>> Perfis instalados na maquina >>>"
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>&1 || echo "(pasta nao existe ou vazia)"
+
+          echo ">>> Certificados disponiveis no keychain >>>"
+          security find-identity -v -p codesigning 2>&1 || echo "(nenhum certificado encontrado)"
 
       - name: Archive (Release, assinado)
         script: |
