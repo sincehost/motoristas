@@ -169,7 +169,9 @@ fun BottomNavigationBar(
     // importa a altura travada no container. Aqui cada item controla o
     // próprio tamanho, sem surpresa.
     val bottomBarHeight = 76.dp
-    val bottomBarShape = RoundedCornerShape(bottomBarHeight / 2)
+    // Raio fixo (não mais metade da altura = pílula total) — um pouco menos
+    // arredondado, a pedido.
+    val bottomBarShape = RoundedCornerShape(28.dp)
     val barColor = if (isDark()) Color(0xFF1A1A2E) else AppColors.Primary
 
     Row(
