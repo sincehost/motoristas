@@ -565,100 +565,10 @@ actual fun IniciarViagemScreen(
                             }
                         }
 
-                        // Implementos (opcional) — carreta, semirreboque… nunca aparecem
-                        // no seletor de veículo acima, só aqui.
-                        if (implementos.isNotEmpty()) {
-                            Spacer(Modifier.height(12.dp))
-                            if (implemento1Visivel) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    ui.AppDropdownField(
-                                        label = "Implemento 1 (opcional)",
-                                        selectedText = implemento1Placa ?: "",
-                                        expanded = implemento1Expandido,
-                                        onExpandedChange = {
-                                            focusManager.clearFocus()
-                                            implemento1Expandido = it
-                                        },
-                                        leadingIcon = {
-                                            Icon(Icons.Default.RvHookup, null, tint = AppColors.Primary)
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        implementos.filter { it.servidor_id != implemento2Id }.forEach { equip ->
-                                            ui.AppDropdownMenuItem(
-                                                text = { Text(equip.placa) },
-                                                onClick = {
-                                                    implemento1Id = equip.servidor_id
-                                                    implemento1Placa = equip.placa
-                                                    implemento1Expandido = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                    IconButton(onClick = {
-                                        implemento1Visivel = false
-                                        implemento1Id = null
-                                        implemento1Placa = null
-                                        // Sem implemento 1, não faz sentido manter o 2.
-                                        implemento2Visivel = false
-                                        implemento2Id = null
-                                        implemento2Placa = null
-                                    }) {
-                                        Icon(Icons.Default.RemoveCircle, "Remover implemento", tint = AppColors.Error)
-                                    }
-                                }
-
-                                Spacer(Modifier.height(8.dp))
-
-                                if (implemento2Visivel) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        ui.AppDropdownField(
-                                            label = "Implemento 2 (opcional)",
-                                            selectedText = implemento2Placa ?: "",
-                                            expanded = implemento2Expandido,
-                                            onExpandedChange = {
-                                                focusManager.clearFocus()
-                                                implemento2Expandido = it
-                                            },
-                                            leadingIcon = {
-                                                Icon(Icons.Default.RvHookup, null, tint = AppColors.Primary)
-                                            },
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            implementos.filter { it.servidor_id != implemento1Id }.forEach { equip ->
-                                                ui.AppDropdownMenuItem(
-                                                    text = { Text(equip.placa) },
-                                                    onClick = {
-                                                        implemento2Id = equip.servidor_id
-                                                        implemento2Placa = equip.placa
-                                                        implemento2Expandido = false
-                                                    }
-                                                )
-                                            }
-                                        }
-                                        IconButton(onClick = {
-                                            implemento2Visivel = false
-                                            implemento2Id = null
-                                            implemento2Placa = null
-                                        }) {
-                                            Icon(Icons.Default.RemoveCircle, "Remover implemento", tint = AppColors.Error)
-                                        }
-                                    }
-                                } else {
-                                    TextButton(onClick = { implemento2Visivel = true }) {
-                                        Icon(Icons.Default.AddCircle, null, tint = AppColors.Primary)
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("Adicionar 2º implemento")
-                                    }
-                                }
-                            } else {
-                                TextButton(onClick = { implemento1Visivel = true }) {
-                                    Icon(Icons.Default.AddCircle, null, tint = AppColors.Primary)
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Adicionar implemento (carreta, semirreboque…)")
-                                }
-                            }
-                        }
+                        // Composição (implemento 1/2) tirada da tela de Iniciar Viagem a
+                        // pedido — os estados abaixo continuam declarados e sempre vazios/
+                        // invisíveis, então o envio (API/local) já manda null pra esses
+                        // campos sozinho, sem precisar mexer na submissão.
 
                         Spacer(Modifier.height(12.dp))
 
