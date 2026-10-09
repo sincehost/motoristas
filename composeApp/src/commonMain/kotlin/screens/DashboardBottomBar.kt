@@ -164,9 +164,12 @@ fun BottomNavigationBar(
     }
 
     // Barra flutuante: afastada das bordas, cantos de pílula (totalmente
-    // arredondados) e sombra. 80dp é a altura padrão do Material pra barra
-    // com ícone+rótulo — em 72dp o texto ficava sem espaço e sumia.
-    val bottomBarHeight = 80.dp
+    // arredondados) e sombra. 88dp é a altura original (a que já
+    // funcionava, com os nomes aparecendo certinho) — em 72dp e 80dp o
+    // conteúdo (ícone+texto) ficava maior que a altura travada, o Column
+    // centralizava por cima/baixo do espaço e o .clip() cortava o texto
+    // que sobrava embaixo.
+    val bottomBarHeight = 88.dp
     val bottomBarShape = RoundedCornerShape(bottomBarHeight / 2)
     NavigationBar(
         containerColor = if (isDark()) Color(0xFF1A1A2E) else AppColors.Primary,
