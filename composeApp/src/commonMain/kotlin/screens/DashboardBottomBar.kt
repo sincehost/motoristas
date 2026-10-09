@@ -163,49 +163,44 @@ fun BottomNavigationBar(
         )
     }
 
-    // Barra flutuante: afastada das bordas, cantos de pílula (totalmente
-    // arredondados) e sombra. 88dp é a altura original (a que já
-    // funcionava, com os nomes aparecendo certinho) — em 72dp e 80dp o
-    // conteúdo (ícone+texto) ficava maior que a altura travada, o Column
-    // centralizava por cima/baixo do espaço e o .clip() cortava o texto
-    // que sobrava embaixo.
+    // Barra flutuante construída na mão (Row + itens clicáveis), não com
+    // NavigationBar/NavigationBarItem do Material — esse componente tem um
+    // tamanho interno próprio pro slot do ícone que cortava o texto, não
+    // importa a altura travada no container. Aqui cada item controla o
+    // próprio tamanho, sem surpresa.
     val bottomBarHeight = 88.dp
     val bottomBarShape = RoundedCornerShape(bottomBarHeight / 2)
-    NavigationBar(
-        containerColor = if (isDark()) Color(0xFF1A1A2E) else AppColors.Primary,
-        tonalElevation = 0.dp,
+    val barColor = if (isDark()) Color(0xFF1A1A2E) else AppColors.Primary
+
+    Row(
         modifier = Modifier
+            .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .padding(bottom = 16.dp)
             .height(bottomBarHeight)
             .shadow(elevation = 16.dp, shape = bottomBarShape, clip = false)
             .clip(bottomBarShape)
+            .background(barColor),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         // 1. Iniciar Viagem
-        NavigationBarItem(
+        BottomBarItem(
+            icon = Icons.Default.LocalShipping,
+            label = "Iniciar",
             selected = telaAtual == Screen.INICIAR_VIAGEM,
             onClick = {
                 scope.launch {
                     onMessage("")
                     onNavigate(Screen.INICIAR_VIAGEM)
                 }
-            },
-            icon = {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                ) {
-                    Icon(Icons.Default.LocalShipping, contentDescription = null, modifier = Modifier.size(26.dp))
-                    Spacer(Modifier.height(4.dp))
-                    Text("Iniciar", fontSize = 11.sp, maxLines = 1, fontWeight = FontWeight.Medium)
-                }
-            },
-            colors = bottomNavColors()
+            }
         )
 
         // 2. Despesas
-        NavigationBarItem(
+        BottomBarItem(
+            icon = Icons.Default.Receipt,
+            label = "Despesas",
             selected = telaAtual == Screen.ADICIONAR_COMBUSTIVEL ||
                     telaAtual == Screen.ADICIONAR_ARLA ||
                     telaAtual == Screen.ADICIONAR_DESCARGA ||
@@ -220,46 +215,26 @@ fun BottomNavigationBar(
                         mostrarAvisoIniciarViagem = true
                     }
                 }
-            },
-            icon = {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                ) {
-                    Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(26.dp))
-                    Spacer(Modifier.height(4.dp))
-                    Text("Despesas", fontSize = 11.sp, maxLines = 1, fontWeight = FontWeight.Medium)
-                }
-            },
-            colors = bottomNavColors()
+            }
         )
 
         // 3. Manutenção
-        NavigationBarItem(
+        BottomBarItem(
+            icon = Icons.Default.Build,
+            label = "Manut.",
             selected = telaAtual == Screen.MANUTENCAO,
             onClick = {
                 scope.launch {
                     onMessage("")
                     onNavigate(Screen.MANUTENCAO)
                 }
-            },
-            icon = {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                ) {
-                    Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(26.dp))
-                    Spacer(Modifier.height(4.dp))
-                    Text("Manut.", fontSize = 11.sp, maxLines = 1, fontWeight = FontWeight.Medium)
-                }
-            },
-            colors = bottomNavColors()
+            }
         )
 
         // 4. Finalizar Viagem
-        NavigationBarItem(
+        BottomBarItem(
+            icon = Icons.Default.Flag,
+            label = "Finalizar",
             selected = telaAtual == Screen.FINALIZAR_VIAGEM,
             onClick = {
                 scope.launch {
@@ -271,20 +246,34 @@ fun BottomNavigationBar(
                         mostrarAvisoSemViagem = true
                     }
                 }
-            },
-            icon = {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                ) {
-                    Icon(Icons.Default.Flag, contentDescription = null, modifier = Modifier.size(26.dp))
-                    Spacer(Modifier.height(4.dp))
-                    Text("Finalizar", fontSize = 11.sp, maxLines = 1, fontWeight = FontWeight.Medium)
-                }
-            },
-            colors = bottomNavColors()
+            }
         )
+    }
+}
+
+@Composable
+private fun RowScope.BottomBarItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val contentColor = if (selected) Color.White else Color.White.copy(alpha = 0.7f)
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(label, fontSize = 11.sp, maxLines = 1, fontWeight = FontWeight.Medium, color = contentColor)
     }
 }
 
@@ -361,14 +350,3 @@ private fun DespesaMenuItem(texto: String, icone: androidx.compose.ui.graphics.v
     }
 }
 
-// ===============================
-// CORES PADRÃO DA BOTTOM NAV
-// ===============================
-@Composable
-private fun bottomNavColors() = NavigationBarItemDefaults.colors(
-    selectedIconColor = Color.White,
-    selectedTextColor = Color.White,
-    unselectedIconColor = Color.White.copy(alpha = 0.7f),
-    unselectedTextColor = Color.White.copy(alpha = 0.7f),
-    indicatorColor = Color.White.copy(alpha = 0.2f)
-)
