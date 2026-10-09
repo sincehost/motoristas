@@ -168,7 +168,7 @@ fun BottomNavigationBar(
     // tamanho interno próprio pro slot do ícone que cortava o texto, não
     // importa a altura travada no container. Aqui cada item controla o
     // próprio tamanho, sem surpresa.
-    val bottomBarHeight = 88.dp
+    val bottomBarHeight = 76.dp
     val bottomBarShape = RoundedCornerShape(bottomBarHeight / 2)
     val barColor = if (isDark()) Color(0xFF1A1A2E) else AppColors.Primary
 
@@ -176,7 +176,11 @@ fun BottomNavigationBar(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .padding(bottom = 16.dp)
+            // navigationBarsPadding() primeiro: em celular com os 3 botões na
+            // tela (não gesto), isso evita a barra ficar colada/por baixo
+            // deles. O +10dp depois é só a folga visual de "flutuando".
+            .navigationBarsPadding()
+            .padding(bottom = 10.dp)
             .height(bottomBarHeight)
             .shadow(elevation = 16.dp, shape = bottomBarShape, clip = false)
             .clip(bottomBarShape)
@@ -271,7 +275,7 @@ private fun RowScope.BottomBarItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(26.dp))
+        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(22.dp))
         Spacer(Modifier.height(4.dp))
         Text(label, fontSize = 11.sp, maxLines = 1, fontWeight = FontWeight.Medium, color = contentColor)
     }
