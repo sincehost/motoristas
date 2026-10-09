@@ -213,7 +213,6 @@ actual fun IniciarViagemScreen(
     var dataViagem by remember { mutableStateOf(dataAtualFormatada()) }
     var kmInicio by remember { mutableStateOf(TextFieldValue("")) }
     var pesoCarga by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
-    var valorFrete by remember { mutableStateOf(TextFieldValue("0,00", selection = TextRange(4))) }
 
     var fotoBase64 by remember { mutableStateOf<String?>(null) }
     var fotoImageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -762,38 +761,6 @@ actual fun IniciarViagemScreen(
                                 ),
                                 singleLine = true
                             )
-
-                            Spacer(Modifier.height(12.dp))
-
-                            OutlinedTextField(
-                                value = valorFrete,
-                                onValueChange = { newValue ->
-                                    // Remove tudo exceto dígitos
-                                    val digits = newValue.text.filter { c -> c.isDigit() }.take(9)
-                                    val formatted = formatarValor(digits)
-
-                                    // Atualiza com cursor sempre no final
-                                    valorFrete = TextFieldValue(
-                                        text = formatted,
-                                        selection = TextRange(formatted.length)
-                                    )
-                                },
-                                label = { Text("Valor do Frete (R\$)") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.AttachMoney, null, tint = AppColors.Primary)
-                                },
-                                placeholder = { Text("0,00") },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number,
-                                    imeAction = ImeAction.Done
-                                ),
-                                keyboardActions = KeyboardActions(
-                                    onDone = { focusManager.clearFocus() }
-                                ),
-                                singleLine = true
-                            )
                         }
 
                         Spacer(Modifier.height(24.dp))
@@ -833,8 +800,9 @@ actual fun IniciarViagemScreen(
                                         mostrarMensagem("Informe o KM de Início", isErro = true)
                                         return@launch
                                     }
-                                    // Peso da Carga e Valor do Frete não são exigidos em Rota
-                                    // Contínua (frete vem de "Adicionar Frete" durante a viagem).
+                                    // Peso da Carga não é exigido em Rota Contínua. Valor do
+                                    // Frete não é mais pedido aqui em nenhum dos dois modos —
+                                    // frete agora é lançado só em "Adicionar Frete" (Despesas).
                                     if (!rotaContinua) {
                                         if (pesoCarga.text.isBlank()) {
                                             mostrarMensagem("Informe o Peso da Carga", isErro = true)
@@ -845,16 +813,6 @@ actual fun IniciarViagemScreen(
                                         mostrarMensagem("Tire a foto do painel de saída", isErro = true)
                                         return@launch
                                     }
-                                    // Mesma validação do Android: sem isso, o iOS enviava o valor do
-                                    // frete vazio (null) silenciosamente quando o motorista deixava
-                                    // "0,00" ou em branco, sem avisar nem bloquear.
-                                    if (!rotaContinua) {
-                                        val freteDigits = valorFrete.text.replace(".", "").replace(",", "").replace(" ", "")
-                                        if (valorFrete.text.isBlank() || freteDigits.toLongOrNull() == 0L || freteDigits.isEmpty()) {
-                                            mostrarMensagem("O valor do frete não pode ser R$ 0,00. Informe um valor válido.", isErro = true)
-                                            return@launch
-                                        }
-                                    }
 
                                     loading = true
 
@@ -864,18 +822,6 @@ actual fun IniciarViagemScreen(
 
                                     val dataViagemAPI = converterDataParaAPI(dataViagem)
                                     val kmInicioNormalizado = normalizarKmVeiculoParaEnvio(kmInicio.text, hodometroTemDecimal)
-
-                                    // Envia o valor mascarado em BR ("17.000,00") direto, igual todo
-                                    // outro campo de valor do app — é o servidor que converte pra
-                                    // decimal (str_replace ponto/vírgula). Converter aqui pra decimal
-                                    // ANTES de enviar fazia o servidor reprocessar um valor que já
-                                    // não tinha separador de milhar, inflando em 100x (17000.00 virava
-                                    // 1700000 ao remover o "." como se fosse separador de milhar).
-                                    val valorFreteParaAPI = if (!rotaContinua && valorFrete.text.isNotBlank() && valorFrete.text != "0,00") {
-                                        valorFrete.text
-                                    } else {
-                                        null
-                                    }
 
                                     // Rota Contínua: sem destino_id (manda destino_livre), sem
                                     // peso obrigatório. Rota Fixa: comportamento de sempre.
@@ -904,7 +850,7 @@ actual fun IniciarViagemScreen(
                                                 implemento1_id = if (implemento1Visivel) implemento1Id?.toInt() else null,
                                                 implemento2_id = if (implemento2Visivel) implemento2Id?.toInt() else null,
                                                 pesocarga = pesoCargaParaApi,
-                                                valorfrete = valorFreteParaAPI,
+                                                valorfrete = null,
                                                 foto_painel_saida = fotoBase64
                                             )
                                         )
@@ -973,7 +919,7 @@ actual fun IniciarViagemScreen(
                                             dataViagem = dataViagemAPI,
                                             kmInicio = kmInicioNormalizado,
                                             pesoCarga = pesoCargaParaApi ?: "",
-                                            valorFrete = valorFreteParaAPI,
+                                            valorFrete = null,
                                             fotoPainelSaida = fotoBase64,
                                             dataCriacao = dataCriacao,
                                             veiculoId = veiculoSelecionadoId,
@@ -1054,40 +1000,3 @@ private fun formatarPeso(digits: String): String {
         .reversed()
 }
 
-/**
- * Formata valor monetário com comportamento de calculadora
- *
- * Comportamento:
- * - "2" → "0,02"
- * - "25" → "0,25"
- * - "250" → "2,50"
- * - "2500" → "25,00"
- * - "25000" → "250,00"
- * - "123456" → "1.234,56"
- */
-private fun formatarValor(digits: String): String {
-    if (digits.isEmpty()) return "0,00"
-
-    val numero = digits.toLongOrNull() ?: return "0,00"
-
-    // Divide por 100 para obter reais e centavos
-    val reais = numero / 100
-    val centavos = numero % 100
-
-    // Formata reais com ponto como separador de milhar
-    val reaisFormatado = if (reais == 0L) {
-        "0"
-    } else {
-        reais.toString()
-            .reversed()
-            .chunked(3)
-            .joinToString(".")
-            .reversed()
-    }
-
-    // Formata centavos sempre com 2 dígitos
-    val centavosFormatado = centavos.toString().padStart(2, '0')
-
-    // Retorna no formato: 0,02 ou 25,00 ou 1.234,56
-    return "$reaisFormatado,$centavosFormatado"
-}

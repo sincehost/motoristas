@@ -237,7 +237,6 @@ actual fun FinalizarViagemScreen(
 
     // Campos de retorno (opcionais) - COM TextFieldValue
     var pesoCargaRetorno by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
-    var valorFreteRetorno by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var localCarregou by remember { mutableStateOf("") }
     var ordemRetorno by remember { mutableStateOf("") }
     var cteRetorno by remember { mutableStateOf("") }
@@ -418,10 +417,6 @@ actual fun FinalizarViagemScreen(
                 mostrarMensagem("Informe o peso da carga de retorno", isErro = true)
                 return
             }
-            if (valorFreteRetorno.text.isEmpty()) {
-                mostrarMensagem("Informe o valor do frete de retorno", isErro = true)
-                return
-            }
             if (localCarregou.isEmpty()) {
                 mostrarMensagem("Informe o local onde carregou", isErro = true)
                 return
@@ -445,10 +440,6 @@ actual fun FinalizarViagemScreen(
         if (teveRetorno) {
             if (pesoCargaRetorno.text.isEmpty()) {
                 mostrarMensagem("Informe o peso da carga de retorno", isErro = true)
-                return
-            }
-            if (valorFreteRetorno.text.isEmpty()) {
-                mostrarMensagem("Informe o valor do frete de retorno", isErro = true)
                 return
             }
             if (localCarregou.isEmpty()) {
@@ -490,7 +481,7 @@ actual fun FinalizarViagemScreen(
                                 observacao = observacao.ifEmpty { null },
                                 teve_retorno = teveRetorno,
                                 peso_carga_retorno = if (teveRetorno) pesoCargaRetorno.text else null,
-                                valor_frete_retorno = if (teveRetorno) valorFreteRetorno.text else null,
+                                valor_frete_retorno = null,
                                 local_carregou = if (teveRetorno) localCarregou else null,
                                 ordem_retorno = if (teveRetorno) ordemRetorno else null,
                                 cte_retorno = if (teveRetorno) cteRetorno else null,
@@ -514,7 +505,7 @@ actual fun FinalizarViagemScreen(
                         dataChegada = dataChegadaAPI,
                         kmChegada = kmChegadaNormalizado,
                         pesocargaRetorno = if (teveRetorno) pesoCargaRetorno.text else null,
-                        valorfreteRetorno = if (teveRetorno) valorFreteRetorno.text else null,
+                        valorfreteRetorno = null,
                         observacao = observacao.ifEmpty { null },
                         fotoPainelChegada = fotoPainelBase64,
                         teveRetorno = teveRetorno,
@@ -1043,33 +1034,6 @@ actual fun FinalizarViagemScreen(
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         placeholder = { Text("Ex: 25.000", color = Color(0xFF9CA3AF)) },
                                         suffix = { Text("kg") })
-
-
-                                    Spacer(Modifier.height(12.dp))
-
-                                    // Valor Frete Retorno
-                                    Text(
-                                        "Valor do Frete (R$) *",
-                                        fontWeight = FontWeight.Medium,
-                                        color = AppColors.TextPrimary,
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    OutlinedTextField(
-                                        value = valorFreteRetorno,
-                                        onValueChange = { newValue ->
-                                            val formatted = formatarValorFinalizar(newValue.text)
-                                            valorFreteRetorno = TextFieldValue(
-                                                text = formatted,
-                                                selection = TextRange(formatted.length)
-                                            )
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        prefix = { Text("R$ ") },
-                                        placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
-
                                 }
                             }
                         }
@@ -1197,14 +1161,4 @@ private fun formatarPesoFinalizar(input: String): String {
     if (digits.isEmpty()) return ""
     val value = digits.toLongOrNull() ?: return ""
     return value.toString().reversed().chunked(3).joinToString(".").reversed()
-}
-
-private fun formatarValorFinalizar(input: String): String {
-    val digits = input.filter { it.isDigit() }
-    if (digits.isEmpty()) return ""
-    val value = digits.toLongOrNull() ?: return ""
-    val reais = value / 100
-    val centavos = value % 100
-    val reaisFormatado = reais.toString().reversed().chunked(3).joinToString(".").reversed()
-    return "$reaisFormatado,${centavos.toString().padStart(2, '0')}"
 }

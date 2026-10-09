@@ -183,7 +183,6 @@ actual fun FinalizarViagemScreen(
 
     // Campos de retorno (opcionais) - COM TextFieldValue persistido
     var pesoCargaRetorno by rememberSaveableTextField("")
-    var valorFreteRetorno by rememberSaveableTextField("")
     var localCarregou by rememberSaveable { mutableStateOf("") }
     var ordemRetorno by rememberSaveable { mutableStateOf("") }
     var cteRetorno by rememberSaveable { mutableStateOf("") }
@@ -311,10 +310,10 @@ actual fun FinalizarViagemScreen(
             }
         }
 
-        // Validação dos campos de retorno
+        // Validação dos campos de retorno — frete de retorno não é mais
+        // pedido aqui; é lançado em "Adicionar Frete" (Despesas).
         if (teveRetorno) {
             if (pesoCargaRetorno.text.isEmpty()) { erro = "Informe o peso da carga de retorno"; return }
-            if (valorFreteRetorno.text.isEmpty()) { erro = "Informe o valor do frete de retorno"; return }
             if (localCarregou.isEmpty()) { erro = "Informe o local onde carregou"; return }
             if (ordemRetorno.isEmpty()) { erro = "Informe a ordem de retorno"; return }
             if (cteRetorno.isEmpty()) { erro = "Informe o CTE de retorno"; return }
@@ -331,7 +330,6 @@ actual fun FinalizarViagemScreen(
         // Revalidar campos de retorno
         if (teveRetorno) {
             if (pesoCargaRetorno.text.isEmpty()) { erro = "Informe o peso da carga de retorno"; return }
-            if (valorFreteRetorno.text.isEmpty()) { erro = "Informe o valor do frete de retorno"; return }
             if (localCarregou.isEmpty()) { erro = "Informe o local onde carregou"; return }
             if (ordemRetorno.isEmpty()) { erro = "Informe a ordem de retorno"; return }
             if (cteRetorno.isEmpty()) { erro = "Informe o CTE de retorno"; return }
@@ -359,7 +357,6 @@ actual fun FinalizarViagemScreen(
                         // peso: "25.000" | valor: "1.500,00"
                         // A API PHP faz a conversão internamente
                         val pesoRetornoParaAPI = if (teveRetorno) pesoCargaRetorno.text else null
-                        val valorRetornoParaAPI = if (teveRetorno) valorFreteRetorno.text else null
 
                         util.LogWriter.log("━━━ FINALIZAR VIAGEM (DIRETO) ━━━")
                         util.LogWriter.log("  motorista_id: ${motorista?.motorista_id}")
@@ -368,7 +365,6 @@ actual fun FinalizarViagemScreen(
                         util.LogWriter.log("  data_chegada: $dataChegadaAPI")
                         util.LogWriter.log("  teve_retorno: $teveRetorno")
                         util.LogWriter.log("  peso: $pesoRetornoParaAPI")
-                        util.LogWriter.log("  valor: $valorRetornoParaAPI")
                         util.LogWriter.log("  foto: ${if (cameraState.base64 != null) "${cameraState.base64!!.length} chars" else "null"}")
 
                         val response = api.ApiClient.finalizarViagem(
@@ -381,7 +377,7 @@ actual fun FinalizarViagemScreen(
                                 observacao = observacao.ifEmpty { null },
                                 teve_retorno = teveRetorno,
                                 peso_carga_retorno = pesoRetornoParaAPI,
-                                valor_frete_retorno = valorRetornoParaAPI,
+                                valor_frete_retorno = null,
                                 local_carregou = if (teveRetorno) localCarregou else null,
                                 ordem_retorno = if (teveRetorno) ordemRetorno else null,
                                 cte_retorno = if (teveRetorno) cteRetorno else null,
@@ -412,7 +408,7 @@ actual fun FinalizarViagemScreen(
                         dataChegada = dataChegadaAPI,
                         kmChegada = kmChegadaNormalizado,
                         pesocargaRetorno = if (teveRetorno) pesoCargaRetorno.text else null,
-                        valorfreteRetorno = if (teveRetorno) valorFreteRetorno.text else null,
+                        valorfreteRetorno = null,
                         observacao = observacao.ifEmpty { null },
                         fotoPainelChegada = cameraState.base64,
                         teveRetorno = teveRetorno,
@@ -853,27 +849,6 @@ actual fun FinalizarViagemScreen(
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         placeholder = { Text("Ex: 25.000", color = Color(0xFF9CA3AF)) },
                                         suffix = { Text("kg") })
-
-
-                                    Spacer(Modifier.height(12.dp))
-
-                                    // Valor Frete Retorno
-                                    Text("Valor do Frete (R$) *", fontWeight = FontWeight.Medium, color = AppColors.TextPrimary, fontSize = 14.sp)
-                                    Spacer(Modifier.height(4.dp))
-                                    OutlinedTextField(
-                                        value = valorFreteRetorno,
-                                        onValueChange = { newValue ->
-                                            val formatted = formatarValorFinalizar(newValue.text)
-                                            valorFreteRetorno = TextFieldValue(
-                                                text = formatted,
-                                                selection = TextRange(formatted.length)
-                                            )
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        prefix = { Text("R$ ") },
-                                        placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
                                 }
                             }
                         }
@@ -983,16 +958,4 @@ private fun formatarPesoFinalizar(input: String): String {
     symbols.groupingSeparator = '.'
     val formatter = java.text.DecimalFormat("#,##0", symbols)
     return formatter.format(value)
-}
-
-private fun formatarValorFinalizar(input: String): String {
-    val digits = input.filter { it.isDigit() }
-    if (digits.isEmpty()) return ""
-    val value = digits.toLongOrNull() ?: return ""
-    val decimal = value / 100.0
-    val symbols = java.text.DecimalFormatSymbols(java.util.Locale("pt", "BR"))
-    symbols.decimalSeparator = ','
-    symbols.groupingSeparator = '.'
-    val formatter = java.text.DecimalFormat("#,##0.00", symbols)
-    return formatter.format(decimal)
 }

@@ -442,8 +442,7 @@ private fun DashboardContent(
     if (mostrarMenuDespesas) {
         DespesasMenuOverlay(
             onDismiss = { mostrarMenuDespesas = false },
-            onNavigate = { screen -> onNavigate(screen) },
-            rotaContinua = remember { repository.isRotaContinua() }
+            onNavigate = { screen -> onNavigate(screen) }
         )
     }
 
