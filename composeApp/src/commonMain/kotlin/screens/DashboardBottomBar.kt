@@ -163,17 +163,20 @@ fun BottomNavigationBar(
         )
     }
 
-    // Barra flutuante: afastada das bordas, com cantos arredondados e sombra,
-    // em vez de encostada/esticada de ponta a ponta na tela.
+    // Barra flutuante: afastada das bordas, cantos de pílula (totalmente
+    // arredondados) e sombra. 80dp é a altura padrão do Material pra barra
+    // com ícone+rótulo — em 72dp o texto ficava sem espaço e sumia.
+    val bottomBarHeight = 80.dp
+    val bottomBarShape = RoundedCornerShape(bottomBarHeight / 2)
     NavigationBar(
         containerColor = if (isDark()) Color(0xFF1A1A2E) else AppColors.Primary,
         tonalElevation = 0.dp,
         modifier = Modifier
             .padding(horizontal = 16.dp)
             .padding(bottom = 16.dp)
-            .height(72.dp)
-            .shadow(elevation = 16.dp, shape = RoundedCornerShape(28.dp), clip = false)
-            .clip(RoundedCornerShape(28.dp))
+            .height(bottomBarHeight)
+            .shadow(elevation = 16.dp, shape = bottomBarShape, clip = false)
+            .clip(bottomBarShape)
     ) {
         // 1. Iniciar Viagem
         NavigationBarItem(
