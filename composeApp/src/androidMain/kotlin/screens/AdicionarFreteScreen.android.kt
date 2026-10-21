@@ -188,36 +188,25 @@ actual fun AdicionarFreteScreen(
 
         val viagemId = viagemEmAndamento!!.id.toLong()
 
+        // Trava já no toque: dois toques rápidos gravariam o lançamento duas vezes.
+        if (salvando) return
+        salvando = true
         scope.launch {
             salvando = true
             try {
-                try {
-                    val response = api.ApiClient.salvarFrete(
-                        api.SalvarFreteRequest(
-                            motorista_id = motorista?.motorista_id ?: "",
-                            viagem_id = viagemEmAndamento!!.id,
-                            tipo = tipo,
-                            numero_identificacao = numeroIdentificacao,
-                            valor = valor.text,
-                            foto_base64 = cameraState.base64
-                        )
-                    )
-                    if (response.status == "ok") {
-                        mostrarMensagem(response.mensagem ?: "Frete registrado com sucesso!")
-                    } else {
-                        mostrarMensagem(response.mensagem ?: "Erro ao salvar", erro = true)
-                    }
-                } catch (e: Exception) {
-                    repository.salvarFrete(
-                        motoristaId = motorista?.motorista_id ?: "",
-                        viagemId = viagemId,
-                        tipo = tipo,
-                        numeroIdentificacao = numeroIdentificacao,
-                        valor = valor.text,
-                        foto = cameraState.base64
-                    )
-                    mostrarMensagem("Frete salvo! Sincronize quando tiver internet.")
-                }
+                // Grava primeiro no celular e a fila envia (na hora, se tiver internet).
+                // Antes tentava o servidor primeiro: se ele recusasse o dado, nada
+                // ficava salvo e o lançamento se perdia.
+                repository.salvarFrete(
+                    motoristaId = motorista?.motorista_id ?: "",
+                    viagemId = viagemId,
+                    tipo = tipo,
+                    numeroIdentificacao = numeroIdentificacao,
+                    valor = valor.text,
+                    foto = cameraState.base64
+                )
+                mostrarMensagem("Frete salvo! Será enviado automaticamente.")
+                
                 recarregarFretesCadastrados(viagemId)
                 limparFormulario()
             } catch (e: Exception) {

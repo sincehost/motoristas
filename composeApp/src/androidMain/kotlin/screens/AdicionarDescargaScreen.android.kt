@@ -210,46 +210,33 @@ actual fun AdicionarDescargaScreen(
 
         val dataAPI = converterDataParaAPI(data)
 
+        // Trava já no toque: dois toques rápidos gravariam o lançamento duas vezes.
+        if (salvando) return
+        salvando = true
         scope.launch {
             salvando = true
             erro = null
             try {
-                // PRIMEIRO: Tentar API
-                try {
-                    val response = api.ApiClient.salvarDescarga(
-                        api.SalvarDescargaRequest(
-                            motorista_id = motorista?.motorista_id ?: "",
-                            viagem_id = viagemEmAndamento!!.id,
-                            data = dataAPI,
-                            placa = placaVeiculo,
-                            ordem_descarga = ordemDescargaInt,
-                            valor = valor.text,
-                            foto = cameraState.base64!! // Garantido que não é null pela validação acima
-                        )
-                    )
-                    if (response.status == "ok") {
-                        sucesso = "Descarga registrada com sucesso!"
-                    } else {
-                        erro = response.mensagem ?: "Erro ao salvar"
-                    }
-                } catch (e: Exception) {
-                    if (cameraState.base64.isNullOrBlank()) {
-                        erro = "Foto do comprovante é obrigatória"
-                        salvando = false
-                        return@launch
-                    }
-
-                    repository.salvarDescarga(
-                        motoristaId = motorista?.motorista_id ?: "",
-                        viagemId = viagemEmAndamento!!.id.toLong(),
-                        data = dataAPI,
-                        placa = placaVeiculo,
-                        ordemDescarga = ordemDescargaInt.toLong(),
-                        valor = valor.text,
-                        foto = cameraState.base64!!
-                    )
-                    sucesso = "Descarga salva! Sincronize quando tiver internet."
+                // Grava primeiro no celular e a fila envia (na hora, se tiver internet).
+                // Antes tentava o servidor primeiro: se ele recusasse o dado, nada
+                // ficava salvo e o lançamento se perdia.
+                if (cameraState.base64.isNullOrBlank()) {
+                    erro = "Foto do comprovante é obrigatória"
+                    salvando = false
+                    return@launch
                 }
+
+                repository.salvarDescarga(
+                    motoristaId = motorista?.motorista_id ?: "",
+                    viagemId = viagemEmAndamento!!.id.toLong(),
+                    data = dataAPI,
+                    placa = placaVeiculo,
+                    ordemDescarga = ordemDescargaInt.toLong(),
+                    valor = valor.text,
+                    foto = cameraState.base64!!
+                )
+                sucesso = "Descarga salva! Será enviada automaticamente."
+                
 
             } catch (e: Exception) {
                 erro = "Erro ao salvar: ${mensagemErroAmigavel(e.message)}"

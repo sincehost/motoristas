@@ -188,6 +188,9 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
             }
         }
 
+        // Trava já no toque: dois toques rápidos gravariam o lançamento duas vezes.
+        if (salvando) return
+        salvando = true
         scope.launch {
             salvando = true
             val dataApi = converterDataParaAPI(dataManutencao)
@@ -197,34 +200,20 @@ actual fun ManutencaoScreen(repository: AppRepository, onVoltar: () -> Unit) {
                 val viagemAtual = repository.getViagemAtual()
                 val viagemId = viagemAtual?.viagem_id ?: 0L
 
-                try {
-                    val resp = ApiClient.salvarManutencao(SalvarManutencaoRequest(
-                        motorista_id = motorista?.motorista_id ?: "", viagem_id = viagemId.toInt(),
-                        data_manutencao = dataApi, placa = placaSelecionada, servico = servicoSelecionado,
-                        tipo_manutencao = tipoManutencaoSelecionado,
-                        descricao_servico = descricaoServico, local_manutencao = localManutencao, valor = valor.text,
-                        km_troca_oleo = kmTrocaOleoNormalizado,
-                        km_troca_pneu = kmTrocaPneuNormalizado,
-                        pneus = pneusSelecionados.toList(),
-                        tipos_pneu = tiposPneu.mapKeys { it.key },
-                        foto_comprovante1 = foto1Base64, foto_comprovante2 = foto2Base64))
-                    if (resp.status == "ok") {
-                        sucessoMsg = "Manutenção registrada com sucesso!"
-                    } else {
-                        erroMsg = resp.mensagem ?: "Erro ao salvar"
-                    }
-                } catch (e: Exception) {
-                    repository.salvarManutencao(
-                        motorista?.motorista_id ?: "", viagemId, dataApi, placaSelecionada,
-                        servicoSelecionado, tipoManutencaoSelecionado, descricaoServico, localManutencao, valor.text,
-                        kmTrocaOleoNormalizado,
-                        kmTrocaPneuNormalizado,
-                        pneusSelecionados.sorted().joinToString(","),
-                        tiposPneu.entries.joinToString(";") { "${it.key}:${it.value}" },
-                        foto1Base64, foto2Base64
-                    )
-                    sucessoMsg = "Manutenção salva! Sincronize quando tiver internet."
-                }
+                // Grava primeiro no celular e a fila envia (na hora, se tiver internet).
+                // Antes tentava o servidor primeiro: se ele recusasse o dado, nada
+                // ficava salvo e o lançamento se perdia.
+                repository.salvarManutencao(
+                    motorista?.motorista_id ?: "", viagemId, dataApi, placaSelecionada,
+                    servicoSelecionado, tipoManutencaoSelecionado, descricaoServico, localManutencao, valor.text,
+                    kmTrocaOleoNormalizado,
+                    kmTrocaPneuNormalizado,
+                    pneusSelecionados.sorted().joinToString(","),
+                    tiposPneu.entries.joinToString(";") { "${it.key}:${it.value}" },
+                    foto1Base64, foto2Base64
+                )
+                sucessoMsg = "Manutenção salva! Será enviada automaticamente."
+                AppEvents.emitir(AppEvent.DadosPendentesAlterados)
             } catch (e: Exception) { erroMsg = "Erro ao salvar: ${mensagemErroAmigavel(e.message)}" }
             salvando = false
         }

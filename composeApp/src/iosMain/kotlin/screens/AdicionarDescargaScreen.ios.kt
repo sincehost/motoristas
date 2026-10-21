@@ -306,41 +306,24 @@ actual fun AdicionarDescargaScreen(
 
         salvando = true
 
+        // Trava já no toque: dois toques rápidos gravariam o lançamento duas vezes.
+        if (salvando) return
+        salvando = true
         scope.launch {
             try {
-                // PRIMEIRO: Tentar API
-                try {
-                    val response = ApiClient.salvarDescarga(
-                        SalvarDescargaRequest(
-
-                            motorista_id = mot.motorista_id,
-                            viagem_id = viagem.viagem_id.toInt(),
-                            data = dataAPI,
-                            placa = placaVeiculo,
-                            ordem_descarga = ordemDescargaInt,
-                            valor = valor.text,
-                            foto = fotoBase64
-                        )
-                    )
-                    if (response.status == "ok") {
-                        // API salvou com sucesso
-                        sucessoMsg = "Descarga registrada com sucesso!"
-                    } else {
-                        mostrarMensagem(response.mensagem ?: "Erro ao salvar", isErro = true)
-                    }
-                } catch (e: Exception) {
-                    // Sem internet - salvar localmente para sincronização
-                    repository.salvarDescarga(
-                        motoristaId = mot.motorista_id,
-                        viagemId = viagem.viagem_id,
-                        data = dataAPI,
-                        placa = placaVeiculo,
-                        ordemDescarga = ordemDescargaInt.toLong(),
-                        valor = valor.text,
-                        foto = fotoBase64
-                    )
-                    sucessoMsg = "Descarga salva! Sincronize quando tiver internet."
-                }
+                // Grava primeiro no celular e a fila envia (na hora, se tiver internet).
+                // Antes tentava o servidor primeiro: se ele recusasse o dado, nada
+                // ficava salvo e o lançamento se perdia.
+                repository.salvarDescarga(
+                    motoristaId = mot.motorista_id,
+                    viagemId = viagem.viagem_id,
+                    data = dataAPI,
+                    placa = placaVeiculo,
+                    ordemDescarga = ordemDescargaInt.toLong(),
+                    valor = valor.text,
+                    foto = fotoBase64
+                )
+                sucessoMsg = "Descarga salva! Será enviada automaticamente."
             } catch (e: Exception) {
                 mostrarMensagem("Erro ao salvar: ${mensagemErroAmigavel(e.message)}", isErro = true)
             } finally {

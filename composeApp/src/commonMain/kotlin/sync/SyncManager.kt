@@ -938,9 +938,16 @@ class SyncManager(private val repository: AppRepository) {
         motorista: Motorista?
     ): SyncItemResult {
         return try {
-            val viagemIdParaEnviar = resolverViagemId(manutencao.viagem_id, repository.getUltimaViagemServidor(), "Manutenção")
+            // viagem_id 0 = manutenção lançada sem viagem aberta — o servidor
+            // aceita assim (manutencao/salvar.php não exige viagem). Antes caía
+            // no fallback "última viagem do servidor" e a manutenção ia parar
+            // numa viagem que não tinha nada a ver (ou travava se não houvesse
+            // nenhuma).
+            val semViagem = manutencao.viagem_id == 0L
+            val viagemIdParaEnviar = if (semViagem) 0L
+                else resolverViagemId(manutencao.viagem_id, repository.getUltimaViagemServidor(), "Manutenção")
 
-            if (viagemIdParaEnviar <= 0) {
+            if (!semViagem && viagemIdParaEnviar <= 0) {
                 LogWriter.log("  ⏳ Manutenção viagem_id ainda não resolvido ($viagemIdParaEnviar), aguardando próximo sync")
                 return SyncItemResult(sucesso = false, erro = "Manutenção: aguardando viagem ser sincronizada primeiro")
             }

@@ -546,7 +546,7 @@ actual fun FinalizarViagemScreen(
 
                     // Resumo de KM
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
+                        colors = CardDefaults.cardColors(containerColor = if (ui.isDark()) AppColors.SurfaceVariant else Color(0xFFF0FDF4)),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
@@ -815,7 +815,7 @@ actual fun FinalizarViagemScreen(
                                 modifier = Modifier.weight(1f).height(50.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (teveRetorno) Color(0xFF10B981) else Color(0xFFE5E7EB)
+                                    containerColor = if (teveRetorno) Color(0xFF10B981) else if (ui.isDark()) AppColors.SurfaceVariant else Color(0xFFE5E7EB)
                                 )
                             ) {
                                 Icon(
@@ -836,7 +836,7 @@ actual fun FinalizarViagemScreen(
                                 modifier = Modifier.weight(1f).height(50.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (!teveRetorno) Color(0xFF10B981) else Color(0xFFE5E7EB)
+                                    containerColor = if (!teveRetorno) Color(0xFF10B981) else if (ui.isDark()) AppColors.SurfaceVariant else Color(0xFFE5E7EB)
                                 )
                             ) {
                                 Icon(
@@ -859,7 +859,7 @@ actual fun FinalizarViagemScreen(
 
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+                                colors = CardDefaults.cardColors(containerColor = if (ui.isDark()) AppColors.SurfaceVariant else Color(0xFFF8FAFC)),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {

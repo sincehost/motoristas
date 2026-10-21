@@ -225,43 +225,26 @@ actual fun AdicionarArlaScreen(
         val dataAPI = converterDataParaAPI(data)
         val kmPostoNormalizado = normalizarKmParaEnvio(kmPosto.text)
 
+        // Trava já no toque: dois toques rápidos gravariam o lançamento duas vezes.
+        if (salvando) return
+        salvando = true
         scope.launch {
             salvando = true
             try {
-                // PRIMEIRO: Tentar API
-                try {
-                    val response = api.ApiClient.salvarArla(
-                        api.SalvarArlaRequest(
-                            motorista_id = motorista?.motorista_id ?: "",
-                            viagem_id = viagemEmAndamento!!.id,
-                            data = dataAPI,
-                            valor = valor.text,
-                            litros = litros.text,
-                            posto = posto,
-                            km_posto = kmPostoNormalizado,
-                            foto_base64 = cameraState.base64
-                        )
-                    )
-                    if (response.status == "ok") {
-                        // API salvou com sucesso
-                        mostrarMensagem("${response.mensagem ?: "ARLA registrado com sucesso!"}")
-                    } else {
-                        mostrarMensagem(response.mensagem ?: "Erro ao salvar", erro = true)
-                    }
-                } catch (e: Exception) {
-                    // Sem internet - salvar localmente para sincronização
-                    repository.salvarArla(
-                        motoristaId = motorista?.motorista_id ?: "",
-                        viagemId = viagemEmAndamento!!.id.toLong(),
-                        data = dataAPI,
-                        valor = valor.text,
-                        litros = litros.text,
-                        posto = posto,
-                        kmPosto = kmPostoNormalizado,
-                        foto = cameraState.base64
-                    )
-                    mostrarMensagem("ARLA salvo! Sincronize quando tiver internet.")
-                }
+                // Grava primeiro no celular e a fila envia (na hora, se tiver internet).
+                // Antes tentava o servidor primeiro: se ele recusasse o dado, nada
+                // ficava salvo e o lançamento se perdia.
+                repository.salvarArla(
+                    motoristaId = motorista?.motorista_id ?: "",
+                    viagemId = viagemEmAndamento!!.id.toLong(),
+                    data = dataAPI,
+                    valor = valor.text,
+                    litros = litros.text,
+                    posto = posto,
+                    kmPosto = kmPostoNormalizado,
+                    foto = cameraState.base64
+                )
+                mostrarMensagem("ARLA salvo! Será enviado automaticamente.")
             } catch (e: Exception) {
                 mostrarMensagem(mensagemErroAmigavel(e.message), erro = true)
             }

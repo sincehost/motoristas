@@ -785,26 +785,50 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         return queries.countTotalPendentes().executeAsOne()
     }
 
+    // ===============================
+    // CORREÇÃO DE LANÇAMENTO RECUSADO (Pendências → "Corrigir")
+    // Valores já no formato de gravação (KM "X.Y", data "yyyy-MM-dd",
+    // dinheiro/litros como o motorista vê "1.234,56"). Limpam ultimo_erro.
+    // ===============================
+
+    fun corrigirViagem(id: Long, numerobd: String, cte: String, dataViagem: String, kmInicio: String, pesoCarga: String) {
+        database.transaction {
+            queries.corrigirViagem(numerobd, cte, dataViagem, kmInicio, pesoCarga, id)
+            // Viagem offline ainda aberta usa -idLocal como viagem_id — o
+            // Finalizar valida contra esse km_inicio, então acompanha a correção.
+            queries.atualizarKmInicioViagemAtual(kmInicio, -id)
+        }
+    }
+
+    fun corrigirFinalizacao(id: Long, dataChegada: String, kmChegada: String) =
+        queries.corrigirFinalizacao(dataChegada, kmChegada, id)
+
+    fun corrigirAbastecimento(id: Long, data: String, posto: String, kmPosto: String, litros: String, valorLitro: String, valor: String) =
+        queries.corrigirAbastecimento(data, posto, kmPosto, litros, valorLitro, valor, id)
+
+    fun corrigirArla(id: Long, data: String, posto: String, kmPosto: String, litros: String, valor: String) =
+        queries.corrigirArla(data, posto, kmPosto, litros, valor, id)
+
+    fun corrigirManutencao(id: Long, data: String, valor: String, kmTrocaOleo: String?, kmTrocaPneu: String?) =
+        queries.corrigirManutencao(data, valor, kmTrocaOleo, kmTrocaPneu, id)
+
+    fun corrigirDescarga(id: Long, data: String, valor: String) = queries.corrigirDescarga(data, valor, id)
+
+    fun corrigirOutraDespesa(id: Long, data: String, valor: String, descricao: String?) =
+        queries.corrigirOutraDespesa(data, valor, descricao, id)
+
+    fun corrigirFrete(id: Long, numeroIdentificacao: String, valor: String) =
+        queries.corrigirFrete(numeroIdentificacao, valor, id)
+
     /**
      * Pendentes que o SERVIDOR recusou (erro de dado, não de conexão) — o
      * card "Envio com problema" do Dashboard. Falha passageira (sem
      * internet etc.) fica de fora: o sync tenta de novo sozinho.
      */
-    fun getLancamentosRecusados(): List<LancamentoRecusado> = buildList {
-        fun add(tipo: String, data: String, erro: String?) {
-            if (!util.isErroTransitorio(erro)) add(LancamentoRecusado(tipo, data, erro!!))
-        }
-        getViagensParaSincronizar().forEach { add("Viagem", it.data_viagem, it.ultimo_erro) }
-        getFinalizacoesParaSincronizar().forEach { add("Finalização de viagem", it.data_chegada, it.ultimo_erro) }
-        getAbastecimentosParaSincronizar().forEach { add("Abastecimento", it.data_, it.ultimo_erro) }
-        getArlasParaSincronizar().forEach { add("ARLA 32", it.data_, it.ultimo_erro) }
-        getDescargasParaSincronizar().forEach { add("Descarga", it.data_, it.ultimo_erro) }
-        getFretesParaSincronizar().forEach { add("Frete", "", it.ultimo_erro) }
-        getManutencoesParaSincronizar().forEach { add("Manutenção", it.data_manutencao, it.ultimo_erro) }
-        getOutrasDespesasParaSincronizar().forEach { add("Outra despesa", it.data_, it.ultimo_erro) }
-        getChecklistsPreParaSincronizar().forEach { add("Checklist pré-viagem", it.data_checklist, it.ultimo_erro) }
-        getChecklistsPosParaSincronizar().forEach { add("Checklist pós-viagem", it.data_checklist, it.ultimo_erro) }
-    }
+    fun getLancamentosRecusados(): List<LancamentoRecusado> =
+        queries.lancamentosComErro().executeAsList()
+            .filter { !util.isErroTransitorio(it.ultimo_erro) }
+            .map { LancamentoRecusado(it.tipo, it.data_lancamento, it.ultimo_erro ?: "") }
 
     // ===============================
     // MANUTENÇÃO

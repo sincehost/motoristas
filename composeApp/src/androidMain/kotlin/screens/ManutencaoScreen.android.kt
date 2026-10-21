@@ -218,6 +218,9 @@ actual fun ManutencaoScreen(
             }
         }
 
+        // Trava já no toque: dois toques rápidos gravariam o lançamento duas vezes.
+        if (salvando) return
+        salvando = true
         scope.launch {
             salvando = true
             erro = null
@@ -230,51 +233,28 @@ actual fun ManutencaoScreen(
                 val viagemAtual = repository.getViagemAtual()
                 val viagemId = viagemAtual?.viagem_id ?: 0L
 
-                try {
-                    val response = ApiClient.salvarManutencao(
-                        SalvarManutencaoRequest(
-                            motorista_id = motorista?.motorista_id ?: "",
-                            viagem_id = viagemId.toInt(),
-                            data_manutencao = dataManutencaoAPI,
-                            placa = placaSelecionada,
-                            servico = servicoSelecionado,
-                            tipo_manutencao = tipoManutencaoSelecionado,
-                            descricao_servico = descricaoServico,
-                            local_manutencao = localManutencao,
-                            valor = valor.text,
-                            km_troca_oleo = kmTrocaOleoNormalizado,
-                            km_troca_pneu = kmTrocaPneuNormalizado,
-                            pneus = parsePneus().toList(),
-                            tipos_pneu = parseTipos(),
-                            foto_comprovante1 = cameraState1.base64,
-                            foto_comprovante2 = cameraState2.base64
-                        )
-                    )
-                    if (response.status == "ok") {
-                        sucesso = "Manutenção registrada com sucesso!"
-                    } else {
-                        erro = response.mensagem ?: "Erro ao salvar"
-                    }
-                } catch (e: Exception) {
-                    repository.salvarManutencao(
-                        motoristaId = motorista?.motorista_id ?: "",
-                        viagemId = viagemId,
-                        dataManutencao = dataManutencaoAPI,
-                        placa = placaSelecionada,
-                        servico = servicoSelecionado,
-                        tipoManutencao = tipoManutencaoSelecionado,
-                        descricaoServico = descricaoServico,
-                        localManutencao = localManutencao,
-                        valor = valor.text,
-                        kmTrocaOleo = kmTrocaOleoNormalizado,
-                        kmTrocaPneu = kmTrocaPneuNormalizado,
-                        pneus = pneusSelecionadosStr,
-                        tiposPneu = tiposPneuStr,
-                        fotoComprovante1 = cameraState1.base64,
-                        fotoComprovante2 = cameraState2.base64
-                    )
-                    sucesso = "Manutenção salva! Sincronize quando tiver internet."
-                }
+                // Grava primeiro no celular e a fila envia (na hora, se tiver internet).
+                // Antes tentava o servidor primeiro: se ele recusasse o dado, nada
+                // ficava salvo e o lançamento se perdia.
+                repository.salvarManutencao(
+                    motoristaId = motorista?.motorista_id ?: "",
+                    viagemId = viagemId,
+                    dataManutencao = dataManutencaoAPI,
+                    placa = placaSelecionada,
+                    servico = servicoSelecionado,
+                    tipoManutencao = tipoManutencaoSelecionado,
+                    descricaoServico = descricaoServico,
+                    localManutencao = localManutencao,
+                    valor = valor.text,
+                    kmTrocaOleo = kmTrocaOleoNormalizado,
+                    kmTrocaPneu = kmTrocaPneuNormalizado,
+                    pneus = pneusSelecionadosStr,
+                    tiposPneu = tiposPneuStr,
+                    fotoComprovante1 = cameraState1.base64,
+                    fotoComprovante2 = cameraState2.base64
+                )
+                sucesso = "Manutenção salva! Será enviada automaticamente."
+                AppEvents.emitir(AppEvent.DadosPendentesAlterados)
             } catch (e: Exception) {
                 erro = "Erro ao salvar: ${mensagemErroAmigavel(e.message)}"
             }

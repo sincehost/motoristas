@@ -1102,6 +1102,53 @@ INSERT OR REPLACE INTO Preferencia(chave, valor) VALUES (?, ?);
 deletePreferencia:
 DELETE FROM Preferencia WHERE chave = ?;
 
+-- ===============================
+-- CORREÇÃO DE LANÇAMENTO RECUSADO (tela Pendências → "Corrigir")
+-- Grava os campos corrigidos pelo motorista e limpa o erro — o próximo sync
+-- reenvia o lançamento como se fosse novo.
+-- ===============================
+corrigirViagem:
+UPDATE Viagem SET numerobd = ?, cte = ?, data_viagem = ?, km_inicio = ?, pesocarga = ?, ultimo_erro = NULL WHERE id = ?;
+
+atualizarKmInicioViagemAtual:
+UPDATE ViagemAtual SET km_inicio = ? WHERE viagem_id = ?;
+
+corrigirFinalizacao:
+UPDATE FinalizacaoViagem SET data_chegada = ?, km_chegada = ?, ultimo_erro = NULL WHERE id = ?;
+
+corrigirAbastecimento:
+UPDATE Abastecimento SET data = ?, posto = ?, km_posto = ?, litros = ?, valor_litro = ?, valor = ?, ultimo_erro = NULL WHERE id = ?;
+
+corrigirArla:
+UPDATE Arla SET data = ?, posto = ?, km_posto = ?, litros = ?, valor = ?, ultimo_erro = NULL WHERE id = ?;
+
+corrigirManutencao:
+UPDATE Manutencao SET data_manutencao = ?, valor = ?, km_troca_oleo = ?, km_troca_pneu = ?, ultimo_erro = NULL WHERE id = ?;
+
+corrigirDescarga:
+UPDATE Descarga SET data = ?, valor = ?, ultimo_erro = NULL WHERE id = ?;
+
+corrigirOutraDespesa:
+UPDATE OutraDespesa SET data = ?, valor = ?, descricao = ?, ultimo_erro = NULL WHERE id = ?;
+
+corrigirFrete:
+UPDATE Frete SET numero_identificacao = ?, valor = ?, ultimo_erro = NULL WHERE id = ?;
+
+-- Pendentes com erro gravado — só tipo, data e mensagem, SEM as fotos. Usado
+-- pelo card "Envio com problema" (Dashboard), que roda a cada mudança de
+-- pendentes: ler as linhas inteiras carregava todas as fotos em base64.
+lancamentosComErro:
+SELECT 'Viagem' AS tipo, data_viagem AS data_lancamento, ultimo_erro FROM Viagem WHERE sincronizado = 0 AND ultimo_erro IS NOT NULL
+UNION ALL SELECT 'Finalização de viagem', data_chegada, ultimo_erro FROM FinalizacaoViagem WHERE sincronizado = 0 AND ultimo_erro IS NOT NULL
+UNION ALL SELECT 'Abastecimento', data, ultimo_erro FROM Abastecimento WHERE sincronizado = 0 AND ultimo_erro IS NOT NULL
+UNION ALL SELECT 'ARLA 32', data, ultimo_erro FROM Arla WHERE sincronizado = 0 AND ultimo_erro IS NOT NULL
+UNION ALL SELECT 'Descarga', data, ultimo_erro FROM Descarga WHERE sincronizado = 0 AND ultimo_erro IS NOT NULL
+UNION ALL SELECT 'Frete', '', ultimo_erro FROM Frete WHERE sincronizado = 0 AND ultimo_erro IS NOT NULL
+UNION ALL SELECT 'Manutenção', data_manutencao, ultimo_erro FROM Manutencao WHERE sincronizado = 0 AND ultimo_erro IS NOT NULL
+UNION ALL SELECT 'Outra despesa', data, ultimo_erro FROM OutraDespesa WHERE sincronizado = 0 AND ultimo_erro IS NOT NULL
+UNION ALL SELECT 'Checklist pré-viagem', data_checklist, ultimo_erro FROM ChecklistPreViagem WHERE sincronizado = 0 AND ultimo_erro IS NOT NULL
+UNION ALL SELECT 'Checklist pós-viagem', data_checklist, ultimo_erro FROM ChecklistPosViagem WHERE sincronizado = 0 AND ultimo_erro IS NOT NULL;
+
 -- ID do último INSERT na mesma conexão — usar dentro de transaction junto
 -- com o insert (ver AppRepository.salvarChecklistPre/Pos).
 lastInsertRowId:

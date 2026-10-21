@@ -19,7 +19,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.zIndex
 import br.com.lfsystem.app.database.Abastecimento
 import br.com.lfsystem.app.database.Arla
 import br.com.lfsystem.app.database.ChecklistPosViagem
@@ -49,7 +50,9 @@ private data class PendenciaItem(
     val detalhes: List<Pair<String, String>> = emptyList(),
     val fotos: List<Pair<String, String>> = emptyList(),
     val onDescartar: (() -> Unit)? = null,
-    val onExcluirTodos: (() -> Unit)? = null
+    val onExcluirTodos: (() -> Unit)? = null,
+    /** Presente quando o servidor recusou o dado — habilita o botão "Corrigir". */
+    val correcao: CorrecaoLancamento? = null
 )
 
 private fun itemErroAoExibir(tipo: String, e: Throwable, onDescartar: () -> Unit): PendenciaItem = PendenciaItem(
@@ -228,6 +231,36 @@ fun PendenciasSyncScreen(
     var itemParaDescartar by remember { mutableStateOf<PendenciaItem?>(null) }
     var itemParaExcluirTodos by remember { mutableStateOf<PendenciaItem?>(null) }
     var itemParaVerDetalhes by remember { mutableStateOf<PendenciaItem?>(null) }
+    var itemParaCorrigir by remember { mutableStateOf<CorrecaoLancamento?>(null) }
+    var mensagemOk by remember { mutableStateOf<String?>(null) }
+    var correcoesFeitas by remember { mutableStateOf(0) }
+
+    // Depois de uma correção o Dashboard (vivo por baixo) dispara o sync —
+    // recarrega a lista por 1 minuto pra o item sumir sozinho quando o
+    // servidor aceitar (ou voltar com erro novo, se ainda tiver problema).
+    // Confere um resumo leve (contagem + erros, sem fotos) e só recarrega a
+    // lista inteira quando ele muda — a lista carrega as fotos de tudo.
+    LaunchedEffect(correcoesFeitas) {
+        if (correcoesFeitas == 0) return@LaunchedEffect
+        fun resumo() = try {
+            repository.countTotalPendentes() to repository.getLancamentosRecusados().map { it.erro }
+        } catch (_: Exception) { null }
+        var anterior = resumo()
+        repeat(12) {
+            kotlinx.coroutines.delay(5_000)
+            val atual = resumo()
+            if (atual != anterior) {
+                anterior = atual
+                refreshTrigger++
+            }
+        }
+    }
+    LaunchedEffect(mensagemOk) {
+        if (mensagemOk != null) {
+            kotlinx.coroutines.delay(6_000)
+            mensagemOk = null
+        }
+    }
     val scrollState = rememberScrollState()
     val compartilharTexto = util.rememberCompartilharTexto()
 
@@ -243,6 +276,7 @@ fun PendenciasSyncScreen(
                                 erro = v.ultimo_erro,
                                 detalhes = detalhesViagem(v),
                                 fotos = fotosViagem(v),
+                                correcao = correcaoViagem(repository, v),
                                 onDescartar = { repository.excluirViagemLocalComDependentes(v.id) }
                             ))
                         } catch (e: Exception) {
@@ -262,6 +296,7 @@ fun PendenciasSyncScreen(
                                 erro = a.ultimo_erro,
                                 detalhes = detalhesAbastecimento(a),
                                 fotos = fotosAbastecimento(a),
+                                correcao = correcaoAbastecimento(repository, a),
                                 onDescartar = { repository.excluirAbastecimentoLocal(a.id) }
                             ))
                         } catch (e: Exception) {
@@ -281,6 +316,7 @@ fun PendenciasSyncScreen(
                                 erro = ar.ultimo_erro,
                                 detalhes = detalhesArla(ar),
                                 fotos = fotosArla(ar),
+                                correcao = correcaoArla(repository, ar),
                                 onDescartar = { repository.excluirArlaLocal(ar.id) }
                             ))
                         } catch (e: Exception) {
@@ -300,6 +336,7 @@ fun PendenciasSyncScreen(
                                 erro = f.ultimo_erro,
                                 detalhes = detalhesFrete(f),
                                 fotos = fotosFrete(f),
+                                correcao = correcaoFrete(repository, f),
                                 onDescartar = { repository.excluirFreteLocal(f.id) }
                             ))
                         } catch (e: Exception) {
@@ -319,6 +356,7 @@ fun PendenciasSyncScreen(
                                 erro = d.ultimo_erro,
                                 detalhes = detalhesDescarga(d),
                                 fotos = fotosDescarga(d),
+                                correcao = correcaoDescarga(repository, d),
                                 onDescartar = { repository.excluirDescargaLocal(d.id) }
                             ))
                         } catch (e: Exception) {
@@ -338,6 +376,7 @@ fun PendenciasSyncScreen(
                                 erro = m.ultimo_erro,
                                 detalhes = detalhesManutencao(m),
                                 fotos = fotosManutencao(m),
+                                correcao = correcaoManutencao(repository, m),
                                 onDescartar = { repository.excluirManutencaoLocal(m.id) }
                             ))
                         } catch (e: Exception) {
@@ -357,6 +396,7 @@ fun PendenciasSyncScreen(
                                 erro = f.ultimo_erro,
                                 detalhes = detalhesFinalizacao(f),
                                 fotos = fotosFinalizacao(f),
+                                correcao = correcaoFinalizacao(repository, f),
                                 onDescartar = { repository.excluirFinalizacaoLocal(f.id) }
                             ))
                         } catch (e: Exception) {
@@ -376,6 +416,7 @@ fun PendenciasSyncScreen(
                                 erro = o.ultimo_erro,
                                 detalhes = detalhesOutraDespesa(o),
                                 fotos = fotosOutraDespesa(o),
+                                correcao = correcaoOutraDespesa(repository, o),
                                 onDescartar = { repository.excluirOutraDespesaLocal(o.id) }
                             ))
                         } catch (e: Exception) {
@@ -471,10 +512,22 @@ fun PendenciasSyncScreen(
                     }
                 }
             } else if (itens.isNotEmpty()) {
+                mensagemOk?.let { msg ->
+                    Text(
+                        msg,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF2E7D32),
+                        modifier = Modifier.fillMaxWidth()
+                            .background(Color(0xFFE8F4E3), RoundedCornerShape(10.dp))
+                            .padding(12.dp)
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
                 Text(
                     "${itens.size} lançamento${if (itens.size == 1) "" else "s"} aguardando sincronizar. " +
-                        "Itens com erro ficam tentando de novo a cada sincronização — toque num item pra ver tudo " +
-                        "que foi preenchido, ou descarte manualmente se estiver travado há muito tempo.",
+                        "Os que o servidor recusou têm o botão \"Corrigir\": ajuste o dado e o app reenvia sozinho. " +
+                        "Toque num item pra ver tudo que foi preenchido.",
                     fontSize = 13.sp,
                     color = AppColors.TextSecondary
                 )
@@ -501,6 +554,7 @@ fun PendenciasSyncScreen(
                         PendenciaCard(
                             item = item,
                             onClick = { itemParaVerDetalhes = item },
+                            onCorrigirClick = { itemParaCorrigir = item.correcao },
                             onDescartarClick = { itemParaDescartar = item },
                             onExcluirTodosClick = { itemParaExcluirTodos = item }
                         )
@@ -599,12 +653,27 @@ fun PendenciasSyncScreen(
     if (itemDetalhes != null) {
         DetalhesPendenciaDialog(item = itemDetalhes, onDismiss = { itemParaVerDetalhes = null })
     }
+
+    val correcaoAtual = itemParaCorrigir
+    if (correcaoAtual != null) {
+        CorrigirLancamentoScreen(
+            correcao = correcaoAtual,
+            onSalvo = { msg ->
+                itemParaCorrigir = null
+                mensagemOk = msg
+                correcoesFeitas++
+                refreshTrigger++
+            },
+            onFechar = { itemParaCorrigir = null }
+        )
+    }
 }
 
 @Composable
 private fun PendenciaCard(
     item: PendenciaItem,
     onClick: () -> Unit,
+    onCorrigirClick: () -> Unit,
     onDescartarClick: () -> Unit,
     onExcluirTodosClick: () -> Unit
 ) {
@@ -613,6 +682,7 @@ private fun PendenciaCard(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground)
     ) {
+      Column {
         Row(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -655,16 +725,52 @@ private fun PendenciaCard(
                 modifier = Modifier.size(20.dp)
             )
         }
+        if (item.correcao != null) {
+            Button(
+                onClick = onCorrigirClick,
+                modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 14.dp).height(48.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC2410C), contentColor = Color.White)
+            ) {
+                Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Corrigir", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            }
+        }
+      }
     }
 }
 
 @Composable
 private fun DetalhesPendenciaDialog(item: PendenciaItem, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
+    // Camada por cima da tela (mesmo esquema do AppAlertDialog) em vez de
+    // Dialog: Dialog/Popup não aparece no iPhone dentro da navegação do app.
+    PlatformBackHandler(enabled = true, onBack = onDismiss)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(1000f)
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss
+            )
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
-            modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
+                // consome o toque dentro do card (não fecha)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {}
+                )
         ) {
             Column(
                 Modifier

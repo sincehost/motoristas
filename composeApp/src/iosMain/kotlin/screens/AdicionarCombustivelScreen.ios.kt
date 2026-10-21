@@ -487,7 +487,7 @@ actual fun AdicionarCombustivelScreen(
                     valorLitro = valorLitro.text
                 )
 
-                mostrarMensagem("Abastecimento salvo! Sincronize quando tiver internet.")
+                mostrarMensagem("Abastecimento salvo! Será enviado automaticamente.")
 
             } catch (e: Exception) {
                 mostrarMensagem("Erro ao salvar: ${mensagemErroAmigavel(e.message)}", isErro = true)

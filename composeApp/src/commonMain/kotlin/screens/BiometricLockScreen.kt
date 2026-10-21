@@ -116,7 +116,44 @@ fun BiometricLockScreen(
 
     // Se o motorista não conseguir desbloquear de nenhuma forma, a única
     // saída não pode ser um bypass silencioso que finge que nada aconteceu.
-    if (mostrarConfirmacaoSair) {
+    // Com lançamentos não enviados, sair por aqui também não é permitido —
+    // mesma regra do botão Sair do Dashboard: o próximo motorista do aparelho
+    // enviaria esses lançamentos em nome dele.
+    val pendentesNaoEnviados = remember(mostrarConfirmacaoSair) {
+        if (mostrarConfirmacaoSair) try { repository.countTotalPendentes() } catch (_: Exception) { 0L } else 0L
+    }
+    if (mostrarConfirmacaoSair && pendentesNaoEnviados > 0) {
+        AppAlertDialog(
+            onDismissRequest = { mostrarConfirmacaoSair = false },
+            containerColor = AppColors.Surface,
+            icon = {
+                Icon(ui.Lucide.RefreshCwOff, null, tint = AppColors.Warning, modifier = Modifier.size(36.dp))
+            },
+            title = {
+                Text("Dados não enviados", fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            },
+            text = {
+                Text(
+                    "Este celular tem $pendentesNaoEnviados ${if (pendentesNaoEnviados > 1) "lançamentos que ainda não foram enviados" else "lançamento que ainda não foi enviado"}.\n\n" +
+                        "Desbloqueie com a digital ou a senha e sincronize antes de sair, para não perder nada.",
+                    fontSize = 14.sp, textAlign = TextAlign.Center, color = AppColors.TextSecondary, modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { mostrarConfirmacaoSair = false; mostrarDialogSenha = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
+                    ) { Text("Desbloquear com a senha", fontWeight = FontWeight.Bold) }
+                    OutlinedButton(
+                        onClick = { mostrarConfirmacaoSair = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Entendido") }
+                }
+            }
+        )
+    } else if (mostrarConfirmacaoSair) {
         AppAlertDialog(
             onDismissRequest = { mostrarConfirmacaoSair = false },
             containerColor = AppColors.Surface,
@@ -128,13 +165,19 @@ fun BiometricLockScreen(
             },
             text = {
                 Text(
-                    "Ao sair, seus dados locais serão removidos e você precisará fazer login novamente.\n\nDados pendentes de sincronização serão perdidos.",
+                    "Ao sair, seus dados locais serão removidos e você precisará fazer login novamente.",
                     fontSize = 14.sp, textAlign = TextAlign.Center, color = AppColors.TextSecondary, modifier = Modifier.fillMaxWidth()
                 )
             },
             confirmButton = {
                 Button(
-                    onClick = { mostrarConfirmacaoSair = false; repository.logout(); onLogout() },
+                    onClick = {
+                        mostrarConfirmacaoSair = false
+                        // Viagem aberta sai junto — mesma regra do Dashboard.
+                        repository.limparViagemAtual()
+                        repository.logout()
+                        onLogout()
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = AppColors.Error)
                 ) { Text("Sair", fontWeight = FontWeight.Bold) }
             },

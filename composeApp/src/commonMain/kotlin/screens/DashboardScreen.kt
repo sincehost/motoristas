@@ -561,7 +561,9 @@ private fun DashboardContent(
                     if (temInternet && pendentes > 0 && syncStatus.state == SyncState.IDLE) {
                         executarSync(silencioso = true)
                     }
-                    mostrarSucesso("Dados atualizados!")
+                    // Sem "Dados atualizados!" aqui: aparecia antes de saber se
+                    // atualizou (até sem internet). O card de sincronização já
+                    // mostra o resultado real quando há algo a enviar.
                 },
                 onSync = { sincronizarManual() },
                 onLogout = { mostrarDialogoLogout = true }
@@ -780,27 +782,27 @@ private fun DashboardMenuItems(
     }
 
     MenuButton(ui.Lucide.List, "Minhas Viagens", AppColors.Purple) {
-        scope.launch {
-            onMensagem(null)
-            sincronizarCatalogos()
-            onNavigate(Screen.MINHAS_VIAGENS)
-        }
+        // Abre na hora; os cadastros atualizam em segundo plano (antes a
+        // tela só abria depois dessa chamada — até 60 s com sinal fraco).
+        onMensagem(null)
+        onNavigate(Screen.MINHAS_VIAGENS)
+        scope.launch { sincronizarCatalogos() }
     }
     Spacer(Modifier.height(12.dp))
     MenuButton(ui.Lucide.Hammer, "Minhas Manutenções", Color(0xFF8B5CF6)) {
-        scope.launch {
-            onMensagem(null)
-            sincronizarCatalogos()
-            onNavigate(Screen.MINHAS_MANUTENCOES)
-        }
+        // Abre na hora; os cadastros atualizam em segundo plano (antes a
+        // tela só abria depois dessa chamada — até 60 s com sinal fraco).
+        onMensagem(null)
+        onNavigate(Screen.MINHAS_MANUTENCOES)
+        scope.launch { sincronizarCatalogos() }
     }
     Spacer(Modifier.height(12.dp))
     MenuButton(ui.Lucide.ChartColumn, "Relatório de Viagens", AppColors.Secondary) {
-        scope.launch {
-            onMensagem(null)
-            sincronizarCatalogos()
-            onNavigate(Screen.RELATORIO_VIAGENS)
-        }
+        // Abre na hora; os cadastros atualizam em segundo plano (antes a
+        // tela só abria depois dessa chamada — até 60 s com sinal fraco).
+        onMensagem(null)
+        onNavigate(Screen.RELATORIO_VIAGENS)
+        scope.launch { sincronizarCatalogos() }
     }
     Spacer(Modifier.height(12.dp))
     MenuButton(ui.Lucide.ClipboardCheck, "Checklist Pré-Viagem", Color(0xFF0097A7)) {
