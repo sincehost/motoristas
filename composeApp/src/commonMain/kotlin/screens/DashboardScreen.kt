@@ -411,25 +411,75 @@ private fun DashboardContent(
         }
     }
 
-    if (mostrarDialogoLogout) {
+    // Com pendências não deixa sair: o sync envia com o motorista_id de quem
+    // estiver logado, então quem entrasse depois herdaria (e enviaria como
+    // seus) os lançamentos deste motorista. Sessão expirada (TokenExpirado)
+    // continua mantendo tudo — é o mesmo motorista que entra de novo.
+    if (mostrarDialogoLogout && pendentes > 0) {
         AppAlertDialog(
             onDismissRequest = { mostrarDialogoLogout = false },
             containerColor = AppColors.Surface,
             icon = {
-                Icon(Icons.Default.Logout, null, tint = AppColors.Error, modifier = Modifier.size(36.dp))
+                Icon(ui.Lucide.RefreshCwOff, null, tint = AppColors.Warning, modifier = Modifier.size(36.dp))
+            },
+            title = {
+                Text("Dados não enviados", fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            },
+            text = {
+                Text(
+                    "Você tem $pendentes ${if (pendentes > 1) "itens que ainda não foram enviados" else "item que ainda não foi enviado"} ao servidor.\n\nSincronize antes de sair para não perder nada.",
+                    fontSize = 14.sp, textAlign = TextAlign.Center, color = AppColors.TextSecondary, modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { mostrarDialogoLogout = false; sincronizarManual() },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("Sincronizar agora", fontWeight = FontWeight.Bold) }
+                    OutlinedButton(
+                        onClick = { mostrarDialogoLogout = false; onNavigate(Screen.PENDENCIAS_SYNC) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("Ver pendências") }
+                    TextButton(
+                        onClick = { mostrarDialogoLogout = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Cancelar") }
+                }
+            }
+        )
+    } else if (mostrarDialogoLogout) {
+        AppAlertDialog(
+            onDismissRequest = { mostrarDialogoLogout = false },
+            containerColor = AppColors.Surface,
+            icon = {
+                Icon(ui.Lucide.LogOut, null, tint = AppColors.Error, modifier = Modifier.size(36.dp))
             },
             title = {
                 Text("Sair do aplicativo", fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             },
             text = {
                 Text(
-                    "Ao sair, seus dados locais serão removidos e você precisará fazer login novamente.\n\nDados pendentes de sincronização serão perdidos.",
+                    "Ao sair, seus dados locais serão removidos e você precisará fazer login novamente.",
                     fontSize = 14.sp, textAlign = TextAlign.Center, color = AppColors.TextSecondary, modifier = Modifier.fillMaxWidth()
                 )
             },
             confirmButton = {
                 Button(
-                    onClick = { mostrarDialogoLogout = false; repository.logout(); onLogout() },
+                    onClick = {
+                        mostrarDialogoLogout = false
+                        // Viagem atual sai junto — senão o próximo motorista
+                        // do aparelho já entra com a viagem aberta deste.
+                        repository.limparViagemAtual()
+                        repository.logout()
+                        onLogout()
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = AppColors.Error)
                 ) { Text("Sair", fontWeight = FontWeight.Bold) }
             },
@@ -555,6 +605,16 @@ private fun DashboardContent(
         ) {
             Spacer(Modifier.height(16.dp))
 
+            // Recalcula sempre que o contador de pendentes muda, ao fim de
+            // cada sync e ao voltar de outra tela (ex.: corrigiu na Pendências).
+            val recusados = remember(pendentes, syncStatus.state, telaAtual) {
+                try { repository.getLancamentosRecusados() } catch (_: Exception) { emptyList() }
+            }
+            if (recusados.isNotEmpty()) {
+                EnvioComProblemaCard(recusados, onVerECorrigir = { onNavigate(Screen.PENDENCIAS_SYNC) })
+                Spacer(Modifier.height(12.dp))
+            }
+
             if (syncStatus.state != SyncState.IDLE) {
                 SyncStatusCard(syncStatus)
                 Spacer(Modifier.height(12.dp))
@@ -641,7 +701,7 @@ private fun DashboardTopBar(
         },
         navigationIcon = {
             IconButton(onClick = onHome) {
-                Icon(Icons.Default.Home, contentDescription = "Início", tint = Color.White)
+                Icon(ui.Lucide.House, contentDescription = "Início", tint = Color.White)
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
@@ -660,7 +720,7 @@ private fun DashboardTopBar(
                 }
             }) {
                 Icon(
-                    if (currentlyDark) Icons.Default.LightMode else Icons.Default.DarkMode,
+                    if (currentlyDark) ui.Lucide.Sun else ui.Lucide.Moon,
                     contentDescription = "Alternar tema",
                     tint = Color.White
                 )
@@ -676,12 +736,12 @@ private fun DashboardTopBar(
                     if (sincronizando) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
                     } else {
-                        Icon(Icons.Default.Sync, "Sincronizar", tint = Color.White)
+                        Icon(ui.Lucide.RefreshCw, "Sincronizar", tint = Color.White)
                     }
                 }
             }
             IconButton(onClick = onLogout) {
-                Icon(Icons.Default.Logout, "Sair", tint = Color.White)
+                Icon(ui.Lucide.LogOut, "Sair", tint = Color.White)
             }
         }
     )
@@ -719,7 +779,7 @@ private fun DashboardMenuItems(
         } catch (_: Exception) { }
     }
 
-    MenuButton(Icons.Default.ListAlt, "Minhas Viagens", AppColors.Purple) {
+    MenuButton(ui.Lucide.List, "Minhas Viagens", AppColors.Purple) {
         scope.launch {
             onMensagem(null)
             sincronizarCatalogos()
@@ -727,7 +787,7 @@ private fun DashboardMenuItems(
         }
     }
     Spacer(Modifier.height(12.dp))
-    MenuButton(Icons.Default.Handyman, "Minhas Manutenções", Color(0xFF8B5CF6)) {
+    MenuButton(ui.Lucide.Hammer, "Minhas Manutenções", Color(0xFF8B5CF6)) {
         scope.launch {
             onMensagem(null)
             sincronizarCatalogos()
@@ -735,7 +795,7 @@ private fun DashboardMenuItems(
         }
     }
     Spacer(Modifier.height(12.dp))
-    MenuButton(Icons.Default.Assessment, "Relatório de Viagens", AppColors.Secondary) {
+    MenuButton(ui.Lucide.ChartColumn, "Relatório de Viagens", AppColors.Secondary) {
         scope.launch {
             onMensagem(null)
             sincronizarCatalogos()
@@ -743,15 +803,15 @@ private fun DashboardMenuItems(
         }
     }
     Spacer(Modifier.height(12.dp))
-    MenuButton(Icons.Default.Checklist, "Checklist Pré-Viagem", Color(0xFF0097A7)) {
+    MenuButton(ui.Lucide.ClipboardCheck, "Checklist Pré-Viagem", Color(0xFF0097A7)) {
         scope.launch { onMensagem(null); onNavigate(Screen.CHECKLIST_PRE_VIAGEM) }
     }
     Spacer(Modifier.height(12.dp))
-    MenuButton(Icons.Default.FactCheck, "Checklist Pós-Viagem", Color(0xFF10B981)) {
+    MenuButton(ui.Lucide.ClipboardList, "Checklist Pós-Viagem", Color(0xFF10B981)) {
         scope.launch { onMensagem(null); onNavigate(Screen.CHECKLIST_POS_VIAGEM) }
     }
     Spacer(Modifier.height(12.dp))
-    MenuButton(Icons.Default.SyncProblem, "Pendências de Sincronização", Color(0xFFEF6C00)) {
+    MenuButton(ui.Lucide.RefreshCwOff, "Pendências de Sincronização", Color(0xFFEF6C00)) {
         scope.launch { onMensagem(null); onNavigate(Screen.PENDENCIAS_SYNC) }
     }
 }

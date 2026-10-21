@@ -241,11 +241,44 @@ actual fun AdicionarCombustivelScreen(
     var valorTotal by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
     var tipoPagamento by remember { mutableStateOf("") }
 
+    // Valor do litro = total ÷ litros, calculado sozinho enquanto o motorista
+    // não digitar nele. Se ele digitar (bomba mostra 3 casas, desconto etc.),
+    // o app respeita o valor dele; apagar o campo volta pro automático.
+    var valorLitroManual by remember { mutableStateOf(false) }
+    fun recalcularValorLitro() {
+        if (valorLitroManual) return
+        val litros = valorBrParaDouble(litrosAbastecidos.text)
+        val total = valorBrParaDouble(valorTotal.text)
+        valorLitro = if (litros > 0 && total > 0) decimalParaTextFieldValueComb((total / litros).toString()) else TextFieldValue("")
+    }
+
     // Fotos
     var fotoMarcador by remember { mutableStateOf<ImageBitmap?>(null) }
     var fotoCupom by remember { mutableStateOf<ImageBitmap?>(null) }
     var fotoMarcadorBase64 by remember { mutableStateOf<String?>(null) }
     var fotoCupomBase64 by remember { mutableStateOf<String?>(null) }
+
+    // KM no posto lido da foto da quilometragem (2.1) — some quando ele digita.
+    var kmLidoPelaCamera by remember { mutableStateOf(false) }
+
+    // Foto da quilometragem tirada → tenta ler o KM dela (Vision, no
+    // aparelho). Conferência: entre o maior KM conhecido (início da viagem /
+    // último da placa) e + 10.000 km. Não mexe no que o motorista já digitou.
+    LaunchedEffect(fotoMarcadorBase64) {
+        val foto = fotoMarcadorBase64 ?: return@LaunchedEffect
+        if (kmPosto.text.isNotBlank() && !kmLidoPelaCamera) return@LaunchedEffect
+        val placa = placaSelecionada?.second ?: viagemEmAndamento?.placa ?: ""
+        val temDecimal = repository.hodometroTemDecimal(placa)
+        val referencia = listOfNotNull(
+            viagemEmAndamento?.km_inicio?.let { util.kmParaDouble(it) },
+            repository.getUltimoKmConhecido(placa)?.let { util.kmParaDouble(it) }
+        ).maxOrNull()
+        val km = util.lerKmDaFoto(foto, referencia, 10000.0, temDecimal) ?: return@LaunchedEffect
+        if (kmPosto.text.isNotBlank() && !kmLidoPelaCamera) return@LaunchedEffect
+        val texto = if (temDecimal) util.formatarKmExibicao(km) else km.toLong().toString()
+        kmPosto = TextFieldValue(texto, TextRange(texto.length))
+        kmLidoPelaCamera = true
+    }
 
     // Dropdowns
     var placaExpandida by remember { mutableStateOf(false) }
@@ -290,6 +323,7 @@ actual fun AdicionarCombustivelScreen(
                 val litrosNum = resultado.litrosDetectado?.toDoubleOrNull()
                 val valorNum = resultado.valorDetectado?.toDoubleOrNull()
                 if (litrosNum != null && litrosNum > 0 && valorNum != null) {
+                    valorLitroManual = false
                     valorLitro = decimalParaTextFieldValueComb((valorNum / litrosNum).toString())
                 }
 
@@ -767,6 +801,7 @@ actual fun AdicionarCombustivelScreen(
                                 value = kmPosto,
                                 onValueChange = { newValue ->
                                     val formatted = formatarKmInput(newValue.text)
+                                    if (formatted != kmPosto.text) kmLidoPelaCamera = false
                                     kmPosto = TextFieldValue(
                                         text = formatted,
                                         selection = TextRange(formatted.length)
@@ -781,7 +816,8 @@ actual fun AdicionarCombustivelScreen(
                                 }
                             )
                             Text(
-                                "Digite como aparece no painel. Ex.: 115670.5",
+                                if (kmLidoPelaCamera) "Lido pela câmera. Confira com o painel antes de salvar."
+                                else "Digite como aparece no painel. Ex.: 115670.5",
                                 fontSize = 12.sp,
                                 color = AppColors.Primary,
                                 modifier = Modifier.padding(start = 4.dp, top = 2.dp)
@@ -853,11 +889,7 @@ actual fun AdicionarCombustivelScreen(
                             Spacer(Modifier.height(16.dp))
 
                             // Litros
-                            Text(
-                                "Litros Abastecidos *",
-                                fontWeight = FontWeight.SemiBold,
-                                color = AppColors.TextPrimary
-                            )
+                            Text("Litros Abastecidos *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = litrosAbastecidos,
@@ -867,52 +899,18 @@ actual fun AdicionarCombustivelScreen(
                                         text = formatted,
                                         selection = TextRange(formatted.length)
                                     )
+                                    recalcularValorLitro()
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                leadingIcon = {
-                                    Icon(Icons.Default.WaterDrop, null, tint = AppColors.Primary)
-                                },
+                                leadingIcon = { Icon(Icons.Default.WaterDrop, null, tint = AppColors.Primary) },
                                 placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
-                            
-
-                            Spacer(Modifier.height(16.dp))
-
-                            // Valor do Litro
-                            Text(
-                                "Valor do Litro *",
-                                fontWeight = FontWeight.SemiBold,
-                                color = AppColors.TextPrimary
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = valorLitro,
-                                onValueChange = { newValue ->
-                                    val formatted = formatarValorLitroComb(newValue.text)
-                                    valorLitro = TextFieldValue(
-                                        text = formatted,
-                                        selection = TextRange(formatted.length)
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                leadingIcon = {
-                                    Icon(Icons.Default.AttachMoney, null, tint = AppColors.Primary)
-                                },
-                                prefix = { Text("R$ ") },
-                                placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
-                            
 
                             Spacer(Modifier.height(16.dp))
 
                             // Valor Total
-                            Text(
-                                "Valor Total *",
-                                fontWeight = FontWeight.SemiBold,
-                                color = AppColors.TextPrimary
-                            )
+                            Text("Valor Total *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = valorTotal,
@@ -922,16 +920,69 @@ actual fun AdicionarCombustivelScreen(
                                         text = formatted,
                                         selection = TextRange(formatted.length)
                                     )
+                                    recalcularValorLitro()
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                leadingIcon = {
-                                    Icon(Icons.Default.Calculate, null, tint = AppColors.Primary)
-                                },
+                                leadingIcon = { Icon(Icons.Default.Calculate, null, tint = AppColors.Primary) },
                                 prefix = { Text("R$ ") },
                                 placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
-                            
+
+                            Spacer(Modifier.height(16.dp))
+
+                            // Valor do Litro — calculado (total ÷ litros), editável
+                            Text("Valor do Litro *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = valorLitro,
+                                onValueChange = { newValue ->
+                                    val formatted = formatarValorLitroComb(newValue.text)
+                                    if (formatted != valorLitro.text) {
+                                        valorLitroManual = formatted.isNotEmpty()
+                                        valorLitro = TextFieldValue(
+                                            text = formatted,
+                                            selection = TextRange(formatted.length)
+                                        )
+                                        if (!valorLitroManual) recalcularValorLitro()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                leadingIcon = { Icon(Icons.Default.AttachMoney, null, tint = AppColors.Primary) },
+                                prefix = { Text("R$ ") },
+                                placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
+                            if (!valorLitroManual && valorLitro.text.isNotEmpty()) {
+                                Text(
+                                    "Calculado automaticamente (total ÷ litros). Toque para alterar.",
+                                    fontSize = 12.sp,
+                                    color = AppColors.Primary,
+                                    modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                                )
+                            }
+                            // Aviso (não bloqueia) quando o valor do litro digitado não
+                            // bate com total ÷ litros. Tolerância de 1 centavo por litro
+                            // (+10 centavos) — cobre o preço com 3 casas na bomba
+                            // registrado aqui com 2.
+                            val litrosNum = valorBrParaDouble(litrosAbastecidos.text)
+                            val totalNum = valorBrParaDouble(valorTotal.text)
+                            val valorLitroNum = valorBrParaDouble(valorLitro.text)
+                            if (litrosNum > 0 && totalNum > 0 && valorLitroNum > 0 &&
+                                kotlin.math.abs(litrosNum * valorLitroNum - totalNum) > litrosNum * 0.01 + 0.10) {
+                                Spacer(Modifier.height(6.dp))
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Icon(Icons.Default.Warning, null, tint = AppColors.Orange, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        "Os valores não batem: ${litrosAbastecidos.text} L × R$ ${valorLitro.text} = " +
+                                            "R$ ${decimalParaTextFieldValueComb((litrosNum * valorLitroNum).toString()).text}, " +
+                                            "mas o total é R$ ${valorTotal.text}. Confira antes de salvar.",
+                                        fontSize = 12.sp,
+                                        color = AppColors.Orange
+                                    )
+                                }
+                            }
 
                             Spacer(Modifier.height(16.dp))
 
@@ -1223,3 +1274,7 @@ private fun runVisionScan(imagem: UIImage): Pair<String, String?> {
 
     return Pair(textoDetectado, codigoDetectado)
 }
+
+/** "1.234,56" (campo formatado em BR) → 1234.56. Vazio/inválido → 0.0. */
+private fun valorBrParaDouble(texto: String): Double =
+    texto.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0

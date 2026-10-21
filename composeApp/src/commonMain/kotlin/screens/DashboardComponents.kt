@@ -88,6 +88,94 @@ fun SyncStatusCard(status: SyncStatus) {
 }
 
 // ===============================
+// CARD "ENVIO COM PROBLEMA" — lançamentos que o servidor recusou (erro de
+// dado, não de conexão). Só aparece quando há algo pro motorista corrigir;
+// some sozinho quando ele corrige ou descarta na tela de Pendências.
+// ===============================
+@Composable
+fun EnvioComProblemaCard(itens: List<database.LancamentoRecusado>, onVerECorrigir: () -> Unit) {
+    if (itens.isEmpty()) return
+    val isDarkMode = isDark()
+    val laranja = Color(0xFFC2410C)
+    val laranjaTexto = if (isDarkMode) Color(0xFFFDBA8C) else Color(0xFF9A3412)
+    val laranjaFundo = if (isDarkMode) Color(0xFF3D2A1E) else Color(0xFFFDEBDD)
+    val borda = if (isDarkMode) Color(0xFF5A3A28) else Color(0xFFF3D3BF)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, borda),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("PRÓXIMA AÇÃO", fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.9.sp, color = AppColors.TextSecondary)
+                Text(
+                    "Precisa corrigir",
+                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = laranjaTexto,
+                    modifier = Modifier.background(laranjaFundo, RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 4.dp)
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(
+                    modifier = Modifier.size(52.dp).background(laranjaFundo, RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(ui.Lucide.TriangleAlert, null, tint = laranja, modifier = Modifier.size(28.dp))
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        if (itens.size == 1) "1 lançamento não foi enviado" else "${itens.size} lançamentos não foram enviados",
+                        fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary, lineHeight = 23.sp
+                    )
+                    Text(
+                        "O servidor recusou. Corrija para não perder os dados.",
+                        fontSize = 13.sp, color = AppColors.TextSecondary, lineHeight = 18.sp
+                    )
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                itens.take(3).forEach { item ->
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                            .background(if (isDarkMode) AppColors.SurfaceVariant else AppColors.Background, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        val data = formatarDiaMes(item.data)
+                        Text(
+                            if (data.isNotEmpty()) "${item.tipo} · $data" else item.tipo,
+                            fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary
+                        )
+                        Text(item.erro, fontSize = 12.sp, color = laranjaTexto, maxLines = 2)
+                    }
+                }
+                if (itens.size > 3) {
+                    Text("+ ${itens.size - 3} outro(s)", fontSize = 12.sp, color = AppColors.TextSecondary)
+                }
+            }
+            Button(
+                onClick = onVerECorrigir,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = laranja, contentColor = Color.White)
+            ) {
+                Text("Ver e corrigir", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(8.dp))
+                Icon(ui.Lucide.ArrowRight, null, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+/** "2026-10-20" (ou "2026-10-20 08:00:00") → "20/10". Outro formato: vazio. */
+private fun formatarDiaMes(data: String): String {
+    val p = data.trim().split(" ").first().split("-")
+    return if (p.size == 3 && p[0].length == 4) "${p[2]}/${p[1]}" else ""
+}
+
+// ===============================
 // CARD DE ALERTA — PLANO DE MANUTENÇÃO (itens vencidos/vencendo por data,
 // cadastrados pelo admin — mesmo alerta que aparece no painel).
 // ===============================
@@ -199,7 +287,7 @@ fun ViagemStatusCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Default.LocalShipping, null,
+                        ui.Lucide.Truck, null,
                         tint = AppColors.Secondary, modifier = Modifier.size(24.dp)
                     )
                     Column {
@@ -231,13 +319,13 @@ fun ViagemStatusCard(
                     if (dataInicio.isNotBlank()) {
                         val dataFormatada = formatarDataBR(dataInicio)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(Icons.Default.CalendarToday, null, modifier = Modifier.size(14.dp), tint = AppColors.TextSecondary)
+                            Icon(ui.Lucide.Calendar, null, modifier = Modifier.size(14.dp), tint = AppColors.TextSecondary)
                             Text(dataFormatada, fontSize = 11.sp, color = AppColors.TextSecondary)
                         }
                     }
                     if (kmInicio.isNotBlank()) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(Icons.Default.Speed, null, modifier = Modifier.size(14.dp), tint = AppColors.TextSecondary)
+                            Icon(ui.Lucide.Gauge, null, modifier = Modifier.size(14.dp), tint = AppColors.TextSecondary)
                             val kmInicioTexto = kmInicio.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmInicio
                             Text("KM de Início: $kmInicioTexto", fontSize = 11.sp, color = AppColors.TextSecondary)
                         }
@@ -371,7 +459,7 @@ fun MenuButton(icon: ImageVector, title: String, color: Color, onClick: () -> Un
             }
             Spacer(Modifier.width(16.dp))
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, null, tint = AppColors.TextSecondary)
+            Icon(ui.Lucide.ChevronRight, null, tint = AppColors.TextSecondary)
         }
     }
 }

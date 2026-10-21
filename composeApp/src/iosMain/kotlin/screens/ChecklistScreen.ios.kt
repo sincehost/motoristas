@@ -129,7 +129,7 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
     }
 
     fun salvar() { if (viagemAtual == null || jaEnviado) return; val d = converterDataParaAPI(dataAtualFormatada()); scope.launch {
-        salvando = true; try { repository.salvarChecklistPre(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id, d, "",
+        salvando = true; try { val idLocal = repository.salvarChecklistPre(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id, d, viagemAtual!!.placa,
             docCnhValida, docCrlvVeiculo, docAnttValida, docSeguroCarga, docOrdemColeta,
             eletFarolDianteiro, eletFarolTraseiro, eletLuzFreio, eletSetaDireita, eletSetaEsquerda, eletLuzRe, eletPainelFuncionando,
             pneuCalibragemOk, pneuEstadoConservacao, pneuEstepeOk, pneuFerramentasTroca,
@@ -138,7 +138,7 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
             carrLonasCordas, carrPortasBau, carrAssoalhoEstado, carrTravasLacres,
             cabBancosCintos, cabEspelhosRetrovisores, cabLimpadorParabrisa, cabArCondicionado, cabFreioEstacionamento,
             observacoes.ifEmpty { null })
-        try { val r = api.ApiClient.salvarChecklistPre(api.SalvarChecklistPreRequest(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id.toInt(), d, "",
+        try { val r = api.ApiClient.salvarChecklistPre(api.SalvarChecklistPreRequest(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id.toInt(), d, viagemAtual!!.placa,
             if(docCnhValida)1 else 0, if(docCrlvVeiculo)1 else 0, if(docAnttValida)1 else 0, if(docSeguroCarga)1 else 0, if(docOrdemColeta)1 else 0,
             if(eletFarolDianteiro)1 else 0, if(eletFarolTraseiro)1 else 0, if(eletLuzFreio)1 else 0, if(eletSetaDireita)1 else 0, if(eletSetaEsquerda)1 else 0, if(eletLuzRe)1 else 0, if(eletPainelFuncionando)1 else 0,
             if(pneuCalibragemOk)1 else 0, if(pneuEstadoConservacao)1 else 0, if(pneuEstepeOk)1 else 0, if(pneuFerramentasTroca)1 else 0,
@@ -147,7 +147,7 @@ actual fun ChecklistPreViagemScreen(repository: AppRepository, onVoltar: () -> U
             if(carrLonasCordas)1 else 0, if(carrPortasBau)1 else 0, if(carrAssoalhoEstado)1 else 0, if(carrTravasLacres)1 else 0,
             if(cabBancosCintos)1 else 0, if(cabEspelhosRetrovisores)1 else 0, if(cabLimpadorParabrisa)1 else 0, if(cabArCondicionado)1 else 0, if(cabFreioEstacionamento)1 else 0,
             observacoes.ifEmpty { null }))
-        if (r.status == "ok") { repository.getChecklistsPreParaSincronizar().lastOrNull()?.let { repository.marcarChecklistPreSincronizado(it.id) } }
+        if (r.status == "ok") { repository.marcarChecklistPreSincronizado(idLocal) }
         } catch (_: Exception) {}
         sucessoMsg = "Checklist pré-viagem salvo!"
         } catch (e: Exception) { erroMsg = "Erro: ${mensagemErroAmigavel(e.message)}" }; salvando = false } }
@@ -293,21 +293,21 @@ actual fun ChecklistPosViagemScreen(repository: AppRepository, onVoltar: () -> U
     }
 
     fun salvar() { if (viagemAtual == null || jaEnviado) return; val d = converterDataParaAPI(dataAtualFormatada()); val pendKmAtualNormalizado = if (pendKmAtual.isNotBlank()) normalizarKmParaEnvio(pendKmAtual) else null; scope.launch {
-        salvando = true; try { repository.salvarChecklistPos(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id, d, "",
+        salvando = true; try { val idLocal = repository.salvarChecklistPos(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id, d, viagemAtual!!.placa,
             avariaCarroceria, avariaCabine, avariaPneus, avariaEspelhos, avariaFarois, avariaDescricao.ifEmpty { null },
             posNivelOleo, posNivelAgua, posNivelCombustivel, posNivelArla,
             limpCabineLimpa, limpCarroceriaLimpa, limpBauVazio,
             funcFreiosOk, funcDirecaoOk, funcSuspensaoOk, funcMotorRuido, funcCambioOk,
             pendManutencaoUrgente, pendDescricaoManutencao.ifEmpty { null }, pendAbastecimentoNecessario, pendTrocaOleoProxima, pendKmAtualNormalizado,
             observacoes.ifEmpty { null })
-        try { val r = api.ApiClient.salvarChecklistPos(api.SalvarChecklistPosRequest(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id.toInt(), d, "",
+        try { val r = api.ApiClient.salvarChecklistPos(api.SalvarChecklistPosRequest(motorista?.motorista_id ?: "", viagemAtual!!.viagem_id.toInt(), d, viagemAtual!!.placa,
             if(avariaCarroceria)1 else 0, if(avariaCabine)1 else 0, if(avariaPneus)1 else 0, if(avariaEspelhos)1 else 0, if(avariaFarois)1 else 0, avariaDescricao.ifEmpty{null},
             if(posNivelOleo)1 else 0, if(posNivelAgua)1 else 0, if(posNivelCombustivel)1 else 0, if(posNivelArla)1 else 0,
             if(limpCabineLimpa)1 else 0, if(limpCarroceriaLimpa)1 else 0, if(limpBauVazio)1 else 0,
             if(funcFreiosOk)1 else 0, if(funcDirecaoOk)1 else 0, if(funcSuspensaoOk)1 else 0, if(funcMotorRuido)1 else 0, if(funcCambioOk)1 else 0,
             if(pendManutencaoUrgente)1 else 0, pendDescricaoManutencao.ifEmpty{null}, if(pendAbastecimentoNecessario)1 else 0, if(pendTrocaOleoProxima)1 else 0, pendKmAtualNormalizado,
             observacoes.ifEmpty{null}))
-        if (r.status == "ok") { repository.getChecklistsPosParaSincronizar().lastOrNull()?.let { repository.marcarChecklistPosSincronizado(it.id) } }
+        if (r.status == "ok") { repository.marcarChecklistPosSincronizado(idLocal) }
         } catch (_: Exception) {}
         sucessoMsg = "Checklist pós-viagem salvo!"
         } catch (e: Exception) { erroMsg = "Erro: ${mensagemErroAmigavel(e.message)}" }; salvando = false } }

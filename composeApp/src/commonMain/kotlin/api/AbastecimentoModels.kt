@@ -154,8 +154,30 @@ data class FinalizarViagemRequest(
 @Serializable
 data class FinalizarViagemResponse(
     val status: String,
-    val mensagem: String? = null
+    val mensagem: String? = null,
+    // Não vem no JSON — preenchido pelo ApiClient com o código HTTP da
+    // resposta, pra separar "dados recusados" (4xx) de "servidor falhou" (5xx).
+    val http_status: Int = 0
 )
+
+enum class ResultadoFinalizarOnline { SUCESSO, RECUSADO, TENTAR_DEPOIS }
+
+/**
+ * Decide o que fazer com a resposta de finalizar.php:
+ * - SUCESSO: finalizou agora, ou já estava finalizada (ex.: sinal caiu depois
+ *   do servidor salvar) — limpa a viagem local, nada fica pendente.
+ * - RECUSADO: erro de dados (KM menor que o início, foto inválida, viagem não
+ *   encontrada…). Salvar offline não adianta, o sync seria recusado igual —
+ *   mostra o erro e mantém a viagem aberta pro motorista corrigir.
+ * - TENTAR_DEPOIS: 5xx, sessão expirada ou resposta inesperada — salva local
+ *   e o sync reenvia depois.
+ */
+fun classificarFinalizarViagem(resp: FinalizarViagemResponse): ResultadoFinalizarOnline = when {
+    resp.status == "ok" -> ResultadoFinalizarOnline.SUCESSO
+    resp.mensagem?.contains("já foi finalizada", ignoreCase = true) == true -> ResultadoFinalizarOnline.SUCESSO
+    resp.http_status in 400..499 && resp.http_status != 401 && resp.http_status != 403 -> ResultadoFinalizarOnline.RECUSADO
+    else -> ResultadoFinalizarOnline.TENTAR_DEPOIS
+}
 
 // ===============================
 // MANUTENÇÃO

@@ -4,6 +4,14 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import motorista.composeapp.generated.resources.Res
+import motorista.composeapp.generated.resources.inter_bold
+import motorista.composeapp.generated.resources.inter_medium
+import motorista.composeapp.generated.resources.inter_regular
+import motorista.composeapp.generated.resources.inter_semibold
+import org.jetbrains.compose.resources.Font
 
 // ===============================
 // GERENCIADOR DE TEMA (GLOBAL)
@@ -142,7 +150,42 @@ fun AppTheme(content: @Composable () -> Unit) {
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = interTypography(),
         content = content
+    )
+}
+
+/**
+ * Inter em todos os estilos do Material — Text/TextField/Button sem
+ * fontFamily explícita herdam daqui, então vale pro app inteiro.
+ * Fonte embutida (composeResources/font, licença OFL em files/inter_license.txt)
+ * pra ficar igual no Android e no iPhone.
+ */
+@Composable
+private fun interTypography(): Typography {
+    val inter = FontFamily(
+        Font(Res.font.inter_regular, FontWeight.Normal),
+        Font(Res.font.inter_medium, FontWeight.Medium),
+        Font(Res.font.inter_semibold, FontWeight.SemiBold),
+        Font(Res.font.inter_bold, FontWeight.Bold)
+    )
+    val base = Typography()
+    return Typography(
+        displayLarge = base.displayLarge.copy(fontFamily = inter),
+        displayMedium = base.displayMedium.copy(fontFamily = inter),
+        displaySmall = base.displaySmall.copy(fontFamily = inter),
+        headlineLarge = base.headlineLarge.copy(fontFamily = inter),
+        headlineMedium = base.headlineMedium.copy(fontFamily = inter),
+        headlineSmall = base.headlineSmall.copy(fontFamily = inter),
+        titleLarge = base.titleLarge.copy(fontFamily = inter),
+        titleMedium = base.titleMedium.copy(fontFamily = inter),
+        titleSmall = base.titleSmall.copy(fontFamily = inter),
+        bodyLarge = base.bodyLarge.copy(fontFamily = inter),
+        bodyMedium = base.bodyMedium.copy(fontFamily = inter),
+        bodySmall = base.bodySmall.copy(fontFamily = inter),
+        labelLarge = base.labelLarge.copy(fontFamily = inter),
+        labelMedium = base.labelMedium.copy(fontFamily = inter),
+        labelSmall = base.labelSmall.copy(fontFamily = inter)
     )
 }
 

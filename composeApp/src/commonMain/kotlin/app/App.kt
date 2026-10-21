@@ -9,7 +9,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import api.ApiClient
+import api.VersaoAppResponse
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.datetime.Clock
 import database.AppRepository
 import push.PushTokenManager
 import push.plataformaPushId
@@ -18,6 +23,8 @@ import screens.DashboardScreen
 import screens.LoginScreen
 import screens.SplashScreen
 import ui.AppTheme
+import ui.AtualizacaoDisponivelDialog
+import ui.AtualizacaoObrigatoriaScreen
 
 @Composable
 fun App(
@@ -53,6 +60,30 @@ fun App(
                 } catch (_: Exception) {}
             }
         }
+    }
+
+    // Controle de atualização (fora/site/admin/versoes.php). Checa ao abrir e
+    // ao voltar pro primeiro plano — motorista deixa o app em segundo plano
+    // por dias, então só checar na abertura não pegaria uma versão mínima
+    // nova. Sem internet/erro: mantém o último resultado e deixa usar (o
+    // app é offline-first, não pode travar o motorista na estrada por isso).
+    var versaoApp by remember { mutableStateOf<VersaoAppResponse?>(null) }
+    var avisoOpcionalAdiado by remember { mutableStateOf(false) }
+    var ultimaChecagemVersao by remember { mutableStateOf(0L) }
+    val versaoScope = rememberCoroutineScope()
+    LifecycleResumeEffect(Unit) {
+        val job = versaoScope.launch {
+            val agora = Clock.System.now().toEpochMilliseconds()
+            if (agora - ultimaChecagemVersao < 30 * 60 * 1000L) return@launch
+            val resp = try {
+                withTimeoutOrNull(8_000) { ApiClient.verificarVersaoApp() }
+            } catch (_: Exception) { null }
+            if (resp?.status == "ok") {
+                versaoApp = resp
+                ultimaChecagemVersao = agora
+            }
+        }
+        onPauseOrDispose { job.cancel() }
     }
 
     // Se algum erro grave aconteceu, mostrar tela de erro
@@ -91,6 +122,12 @@ fun App(
     }
 
     AppTheme {
+        val versao = versaoApp
+        if (!showSplash && versao != null && versao.obrigatoria) {
+            AtualizacaoObrigatoriaScreen(versao)
+            return@AppTheme
+        }
+        Box(modifier = Modifier.fillMaxSize()) {
         if (showSplash) {
             SplashScreen(onFinished = { showSplash = false })
         } else if (needsMiuiSetup && miuiSetupContent != null) {
@@ -117,6 +154,11 @@ fun App(
                     }
                 }
             )
+        }
+
+        if (!showSplash && versao != null && versao.opcional && !avisoOpcionalAdiado) {
+            AtualizacaoDisponivelDialog(versao, onDepois = { avisoOpcionalAdiado = true })
+        }
         }
     }
 }

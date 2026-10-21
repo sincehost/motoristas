@@ -632,7 +632,12 @@ class SyncManager(private val repository: AppRepository) {
                     cte = viagem.cte,
                     numerobd2 = viagem.numerobd2,
                     cte2 = viagem.cte2,
-                    destino_id = viagem.destino_id.toInt(),
+                    // destino_id 0 é a sentinela de Rota Contínua (ver
+                    // IniciarViagemScreen) — o servidor recusa 0, então manda
+                    // null + o nome digitado como destino_livre, igual ao
+                    // envio online.
+                    destino_id = viagem.destino_id.toInt().takeIf { it > 0 },
+                    destino_livre = if (viagem.destino_id <= 0L) viagem.destino_nome else null,
                     data_viagem = viagem.data_viagem,
                     km_inicio = viagem.km_inicio,
                     placa = viagem.placa,

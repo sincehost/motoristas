@@ -51,6 +51,8 @@ import util.formatarKmVeiculo
 import util.normalizarKmVeiculoParaEnvio
 import util.kmParaDouble
 import util.formatarKmExibicao
+import util.kmParaCampoVeiculo
+import util.lerKmDaFoto
 import util.mensagemErroAmigavel
 import java.io.File
 import java.text.SimpleDateFormat
@@ -143,10 +145,14 @@ actual fun FinalizarViagemScreen(
                 } catch (e: Exception) {
                     // FALLBACK: API falhou (offline) — usa o cache já carregado
                     // acima; se nem isso tiver, tenta a tabela Viagem local
+                    // Só aceita a viagem local que bate com esta (placa + data
+                    // de início) — antes pegava a primeira viagem qualquer com
+                    // KM, e podia validar contra o KM de outra viagem.
                     if (kmInicioViagem.isEmpty()) {
-                        val viagensLocais = repository.getAllViagens()
-                        val viagemLocal = viagensLocais.firstOrNull { viagem ->
-                            viagem.km_inicio.isNotEmpty()
+                        val viagemLocal = repository.getAllViagens().firstOrNull { viagem ->
+                            viagem.km_inicio.isNotEmpty() &&
+                                viagem.placa == viagemAtual!!.placa &&
+                                viagem.data_viagem == viagemAtual!!.data_inicio
                         }
                         if (viagemLocal != null) {
                             kmInicioViagem = viagemLocal.km_inicio
@@ -190,6 +196,33 @@ actual fun FinalizarViagemScreen(
     // Foto
     val cameraState = rememberCameraState(context, prefix = "FIN")
 
+    // KM lido pelo scanner/foto (2.1) — some quando o motorista digita.
+    var kmLidoPelaCamera by rememberSaveable { mutableStateOf(false) }
+    var mostrarScannerKm by remember { mutableStateOf(false) }
+
+    // Referência pra conferir o KM lido: o KM de início da viagem. Limite =
+    // 3x a rota (mínimo 5.000 km) — chegada fora disso não é sugerida.
+    fun referenciaKmCamera(): Double? =
+        kmParaDouble(kmInicioViagem.ifEmpty { viagemAtual?.km_inicio ?: "" }).takeIf { it > 0.0 }
+    fun limiteKmCamera(): Double = maxOf(5000.0, kmRotaDestino * 3)
+
+    fun aplicarKmLido(km: Double) {
+        val texto = kmParaCampoVeiculo(formatarKmExibicao(km), hodometroTemDecimal)
+        kmChegada = TextFieldValue(texto, TextRange(texto.length))
+        kmLidoPelaCamera = true
+    }
+
+    // Foto que não veio do scanner (galeria / câmera do sistema): tenta ler o
+    // KM dela. Não mexe no que o motorista já digitou.
+    fun lerKmDaFotoAtual() {
+        val foto = cameraState.base64 ?: return
+        if (kmChegada.text.isNotBlank() && !kmLidoPelaCamera) return
+        scope.launch {
+            val km = lerKmDaFoto(foto, referenciaKmCamera(), limiteKmCamera(), hodometroTemDecimal)
+            if (km != null && (kmChegada.text.isBlank() || kmLidoPelaCamera)) aplicarKmLido(km)
+        }
+    }
+
     // Diálogo de confirmação antes de finalizar (Prioridade 2 - #8)
     var mostrarDialogoConfirmacao by remember { mutableStateOf(false) }
     // Diálogo de aviso de KM suspeito
@@ -201,16 +234,14 @@ actual fun FinalizarViagemScreen(
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success || cameraState.checkPhotoExistsAfterCapture()) {
             cameraState.onPhotoTaken()
+            lerKmDaFotoAtual()
         }
     }
 
     var mostrarPermissaoNegada by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
-            try {
-                val uri = cameraState.prepareCapture()
-                cameraLauncher.launch(uri)
-            } catch (e: Exception) { }
+            mostrarScannerKm = true
         } else {
             mostrarPermissaoNegada = true
         }
@@ -223,16 +254,24 @@ actual fun FinalizarViagemScreen(
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             cameraState.onGalleryPicked(uri)
+            lerKmDaFotoAtual()
         }
     }
 
+    // Foto do hodômetro abre o scanner de KM (câmera dentro do app). A câmera
+    // do sistema fica só como plano B se o scanner não abrir no aparelho.
     fun tirarFoto() {
+        when {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED ->
+                mostrarScannerKm = true
+            else -> permissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    fun abrirCameraDoSistema() {
         try {
             val uri = cameraState.prepareCapture()
-            when {
-                ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> cameraLauncher.launch(uri)
-                else -> permissionLauncher.launch(Manifest.permission.CAMERA)
-            }
+            cameraLauncher.launch(uri)
         } catch (e: Exception) { }
     }
 
@@ -351,6 +390,7 @@ actual fun FinalizarViagemScreen(
             try {
                 // PRIMEIRO: Tentar API se viagem já foi sincronizada (ID > 0)
                 var salvouOnline = false
+                var recusadoPeloServidor: String? = null
                 if (viagemId > 0) {
                     try {
                         // API espera valores no formato brasileiro original
@@ -387,16 +427,26 @@ actual fun FinalizarViagemScreen(
 
                         util.LogWriter.log("  RESPOSTA: status=${response.status}, msg=${response.mensagem}")
 
-                        if (response.status == "ok") {
-                            salvouOnline = true
-                        } else {
-                            util.LogWriter.log("⚠️ Finalizar viagem API erro: ${response.mensagem}")
+                        when (api.classificarFinalizarViagem(response)) {
+                            api.ResultadoFinalizarOnline.SUCESSO -> salvouOnline = true
+                            api.ResultadoFinalizarOnline.RECUSADO ->
+                                recusadoPeloServidor = response.mensagem ?: "O servidor recusou os dados. Confira e tente novamente."
+                            api.ResultadoFinalizarOnline.TENTAR_DEPOIS ->
+                                util.LogWriter.log("⚠️ Finalizar viagem API erro (${response.http_status}): ${response.mensagem}")
                         }
                     } catch (e: Exception) {
                         util.LogWriter.log("⚠️ Finalizar viagem EXCEPTION: ${e::class.simpleName}: ${e.message}")
                     }
                 } else {
                     util.LogWriter.log("⚠️ viagem_id <= 0 ($viagemId), salvando offline direto")
+                }
+
+                // Dados recusados (KM, foto…): salvar offline só deixaria uma
+                // pendência que nunca sincroniza — mantém a viagem aberta.
+                if (recusadoPeloServidor != null) {
+                    erro = recusadoPeloServidor
+                    salvando = false
+                    return@launch
                 }
 
                 // Se não salvou online, salvar localmente para sincronização
@@ -417,6 +467,10 @@ actual fun FinalizarViagemScreen(
                         cteRetorno = if (teveRetorno) cteRetorno else null
                     )
                 }
+
+                // KM de chegada vira o KM de início sugerido da próxima viagem
+                // dessa placa — vale mesmo se a finalização ficou offline.
+                repository.salvarUltimoKmPlaca(viagemAtual!!.placa, kmChegadaNormalizado)
 
                 // Limpa viagem atual local
                 repository.limparViagemAtual()
@@ -549,6 +603,21 @@ actual fun FinalizarViagemScreen(
         )
     }
 
+    if (mostrarScannerKm) {
+        ui.ScannerKm(
+            referenciaKm = referenciaKmCamera(),
+            limiteKm = limiteKmCamera(),
+            temDecimal = hodometroTemDecimal,
+            onConcluir = { km, foto ->
+                mostrarScannerKm = false
+                cameraState.onFotoExterna(foto)
+                if (km != null) aplicarKmLido(km)
+            },
+            onUsarCameraDoCelular = { mostrarScannerKm = false; abrirCameraDoSistema() },
+            onFechar = { mostrarScannerKm = false }
+        )
+    }
+
     // Diálogo de sucesso modal
     if (sucesso != null) {
         ui.SucessoDialog(
@@ -665,6 +734,7 @@ actual fun FinalizarViagemScreen(
                             value = kmChegada,
                             onValueChange = { newValue ->
                                 val formatted = formatarKmVeiculo(newValue.text, hodometroTemDecimal)
+                                if (formatted != kmChegada.text) kmLidoPelaCamera = false
                                 kmChegada = TextFieldValue(
                                     text = formatted,
                                     selection = TextRange(formatted.length)
@@ -676,7 +746,11 @@ actual fun FinalizarViagemScreen(
                             leadingIcon = { Icon(Icons.Default.Speed, null, tint = Color(0xFF10B981)) },
                             placeholder = { Text(if (hodometroTemDecimal) "Ex.: 115750.5" else "Ex.: 115750", color = Color(0xFF9CA3AF)) })
                         Text(
-                            if (hodometroTemDecimal) "Digite como aparece no painel. Ex.: 115750.5" else "Digite como aparece no painel. Ex.: 115750",
+                            when {
+                                kmLidoPelaCamera -> "Lido pela câmera. Confira com o painel antes de salvar."
+                                hodometroTemDecimal -> "Digite como aparece no painel. Ex.: 115750.5"
+                                else -> "Digite como aparece no painel. Ex.: 115750"
+                            },
                             fontSize = 12.sp,
                             color = AppColors.Primary,
                             modifier = Modifier.padding(start = 4.dp, top = 2.dp)

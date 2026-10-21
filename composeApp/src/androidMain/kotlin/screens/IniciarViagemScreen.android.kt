@@ -51,6 +51,9 @@ import util.ImageCompressor
 import util.formatarKmVeiculo
 import util.normalizarKmVeiculoParaEnvio
 import util.kmParaDouble
+import util.kmParaCampoVeiculo
+import util.formatarKmExibicao
+import util.lerKmDaFoto
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -152,6 +155,37 @@ actual fun IniciarViagemScreen(
 
     var dataViagem by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
     var kmInicio by rememberSaveableTextField("")
+    // true enquanto o KM de Início ainda é o que o app preencheu sozinho
+    // (último KM da placa) — vira false assim que o motorista digita.
+    var kmAutoPreenchido by rememberSaveable { mutableStateOf(false) }
+    // true quando o KM veio do scanner/foto (2.1) — some quando ele digita.
+    var kmLidoPelaCamera by rememberSaveable { mutableStateOf(false) }
+    var mostrarScannerKm by remember { mutableStateOf(false) }
+
+    // Pré-preenche com o último veículo usado neste aparelho — só se ele
+    // ainda estiver na lista (veículo desativado/removido não volta).
+    LaunchedEffect(Unit) {
+        if (placaSelecionada.isBlank()) {
+            repository.getUltimoVeiculoUsado()?.let { (placa, _) ->
+                veiculos.firstOrNull { it.placa == placa }?.let { equip ->
+                    veiculoSelecionadoId = equip.servidor_id
+                    placaSelecionada = equip.placa
+                }
+            }
+        }
+    }
+
+    // KM de Início = último KM conhecido da placa. Só mexe no campo se ele
+    // estiver vazio ou ainda com o valor que o próprio app colocou — nunca
+    // sobrescreve o que o motorista digitou.
+    LaunchedEffect(placaSelecionada) {
+        if (placaSelecionada.isBlank()) return@LaunchedEffect
+        if (kmInicio.text.isNotBlank() && !kmAutoPreenchido) return@LaunchedEffect
+        val km = repository.getUltimoKmConhecido(placaSelecionada)
+        val texto = if (km != null) kmParaCampoVeiculo(km, repository.hodometroTemDecimal(placaSelecionada)) else ""
+        kmInicio = TextFieldValue(texto, TextRange(texto.length))
+        kmAutoPreenchido = texto.isNotEmpty()
+    }
     var pesoCarga by rememberSaveableTextField("")
     val cameraState = rememberCameraState(context, prefix = "VIAG")
 
@@ -174,11 +208,34 @@ actual fun IniciarViagemScreen(
         }
     }
 
+    // Referência pra conferir o KM lido pela câmera: último KM da placa.
+    fun referenciaKmCamera(): Double? =
+        repository.getUltimoKmConhecido(placaSelecionada)?.let { kmParaDouble(it) }?.takeIf { it > 0.0 }
+
+    fun aplicarKmLido(km: Double) {
+        val texto = kmParaCampoVeiculo(formatarKmExibicao(km), repository.hodometroTemDecimal(placaSelecionada))
+        kmInicio = TextFieldValue(texto, TextRange(texto.length))
+        kmAutoPreenchido = false
+        kmLidoPelaCamera = true
+    }
+
+    // Foto que não veio do scanner (câmera do sistema): tenta ler o KM dela.
+    // Não mexe no que o motorista já digitou.
+    fun lerKmDaFotoAtual() {
+        val foto = cameraState.base64 ?: return
+        if (kmInicio.text.isNotBlank() && !kmAutoPreenchido) return
+        scope.launch {
+            val km = lerKmDaFoto(foto, referenciaKmCamera(), 5000.0, repository.hodometroTemDecimal(placaSelecionada))
+            if (km != null && (kmInicio.text.isBlank() || kmAutoPreenchido)) aplicarKmLido(km)
+        }
+    }
+
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         if (success || cameraState.checkPhotoExistsAfterCapture()) {
             cameraState.onPhotoTaken()
+            lerKmDaFotoAtual()
         }
     }
 
@@ -187,8 +244,7 @@ actual fun IniciarViagemScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            val uri = cameraState.prepareCapture()
-            cameraLauncher.launch(uri)
+            mostrarScannerKm = true
         } else {
             mostrarPermissaoNegada = true
         }
@@ -197,14 +253,19 @@ actual fun IniciarViagemScreen(
         ui.CameraPermissaoNegadaDialog(onDismiss = { mostrarPermissaoNegada = false })
     }
 
+    // Foto do hodômetro abre o scanner de KM (câmera dentro do app). A câmera
+    // do sistema fica só como plano B se o scanner não abrir no aparelho.
     fun abrirCamera() {
         when {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
-                val uri = cameraState.prepareCapture()
-                cameraLauncher.launch(uri)
-            }
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED ->
+                mostrarScannerKm = true
             else -> permissionLauncher.launch(Manifest.permission.CAMERA)
         }
+    }
+
+    fun abrirCameraDoSistema() {
+        val uri = cameraState.prepareCapture()
+        cameraLauncher.launch(uri)
     }
 
     // Diálogos modais de erro e sucesso
@@ -213,6 +274,21 @@ actual fun IniciarViagemScreen(
     }
     if (sucessoMsg != null) {
         ui.SucessoDialog(mensagem = sucessoMsg!!, onDismiss = { sucessoMsg = null; onSucesso() })
+    }
+
+    if (mostrarScannerKm) {
+        ui.ScannerKm(
+            referenciaKm = referenciaKmCamera(),
+            limiteKm = 5000.0,
+            temDecimal = repository.hodometroTemDecimal(placaSelecionada),
+            onConcluir = { km, foto ->
+                mostrarScannerKm = false
+                cameraState.onFotoExterna(foto)
+                if (km != null) aplicarKmLido(km)
+            },
+            onUsarCameraDoCelular = { mostrarScannerKm = false; abrirCameraDoSistema() },
+            onFechar = { mostrarScannerKm = false }
+        )
     }
 
     Scaffold(
@@ -479,6 +555,7 @@ actual fun IniciarViagemScreen(
                             value = kmInicio,
                             onValueChange = { newValue ->
                                 val formatted = formatarKmVeiculo(newValue.text, hodometroTemDecimal)
+                                if (formatted != kmInicio.text) { kmAutoPreenchido = false; kmLidoPelaCamera = false }
                                 kmInicio = TextFieldValue(
                                     text = formatted,
                                     selection = TextRange(formatted.length)
@@ -493,7 +570,12 @@ actual fun IniciarViagemScreen(
                             singleLine = true
                         )
                         Text(
-                            if (hodometroTemDecimal) "Digite como aparece no painel. Ex.: 115670.5" else "Digite como aparece no painel. Ex.: 115670",
+                            when {
+                                kmLidoPelaCamera -> "Lido pela câmera. Confira com o painel antes de salvar."
+                                kmAutoPreenchido -> "Último KM registrado desta placa. Confira com o painel antes de salvar."
+                                hodometroTemDecimal -> "Digite como aparece no painel. Ex.: 115670.5"
+                                else -> "Digite como aparece no painel. Ex.: 115670"
+                            },
                             fontSize = 12.sp,
                             color = AppColors.Primary,
                             modifier = Modifier.padding(start = 4.dp, top = 2.dp)
@@ -684,6 +766,7 @@ actual fun IniciarViagemScreen(
                                                 implemento1Placa = if (implemento1Visivel) implemento1Placa.ifBlank { null } else null,
                                                 implemento2Placa = if (implemento2Visivel) implemento2Placa.ifBlank { null } else null
                                             )
+                                            repository.salvarUltimoVeiculoUsado(placaSelecionada, veiculoSelecionadoId.takeIf { it > 0 })
                                             mostrarMensagem("Viagem registrada com sucesso!")
                                         } else {
                                             // API retornou erro de VALIDAÇÃO (dados inválidos, motorista não encontrado, etc.)
@@ -758,6 +841,7 @@ actual fun IniciarViagemScreen(
                                             implemento1Placa = if (implemento1Visivel) implemento1Placa.ifBlank { null } else null,
                                             implemento2Placa = if (implemento2Visivel) implemento2Placa.ifBlank { null } else null
                                         )
+                                        repository.salvarUltimoVeiculoUsado(placaSelecionada, veiculoSelecionadoId.takeIf { it > 0 })
                                         mostrarMensagem("Sem internet. Viagem salva e será sincronizada automaticamente quando conectar.")
                                     }
 

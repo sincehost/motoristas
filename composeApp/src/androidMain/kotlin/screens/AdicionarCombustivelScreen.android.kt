@@ -198,6 +198,17 @@ actual fun AdicionarCombustivelScreen(
     var valorTotal by rememberSaveableTextField("")
     var tipoPagamento by rememberSaveable { mutableStateOf("") }
 
+    // Valor do litro = total ÷ litros, calculado sozinho enquanto o motorista
+    // não digitar nele. Se ele digitar (bomba mostra 3 casas, desconto etc.),
+    // o app respeita o valor dele; apagar o campo volta pro automático.
+    var valorLitroManual by rememberSaveable { mutableStateOf(false) }
+    fun recalcularValorLitro() {
+        if (valorLitroManual) return
+        val litros = valorBrParaDouble(litrosAbastecidos.text)
+        val total = valorBrParaDouble(valorTotal.text)
+        valorLitro = if (litros > 0 && total > 0) decimalParaTextFieldValueComb((total / litros).toString()) else TextFieldValue("")
+    }
+
     // Fotos
     val cameraStateMarcador = rememberCameraState(context, prefix = "COMB_MARC")
     val cameraStateCupom = rememberCameraState(context, prefix = "COMB_CUP")
@@ -208,6 +219,36 @@ actual fun AdicionarCombustivelScreen(
 
     // Camera
     var currentPhotoType by rememberSaveable { mutableStateOf("") }
+
+    // KM no posto lido pelo scanner/foto (2.1) — some quando o motorista digita.
+    var kmLidoPelaCamera by rememberSaveable { mutableStateOf(false) }
+    var mostrarScannerKm by remember { mutableStateOf(false) }
+
+    // Referência pra conferir o KM lido: o maior entre o KM de início da
+    // viagem e o último KM conhecido da placa (o posto vem depois dos dois).
+    fun referenciaKmCamera(): Double? = listOfNotNull(
+        viagemEmAndamento?.km_inicio?.let { util.kmParaDouble(it) },
+        repository.getUltimoKmConhecido(placaSelecionadaNome)?.let { util.kmParaDouble(it) }
+    ).maxOrNull()?.takeIf { it > 0.0 }
+
+    fun temDecimalPlaca(): Boolean = repository.hodometroTemDecimal(placaSelecionadaNome)
+
+    fun aplicarKmLido(km: Double) {
+        val texto = if (temDecimalPlaca()) formatarKmExibicao(km) else km.toLong().toString()
+        kmPosto = TextFieldValue(texto, TextRange(texto.length))
+        kmLidoPelaCamera = true
+    }
+
+    // Foto do marcador que não veio do scanner (galeria / câmera do sistema):
+    // tenta ler o KM dela. Não mexe no que o motorista já digitou.
+    fun lerKmDaFotoMarcador() {
+        val foto = cameraStateMarcador.base64 ?: return
+        if (kmPosto.text.isNotBlank() && !kmLidoPelaCamera) return
+        scope.launch {
+            val km = util.lerKmDaFoto(foto, referenciaKmCamera(), 10000.0, temDecimalPlaca())
+            if (km != null && (kmPosto.text.isBlank() || kmLidoPelaCamera)) aplicarKmLido(km)
+        }
+    }
 
     // Scanear Nota — OCR + QR/código de barras 100% on-device (ML Kit).
     // Reaproveita a mesma foto do cupom fiscal: essa foto vale como comprovante
@@ -248,6 +289,7 @@ actual fun AdicionarCombustivelScreen(
             val litrosNum = resultado.litrosDetectado?.toDoubleOrNull()
             val valorNum = resultado.valorDetectado?.toDoubleOrNull()
             if (litrosNum != null && litrosNum > 0 && valorNum != null) {
+                valorLitroManual = false
                 valorLitro = decimalParaTextFieldValueComb((valorNum / litrosNum).toString())
             }
 
@@ -279,7 +321,7 @@ actual fun AdicionarCombustivelScreen(
         val currentState = if (currentPhotoType == "marcador") cameraStateMarcador else cameraStateCupom
         if (success || currentState.checkPhotoExistsAfterCapture()) {
             when (currentPhotoType) {
-                "marcador" -> cameraStateMarcador.onPhotoTaken()
+                "marcador" -> { cameraStateMarcador.onPhotoTaken(); lerKmDaFotoMarcador() }
                 "cupom" -> cameraStateCupom.onPhotoTaken()
             }
         }
@@ -288,13 +330,13 @@ actual fun AdicionarCombustivelScreen(
     var mostrarPermissaoNegada by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
-            try {
-                val uri = when (currentPhotoType) {
-                    "marcador" -> cameraStateMarcador.prepareCapture()
-                    else -> cameraStateCupom.prepareCapture()
-                }
-                cameraLauncher.launch(uri)
-            } catch (e: Exception) { }
+            if (currentPhotoType == "marcador") {
+                mostrarScannerKm = true
+            } else {
+                try {
+                    cameraLauncher.launch(cameraStateCupom.prepareCapture())
+                } catch (e: Exception) { }
+            }
         } else {
             mostrarPermissaoNegada = true
         }
@@ -307,7 +349,7 @@ actual fun AdicionarCombustivelScreen(
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             when (currentPhotoType) {
-                "marcador" -> cameraStateMarcador.onGalleryPicked(uri)
+                "marcador" -> { cameraStateMarcador.onGalleryPicked(uri); lerKmDaFotoMarcador() }
                 "cupom" -> cameraStateCupom.onGalleryPicked(uri)
             }
         }
@@ -318,8 +360,25 @@ actual fun AdicionarCombustivelScreen(
         galleryLauncher.launch("image/*")
     }
 
+    fun abrirCameraDoSistemaMarcador() {
+        currentPhotoType = "marcador"
+        try {
+            cameraLauncher.launch(cameraStateMarcador.prepareCapture())
+        } catch (e: Exception) { }
+    }
+
     fun tirarFoto(tipo: String) {
         currentPhotoType = tipo
+        // Foto da quilometragem abre o scanner de KM (câmera dentro do app).
+        // Cupom continua na câmera do sistema (o OCR do cupom é outro).
+        if (tipo == "marcador") {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                mostrarScannerKm = true
+            } else {
+                permissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+            return
+        }
         try {
             val uri = when (tipo) {
                 "marcador" -> cameraStateMarcador.prepareCapture()
@@ -385,6 +444,21 @@ actual fun AdicionarCombustivelScreen(
     }
     if (sucesso != null) {
         ui.SucessoDialog(mensagem = sucesso!!, onDismiss = { sucesso = null; onSucesso() })
+    }
+
+    if (mostrarScannerKm) {
+        ui.ScannerKm(
+            referenciaKm = referenciaKmCamera(),
+            limiteKm = 10000.0,
+            temDecimal = temDecimalPlaca(),
+            onConcluir = { km, foto ->
+                mostrarScannerKm = false
+                cameraStateMarcador.onFotoExterna(foto)
+                if (km != null) aplicarKmLido(km)
+            },
+            onUsarCameraDoCelular = { mostrarScannerKm = false; abrirCameraDoSistemaMarcador() },
+            onFechar = { mostrarScannerKm = false }
+        )
     }
 
     Scaffold(
@@ -597,6 +671,7 @@ actual fun AdicionarCombustivelScreen(
                                 value = kmPosto,
                                 onValueChange = { newValue ->
                                     val formatted = formatarKmInput(newValue.text)
+                                    if (formatted != kmPosto.text) kmLidoPelaCamera = false
                                     kmPosto = TextFieldValue(
                                         text = formatted,
                                         selection = TextRange(formatted.length)
@@ -609,7 +684,8 @@ actual fun AdicionarCombustivelScreen(
                                 leadingIcon = { Icon(Icons.Default.Speed, null, tint = AppColors.Primary) }
                             )
                             Text(
-                                "Digite como aparece no painel. Ex.: 115670.5",
+                                if (kmLidoPelaCamera) "Lido pela câmera. Confira com o painel antes de salvar."
+                                else "Digite como aparece no painel. Ex.: 115670.5",
                                 fontSize = 12.sp,
                                 color = AppColors.Primary,
                                 modifier = Modifier.padding(start = 4.dp, top = 2.dp)
@@ -669,35 +745,13 @@ actual fun AdicionarCombustivelScreen(
                                         text = formatted,
                                         selection = TextRange(formatted.length)
                                     )
+                                    recalcularValorLitro()
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 leadingIcon = { Icon(Icons.Default.WaterDrop, null, tint = AppColors.Primary) },
                                 placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
-                            
-
-                            Spacer(Modifier.height(16.dp))
-
-                            // Valor do Litro
-                            Text("Valor do Litro *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = valorLitro,
-                                onValueChange = { newValue ->
-                                    val formatted = formatarValorLitroComb(newValue.text)
-                                    valorLitro = TextFieldValue(
-                                        text = formatted,
-                                        selection = TextRange(formatted.length)
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                leadingIcon = { Icon(Icons.Default.AttachMoney, null, tint = AppColors.Primary) },
-                                prefix = { Text("R$ ") },
-                                placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
-                            
 
                             Spacer(Modifier.height(16.dp))
 
@@ -712,6 +766,7 @@ actual fun AdicionarCombustivelScreen(
                                         text = formatted,
                                         selection = TextRange(formatted.length)
                                     )
+                                    recalcularValorLitro()
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
@@ -719,7 +774,61 @@ actual fun AdicionarCombustivelScreen(
                                 leadingIcon = { Icon(Icons.Default.Calculate, null, tint = AppColors.Primary) },
                                 prefix = { Text("R$ ") },
                                 placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
-                            
+
+                            Spacer(Modifier.height(16.dp))
+
+                            // Valor do Litro — calculado (total ÷ litros), editável
+                            Text("Valor do Litro *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = valorLitro,
+                                onValueChange = { newValue ->
+                                    val formatted = formatarValorLitroComb(newValue.text)
+                                    if (formatted != valorLitro.text) {
+                                        valorLitroManual = formatted.isNotEmpty()
+                                        valorLitro = TextFieldValue(
+                                            text = formatted,
+                                            selection = TextRange(formatted.length)
+                                        )
+                                        if (!valorLitroManual) recalcularValorLitro()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                leadingIcon = { Icon(Icons.Default.AttachMoney, null, tint = AppColors.Primary) },
+                                prefix = { Text("R$ ") },
+                                placeholder = { Text("0,00", color = Color(0xFF9CA3AF)) })
+                            if (!valorLitroManual && valorLitro.text.isNotEmpty()) {
+                                Text(
+                                    "Calculado automaticamente (total ÷ litros). Toque para alterar.",
+                                    fontSize = 12.sp,
+                                    color = AppColors.Primary,
+                                    modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                                )
+                            }
+                            // Aviso (não bloqueia) quando o valor do litro digitado não
+                            // bate com total ÷ litros. Tolerância de 1 centavo por litro
+                            // (+10 centavos) — cobre o preço com 3 casas na bomba
+                            // registrado aqui com 2.
+                            val litrosNum = valorBrParaDouble(litrosAbastecidos.text)
+                            val totalNum = valorBrParaDouble(valorTotal.text)
+                            val valorLitroNum = valorBrParaDouble(valorLitro.text)
+                            if (litrosNum > 0 && totalNum > 0 && valorLitroNum > 0 &&
+                                kotlin.math.abs(litrosNum * valorLitroNum - totalNum) > litrosNum * 0.01 + 0.10) {
+                                Spacer(Modifier.height(6.dp))
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Icon(Icons.Default.Warning, null, tint = AppColors.Orange, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        "Os valores não batem: ${litrosAbastecidos.text} L × R$ ${valorLitro.text} = " +
+                                            "R$ ${decimalParaTextFieldValueComb((litrosNum * valorLitroNum).toString()).text}, " +
+                                            "mas o total é R$ ${valorTotal.text}. Confira antes de salvar.",
+                                        fontSize = 12.sp,
+                                        color = AppColors.Orange
+                                    )
+                                }
+                            }
 
                             Spacer(Modifier.height(16.dp))
 
@@ -892,3 +1001,7 @@ private fun formatarDataBR(data: String): String {
         data
     }
 }
+
+/** "1.234,56" (campo formatado em BR) → 1234.56. Vazio/inválido → 0.0. */
+private fun valorBrParaDouble(texto: String): Double =
+    texto.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0

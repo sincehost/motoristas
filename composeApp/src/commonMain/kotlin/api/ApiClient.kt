@@ -101,6 +101,21 @@ object ApiClient {
                 header("Authorization", "Bearer $token")
             }
         }
+        // Versão do app em toda chamada autenticada — a API passa a saber
+        // qual build está chamando (ex.: $_SERVER['HTTP_X_APP_BUILD']) e pode
+        // mudar endpoint sem quebrar quem ainda não atualizou.
+        header("X-App-Plataforma", push.plataformaPushId())
+        header("X-App-Build", util.buildAtualApp().toString())
+    }
+
+    // ===============================
+    // VERSÃO DO APP (CENTRAL)
+    // ===============================
+    suspend fun verificarVersaoApp(): VersaoAppResponse {
+        return client.get("$CENTRAL_URL/versao_app.php") {
+            parameter("plataforma", push.plataformaPushId())
+            parameter("build", util.buildAtualApp())
+        }.body()
     }
 
     // ===============================
@@ -210,11 +225,12 @@ object ApiClient {
     // FINALIZAR VIAGEM
     // ===============================
     suspend fun finalizarViagem(request: FinalizarViagemRequest): FinalizarViagemResponse {
-        return client.post("${getBaseUrl()}/viagem/finalizar.php") {
+        val resp = client.post("${getBaseUrl()}/viagem/finalizar.php") {
             contentType(ContentType.Application.Json)
             withAuth()
             setBody(request)
-        }.body()
+        }
+        return resp.body<FinalizarViagemResponse>().copy(http_status = resp.status.value)
     }
 
     // ===============================

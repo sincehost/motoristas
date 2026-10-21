@@ -80,6 +80,14 @@ kotlin {
             // Notificações push (FCM)
             implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
             implementation("com.google.firebase:firebase-messaging")
+
+            // Scanner de KM ao vivo (câmera dentro do app + ML Kit) — ui/ScannerKm.android.kt
+            implementation("androidx.camera:camera-camera2:1.3.4")
+            implementation("androidx.camera:camera-lifecycle:1.3.4")
+            implementation("androidx.camera:camera-view:1.3.4")
+
+            // Atualização do app pela Play Store sem sair do app (ui/AtualizacaoApp.android.kt)
+            implementation("com.google.android.play:app-update:2.1.0")
         }
 
         iosMain.dependencies {
@@ -108,8 +116,13 @@ android {
         applicationId = "br.com.lfsystem.app"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 18
-        versionName = "4.1"
+        versionCode = 19
+        versionName = "4.2"
+    }
+
+    // BuildConfig.VERSION_CODE — enviado ao servidor pra checar atualização (util/VersaoApp.android.kt)
+    buildFeatures {
+        buildConfig = true
     }
 
     packaging {

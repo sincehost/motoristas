@@ -667,3 +667,19 @@ data class AtualizarManutencaoResponse(
     val manutencao_id: Int? = null
 )
 
+
+// ===============================
+// VERSÃO DO APP (fora/site/api/versao_app.php)
+// ===============================
+@Serializable
+data class VersaoAppResponse(
+    val status: String = "",
+    // "nenhuma" | "opcional" | "obrigatoria"
+    val atualizacao: String = "nenhuma",
+    val versao_nome: String = "",
+    val mensagem: String = "",
+    val url_loja: String = ""
+) {
+    val obrigatoria: Boolean get() = status == "ok" && atualizacao == "obrigatoria"
+    val opcional: Boolean get() = status == "ok" && atualizacao == "opcional"
+}

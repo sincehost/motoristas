@@ -46,7 +46,9 @@ actual class DatabaseDriverFactory {
             "ALTER TABLE ViagemAtual ADD COLUMN veiculo_id INTEGER",
             "ALTER TABLE ViagemAtual ADD COLUMN implemento1_placa TEXT",
             "ALTER TABLE ViagemAtual ADD COLUMN implemento2_placa TEXT",
-            "ALTER TABLE Descarga ADD COLUMN equipamento_id INTEGER"
+            "ALTER TABLE Descarga ADD COLUMN equipamento_id INTEGER",
+            // Preferências locais (último veículo / último KM por placa).
+            "CREATE TABLE IF NOT EXISTS Preferencia (chave TEXT NOT NULL PRIMARY KEY, valor TEXT NOT NULL)"
         )
         for (sql in migrações) {
             try {

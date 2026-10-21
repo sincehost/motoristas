@@ -25,6 +25,9 @@ data class TipoDespesaSync(val id: String, val nome: String, val icone: String, 
  * flag de horas pra saber quando exibir o campo. Usado só por salvarTiposCombustivel(). */
 data class TipoCombustivelSync(val id: String, val nome: String, val requerHoras: Boolean)
 
+/** Lançamento pendente recusado pelo servidor — ver getLancamentosRecusados(). */
+data class LancamentoRecusado(val tipo: String, val data: String, val erro: String)
+
 class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     private val driver = driverFactory.createDriver()
@@ -109,7 +112,48 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
                PasswordHasher.verify(senha, local.senha)
     }
 
+    // ===============================
+    // PREFERÊNCIAS LOCAIS — pré-preenchimento de Iniciar Viagem
+    // ===============================
+
+    /** Gravado ao iniciar viagem — Iniciar Viagem seguinte já abre com esse veículo. */
+    fun salvarUltimoVeiculoUsado(placa: String, veiculoId: Long?) {
+        queries.salvarPreferencia("ultima_placa", placa)
+        queries.salvarPreferencia("ultimo_veiculo_id", veiculoId?.toString() ?: "")
+    }
+
+    /** (placa, servidor_id) do último veículo usado neste aparelho, ou null. */
+    fun getUltimoVeiculoUsado(): Pair<String, Long?>? {
+        val placa = queries.getPreferencia("ultima_placa").executeAsOneOrNull()?.takeIf { it.isNotBlank() } ?: return null
+        val id = queries.getPreferencia("ultimo_veiculo_id").executeAsOneOrNull()?.toLongOrNull()
+        return placa to id
+    }
+
+    /** Gravado ao finalizar viagem (online ou offline) — KM normalizado "X.Y". */
+    fun salvarUltimoKmPlaca(placa: String, km: String) {
+        if (placa.isBlank() || util.kmParaDouble(km) <= 0.0) return
+        queries.salvarPreferencia("km_placa:$placa", km)
+    }
+
+    /**
+     * Maior KM conhecido da placa: o do servidor (Equipamento.km, chega no
+     * sync) ou o da última chegada registrada neste aparelho — esse cobre a
+     * viagem finalizada offline que ainda não subiu pro servidor.
+     */
+    fun getUltimoKmConhecido(placa: String): String? {
+        if (placa.isBlank()) return null
+        val candidatos = listOfNotNull(
+            getKmEquipamentoPorPlaca(placa),
+            queries.getPreferencia("km_placa:$placa").executeAsOneOrNull()
+        ).filter { util.kmParaDouble(it) > 0.0 }
+        return candidatos.maxByOrNull { util.kmParaDouble(it) }
+    }
+
     fun logout() {
+        // Último veículo é do motorista que está saindo — o próximo do
+        // aparelho escolhe o dele. KM por placa fica (vale pra qualquer um).
+        queries.deletePreferencia("ultima_placa")
+        queries.deletePreferencia("ultimo_veiculo_id")
         queries.deleteMotorista()
         queries.deleteAllDestinos()
         queries.deleteAllEquipamentos()
@@ -741,6 +785,27 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         return queries.countTotalPendentes().executeAsOne()
     }
 
+    /**
+     * Pendentes que o SERVIDOR recusou (erro de dado, não de conexão) — o
+     * card "Envio com problema" do Dashboard. Falha passageira (sem
+     * internet etc.) fica de fora: o sync tenta de novo sozinho.
+     */
+    fun getLancamentosRecusados(): List<LancamentoRecusado> = buildList {
+        fun add(tipo: String, data: String, erro: String?) {
+            if (!util.isErroTransitorio(erro)) add(LancamentoRecusado(tipo, data, erro!!))
+        }
+        getViagensParaSincronizar().forEach { add("Viagem", it.data_viagem, it.ultimo_erro) }
+        getFinalizacoesParaSincronizar().forEach { add("Finalização de viagem", it.data_chegada, it.ultimo_erro) }
+        getAbastecimentosParaSincronizar().forEach { add("Abastecimento", it.data_, it.ultimo_erro) }
+        getArlasParaSincronizar().forEach { add("ARLA 32", it.data_, it.ultimo_erro) }
+        getDescargasParaSincronizar().forEach { add("Descarga", it.data_, it.ultimo_erro) }
+        getFretesParaSincronizar().forEach { add("Frete", "", it.ultimo_erro) }
+        getManutencoesParaSincronizar().forEach { add("Manutenção", it.data_manutencao, it.ultimo_erro) }
+        getOutrasDespesasParaSincronizar().forEach { add("Outra despesa", it.data_, it.ultimo_erro) }
+        getChecklistsPreParaSincronizar().forEach { add("Checklist pré-viagem", it.data_checklist, it.ultimo_erro) }
+        getChecklistsPosParaSincronizar().forEach { add("Checklist pós-viagem", it.data_checklist, it.ultimo_erro) }
+    }
+
     // ===============================
     // MANUTENÇÃO
     // ===============================
@@ -1048,7 +1113,7 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         carrLonasCordas: Boolean, carrPortasBau: Boolean, carrAssoalhoEstado: Boolean, carrTravasLacres: Boolean,
         cabBancosCintos: Boolean, cabEspelhosRetrovisores: Boolean, cabLimpadorParabrisa: Boolean, cabArCondicionado: Boolean, cabFreioEstacionamento: Boolean,
         observacoes: String?
-    ) {
+    ): Long = database.transactionWithResult {
         queries.insertChecklistPre(
             motorista_id = motoristaId, viagem_id = viagemId, data_checklist = dataChecklist, placa = placa,
             doc_cnh_valida = if (docCnhValida) 1L else 0L, doc_crlv_veiculo = if (docCrlvVeiculo) 1L else 0L,
@@ -1073,6 +1138,7 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
             cab_freio_estacionamento = if (cabFreioEstacionamento) 1L else 0L,
             observacoes = observacoes
         )
+        queries.lastInsertRowId().executeAsOne()
     }
 
     fun getChecklistsPreParaSincronizar(): List<br.com.lfsystem.app.database.ChecklistPreViagem> {
@@ -1119,7 +1185,7 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         funcFreiosOk: Boolean, funcDirecaoOk: Boolean, funcSuspensaoOk: Boolean, funcMotorRuido: Boolean, funcCambioOk: Boolean,
         pendManutencaoUrgente: Boolean, pendDescricaoManutencao: String?, pendAbastecimentoNecessario: Boolean, pendTrocaOleoProxima: Boolean, pendKmAtual: String?,
         observacoes: String?
-    ) {
+    ): Long = database.transactionWithResult {
         queries.insertChecklistPos(
             motorista_id = motoristaId, viagem_id = viagemId, data_checklist = dataChecklist, placa = placa,
             avaria_carroceria = if (avariaCarroceria) 1L else 0L, avaria_cabine = if (avariaCabine) 1L else 0L,
@@ -1137,6 +1203,7 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
             pend_troca_oleo_proxima = if (pendTrocaOleoProxima) 1L else 0L, pend_km_atual = pendKmAtual,
             observacoes = observacoes
         )
+        queries.lastInsertRowId().executeAsOne()
     }
 
     fun getChecklistsPosParaSincronizar(): List<br.com.lfsystem.app.database.ChecklistPosViagem> {

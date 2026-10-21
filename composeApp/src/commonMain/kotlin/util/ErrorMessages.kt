@@ -145,3 +145,29 @@ fun isErroDeConectividade(erro: String?): Boolean {
             msg.contains("A data connection is not currently allowed", ignoreCase = true) ||
             msg.contains("NSURLErrorDomain", ignoreCase = true)
 }
+
+/**
+ * true quando o `ultimo_erro` gravado num lançamento pendente é falha
+ * passageira (sem internet, servidor fora, sessão expirada…) — o sync vai
+ * tentar de novo sozinho e não há nada pro motorista corrigir. false = o
+ * servidor recusou o dado (mensagem de regra de negócio vinda da API), que é
+ * o que o card "Envio com problema" do Dashboard mostra.
+ *
+ * Compara com as mensagens que mensagemErroAmigavel() produz, porque é isso
+ * que o SyncManager grava em ultimo_erro quando a falha é exceção.
+ */
+fun isErroTransitorio(erro: String?): Boolean {
+    val msg = erro ?: return true
+    return isErroDeConectividade(msg) ||
+            isErroDeAutenticacao(msg) ||
+            msg.startsWith("Sem conexão com a internet") ||
+            msg.startsWith("Sua conexão com a internet está lenta") ||
+            msg.startsWith("Não foi possível conectar ao servidor") ||
+            msg.startsWith("Não foi possível estabelecer uma conexão segura") ||
+            msg.startsWith("Sua sessão expirou") ||
+            msg.startsWith("O servidor está indisponível") ||
+            msg.startsWith("Problema de conexão") ||
+            msg.startsWith("Ocorreu um erro inesperado") ||
+            msg.startsWith("Não foi possível processar a resposta do servidor") ||
+            msg == "API não disponível ainda"
+}

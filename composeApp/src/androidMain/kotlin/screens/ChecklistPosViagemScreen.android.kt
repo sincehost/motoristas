@@ -161,9 +161,9 @@ actual fun ChecklistPosViagemScreen(
         scope.launch {
             salvando = true
             try {
-                repository.salvarChecklistPos(
+                val idLocal = repository.salvarChecklistPos(
                     motoristaId = motorista?.motorista_id ?: "", viagemId = viagemAtual!!.viagem_id,
-                    dataChecklist = dataApi, placa = "",
+                    dataChecklist = dataApi, placa = viagemAtual!!.placa,
                     avariaCarroceria = avariaCarroceria, avariaCabine = avariaCabine, avariaPneus = avariaPneus,
                     avariaEspelhos = avariaEspelhos, avariaFarois = avariaFarois, avariaDescricao = avariaDescricao.ifEmpty { null },
                     posNivelOleo = posNivelOleo, posNivelAgua = posNivelAgua,
@@ -181,7 +181,7 @@ actual fun ChecklistPosViagemScreen(
                     val resp = api.ApiClient.salvarChecklistPos(
                         api.SalvarChecklistPosRequest(
                             motorista_id = motorista?.motorista_id ?: "", viagem_id = viagemAtual!!.viagem_id.toInt(),
-                            data_checklist = dataApi, placa = "",
+                            data_checklist = dataApi, placa = viagemAtual!!.placa,
                             avaria_carroceria = if (avariaCarroceria) 1 else 0, avaria_cabine = if (avariaCabine) 1 else 0,
                             avaria_pneus = if (avariaPneus) 1 else 0, avaria_espelhos = if (avariaEspelhos) 1 else 0,
                             avaria_farois = if (avariaFarois) 1 else 0, avaria_descricao = avariaDescricao.ifEmpty { null },
@@ -199,8 +199,7 @@ actual fun ChecklistPosViagemScreen(
                         )
                     )
                     if (resp.status == "ok") {
-                        val checklists = repository.getChecklistsPosParaSincronizar()
-                        checklists.lastOrNull()?.let { repository.marcarChecklistPosSincronizado(it.id) }
+                        repository.marcarChecklistPosSincronizado(idLocal)
                     }
                 } catch (_: Exception) { }
 

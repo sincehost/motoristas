@@ -137,6 +137,20 @@ class CameraState(
     /**
      * Carrega foto a partir de Uri da galeria.
      */
+    /**
+     * Foto tirada pelo scanner de KM (câmera dentro do app, ui/ScannerKm) —
+     * já salva em arquivo e na orientação certa. Guarda o path igual à
+     * câmera do sistema, então sobrevive à Activity recriada do mesmo jeito.
+     */
+    fun onFotoExterna(file: File) {
+        if (!file.exists() || file.length() == 0L) return
+        photoPath = file.absolutePath
+        val result = ImageCompressor.compressFromFile(file)
+        bitmap = result.bitmap
+        base64 = result.base64
+        hasPhoto = result.bitmap != null
+    }
+
     fun onGalleryPicked(uri: Uri) {
         val result = ImageCompressor.compressFromUri(context, uri)
         bitmap = result.bitmap

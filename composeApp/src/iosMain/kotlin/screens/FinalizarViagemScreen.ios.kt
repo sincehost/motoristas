@@ -198,10 +198,14 @@ actual fun FinalizarViagemScreen(
                 } catch (e: Exception) {
                     // Sem internet — usa o cache local já carregado acima; se
                     // nem isso tiver, tenta a tabela Viagem local
+                    // Só aceita a viagem local que bate com esta (placa + data
+                    // de início) — antes pegava a primeira viagem qualquer com
+                    // KM, e podia validar contra o KM de outra viagem.
                     if (kmInicioViagem.isEmpty()) {
-                        val viagensLocais = repository.getAllViagens()
-                        val viagemLocal = viagensLocais.firstOrNull { viagem ->
-                            viagem.km_inicio.isNotEmpty()
+                        val viagemLocal = repository.getAllViagens().firstOrNull { viagem ->
+                            viagem.km_inicio.isNotEmpty() &&
+                                viagem.placa == viagemAtual!!.placa &&
+                                viagem.data_viagem == viagemAtual!!.data_inicio
                         }
                         if (viagemLocal != null) {
                             kmInicioViagem = viagemLocal.km_inicio
@@ -244,6 +248,23 @@ actual fun FinalizarViagemScreen(
     // Foto
     var fotoPainel by remember { mutableStateOf<ImageBitmap?>(null) }
     var fotoPainelBase64 by remember { mutableStateOf<String?>(null) }
+
+    // KM lido da foto do painel (2.1) — some quando o motorista digita.
+    var kmLidoPelaCamera by remember { mutableStateOf(false) }
+
+    // Foto do painel tirada → tenta ler o KM de chegada dela (Vision, no
+    // aparelho). Conferência: entre o KM de início e início + 3x a rota
+    // (mínimo 5.000 km). Não mexe no que o motorista já digitou.
+    LaunchedEffect(fotoPainelBase64) {
+        val foto = fotoPainelBase64 ?: return@LaunchedEffect
+        if (kmChegada.text.isNotBlank() && !kmLidoPelaCamera) return@LaunchedEffect
+        val referencia = util.kmParaDouble(kmInicioViagem.ifEmpty { viagemAtual?.km_inicio ?: "" })
+        val km = util.lerKmDaFoto(foto, referencia, maxOf(5000.0, kmRotaDestino * 3), hodometroTemDecimal) ?: return@LaunchedEffect
+        if (kmChegada.text.isNotBlank() && !kmLidoPelaCamera) return@LaunchedEffect
+        val texto = util.kmParaCampoVeiculo(util.formatarKmExibicao(km), hodometroTemDecimal)
+        kmChegada = TextFieldValue(texto, TextRange(texto.length))
+        kmLidoPelaCamera = true
+    }
 
     // Diálogo de confirmação e aviso de KM suspeito
     var mostrarDialogoConfirmacao by remember { mutableStateOf(false) }
@@ -469,6 +490,7 @@ actual fun FinalizarViagemScreen(
             try {
                 // PRIMEIRO: Tentar API se viagem já foi sincronizada (ID > 0)
                 var salvouOnline = false
+                var recusadoPeloServidor: String? = null
                 if (viagemId > 0) {
                     try {
                         val response = api.ApiClient.finalizarViagem(
@@ -489,12 +511,23 @@ actual fun FinalizarViagemScreen(
                             )
                         )
 
-                        if (response.status == "ok") {
-                            salvouOnline = true
+                        when (api.classificarFinalizarViagem(response)) {
+                            api.ResultadoFinalizarOnline.SUCESSO -> salvouOnline = true
+                            api.ResultadoFinalizarOnline.RECUSADO ->
+                                recusadoPeloServidor = response.mensagem ?: "O servidor recusou os dados. Confira e tente novamente."
+                            api.ResultadoFinalizarOnline.TENTAR_DEPOIS -> {}
                         }
                     } catch (e: Exception) {
                         // Sem conexão - salvar localmente
                     }
+                }
+
+                // Dados recusados (KM, foto…): salvar offline só deixaria uma
+                // pendência que nunca sincroniza — mantém a viagem aberta.
+                if (recusadoPeloServidor != null) {
+                    mostrarMensagem(recusadoPeloServidor, isErro = true)
+                    salvando = false
+                    return@launch
                 }
 
                 // Se não salvou online, salvar localmente para sincronização
@@ -514,6 +547,10 @@ actual fun FinalizarViagemScreen(
                         cteRetorno = if (teveRetorno) cteRetorno else null
                     )
                 }
+
+                // KM de chegada vira o KM de início sugerido da próxima viagem
+                // dessa placa — vale mesmo se a finalização ficou offline.
+                repository.salvarUltimoKmPlaca(viagemAtual!!.placa, kmChegadaNormalizado)
 
                 // Limpa viagem atual local
                 repository.limparViagemAtual()
@@ -793,6 +830,7 @@ actual fun FinalizarViagemScreen(
                             value = kmChegada,
                             onValueChange = { newValue ->
                                 val formatted = formatarKmVeiculo(newValue.text, hodometroTemDecimal)
+                                if (formatted != kmChegada.text) kmLidoPelaCamera = false
                                 kmChegada = TextFieldValue(
                                     text = formatted,
                                     selection = TextRange(formatted.length)
@@ -806,7 +844,11 @@ actual fun FinalizarViagemScreen(
                             },
                             placeholder = { Text(if (hodometroTemDecimal) "Ex.: 115750.5" else "Ex.: 115750", color = Color(0xFF9CA3AF)) })
                         Text(
-                            if (hodometroTemDecimal) "Digite como aparece no painel. Ex.: 115750.5" else "Digite como aparece no painel. Ex.: 115750",
+                            when {
+                                kmLidoPelaCamera -> "Lido pela câmera. Confira com o painel antes de salvar."
+                                hodometroTemDecimal -> "Digite como aparece no painel. Ex.: 115750.5"
+                                else -> "Digite como aparece no painel. Ex.: 115750"
+                            },
                             fontSize = 12.sp,
                             color = AppColors.Primary,
                             modifier = Modifier.padding(start = 4.dp, top = 2.dp)

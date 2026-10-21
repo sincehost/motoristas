@@ -134,3 +134,14 @@ fun formatarKmExibicao(valor: Double): String {
     val decimal = absDecimos % 10
     return (if (negativo) "-" else "") + "$inteiro.$decimal"
 }
+
+/**
+ * Converte um KM já normalizado (banco/API, "115670.5") pro texto que o
+ * campo de KM de um veículo espera — mesmo formato que formatarKmVeiculo()
+ * produz na digitação. Usado pra pré-preencher o KM de Início.
+ */
+fun kmParaCampoVeiculo(km: String, temDecimal: Boolean): String {
+    val valor = kmParaDouble(km)
+    if (valor <= 0.0) return ""
+    return if (temDecimal) formatarKmExibicao(valor) else round(valor).toLong().toString()
+}

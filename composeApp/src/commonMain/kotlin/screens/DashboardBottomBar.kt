@@ -50,7 +50,7 @@ fun BottomNavigationBar(
             containerColor = AppColors.Surface,
             icon = {
                 Icon(
-                    Icons.Default.LocalShipping,
+                    ui.Lucide.Truck,
                     contentDescription = null,
                     tint = AppColors.Primary,
                     modifier = Modifier.size(40.dp)
@@ -110,7 +110,7 @@ fun BottomNavigationBar(
             containerColor = AppColors.Surface,
             icon = {
                 Icon(
-                    Icons.Default.Info,
+                    ui.Lucide.Info,
                     contentDescription = null,
                     tint = Color(0xFFFF6F00),
                     modifier = Modifier.size(40.dp)
@@ -192,7 +192,7 @@ fun BottomNavigationBar(
     ) {
         // 1. Iniciar Viagem
         BottomBarItem(
-            icon = Icons.Default.LocalShipping,
+            icon = ui.Lucide.Truck,
             label = "Iniciar",
             selected = telaAtual == Screen.INICIAR_VIAGEM,
             onClick = {
@@ -205,7 +205,7 @@ fun BottomNavigationBar(
 
         // 2. Despesas
         BottomBarItem(
-            icon = Icons.Default.Receipt,
+            icon = ui.Lucide.Receipt,
             label = "Despesas",
             selected = telaAtual == Screen.ADICIONAR_COMBUSTIVEL ||
                     telaAtual == Screen.ADICIONAR_ARLA ||
@@ -226,7 +226,7 @@ fun BottomNavigationBar(
 
         // 3. Manutenção
         BottomBarItem(
-            icon = Icons.Default.Build,
+            icon = ui.Lucide.Wrench,
             label = "Manut.",
             selected = telaAtual == Screen.MANUTENCAO,
             onClick = {
@@ -239,7 +239,7 @@ fun BottomNavigationBar(
 
         // 4. Finalizar Viagem
         BottomBarItem(
-            icon = Icons.Default.Flag,
+            icon = ui.Lucide.Flag,
             label = "Finalizar",
             selected = telaAtual == Screen.FINALIZAR_VIAGEM,
             onClick = {
@@ -317,20 +317,20 @@ fun DespesasMenuOverlay(
             colors = CardDefaults.cardColors(containerColor = AppColors.Surface)
         ) {
             Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                DespesaMenuItem("Abastecimento", Icons.Default.LocalGasStation, AppColors.Primary) {
+                DespesaMenuItem("Abastecimento", ui.Lucide.Fuel, AppColors.Primary) {
                     onDismiss(); onNavigate(Screen.ADICIONAR_COMBUSTIVEL)
                 }
-                DespesaMenuItem("ARLA 32", Icons.Default.WaterDrop, Color(0xFF06B6D4)) {
+                DespesaMenuItem("ARLA 32", ui.Lucide.Droplet, Color(0xFF06B6D4)) {
                     onDismiss(); onNavigate(Screen.ADICIONAR_ARLA)
                 }
-                DespesaMenuItem("Descarga", Icons.Default.Inventory, Color(0xFF8B5CF6)) {
+                DespesaMenuItem("Descarga", ui.Lucide.Package, Color(0xFF8B5CF6)) {
                     onDismiss(); onNavigate(Screen.ADICIONAR_DESCARGA)
                 }
-                DespesaMenuItem("Adicionar Frete", Icons.Default.LocalShipping, Color(0xFFF59E0B)) {
+                DespesaMenuItem("Adicionar Frete", ui.Lucide.Truck, Color(0xFFF59E0B)) {
                     onDismiss(); onNavigate(Screen.ADICIONAR_FRETE)
                 }
                 HorizontalDivider()
-                DespesaMenuItem("Outras Despesas", Icons.Default.MoreHoriz, Color(0xFFFF6F00)) {
+                DespesaMenuItem("Outras Despesas", ui.Lucide.Ellipsis, Color(0xFFFF6F00)) {
                     onDismiss(); onNavigate(Screen.OUTRAS_DESPESAS)
                 }
             }

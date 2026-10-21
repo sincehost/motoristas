@@ -95,6 +95,9 @@ actual class DatabaseDriverFactory(private val context: Context) {
                     try {
                         db.execSQL("ALTER TABLE Descarga ADD COLUMN equipamento_id INTEGER")
                     } catch (_: Exception) {}
+                    try {
+                        db.execSQL("CREATE TABLE IF NOT EXISTS Preferencia (chave TEXT NOT NULL PRIMARY KEY, valor TEXT NOT NULL)")
+                    } catch (_: Exception) {}
                 }
             }
         )

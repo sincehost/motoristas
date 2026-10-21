@@ -1082,3 +1082,27 @@ atualizarViagemIdChecklistsPos:
 UPDATE ChecklistPosViagem
 SET viagem_id = :viagem_id_novo
 WHERE viagem_id = :viagem_id_antigo AND sincronizado = 0;
+
+-- ===============================
+-- PREFERÊNCIAS LOCAIS (chave/valor) — memória do app no aparelho, ex.:
+-- último veículo usado e último KM de chegada por placa, pra pré-preencher
+-- Iniciar Viagem. Bancos antigos criam a tabela em DatabaseDriverFactory.
+-- ===============================
+CREATE TABLE IF NOT EXISTS Preferencia (
+    chave TEXT NOT NULL PRIMARY KEY,
+    valor TEXT NOT NULL
+);
+
+getPreferencia:
+SELECT valor FROM Preferencia WHERE chave = ?;
+
+salvarPreferencia:
+INSERT OR REPLACE INTO Preferencia(chave, valor) VALUES (?, ?);
+
+deletePreferencia:
+DELETE FROM Preferencia WHERE chave = ?;
+
+-- ID do último INSERT na mesma conexão — usar dentro de transaction junto
+-- com o insert (ver AppRepository.salvarChecklistPre/Pos).
+lastInsertRowId:
+SELECT last_insert_rowid();

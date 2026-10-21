@@ -182,9 +182,9 @@ actual fun ChecklistPreViagemScreen(
         scope.launch {
             salvando = true
             try {
-                repository.salvarChecklistPre(
+                val idLocal = repository.salvarChecklistPre(
                     motoristaId = motorista?.motorista_id ?: "", viagemId = viagemAtual!!.viagem_id,
-                    dataChecklist = dataApi, placa = "",
+                    dataChecklist = dataApi, placa = viagemAtual!!.placa,
                     docCnhValida = docCnhValida, docCrlvVeiculo = docCrlvVeiculo, docAnttValida = docAnttValida,
                     docSeguroCarga = docSeguroCarga, docOrdemColeta = docOrdemColeta,
                     eletFarolDianteiro = eletFarolDianteiro, eletFarolTraseiro = eletFarolTraseiro,
@@ -208,7 +208,7 @@ actual fun ChecklistPreViagemScreen(
                     val resp = api.ApiClient.salvarChecklistPre(
                         api.SalvarChecklistPreRequest(
                             motorista_id = motorista?.motorista_id ?: "", viagem_id = viagemAtual!!.viagem_id.toInt(),
-                            data_checklist = dataApi, placa = "",
+                            data_checklist = dataApi, placa = viagemAtual!!.placa,
                             doc_cnh_valida = if (docCnhValida) 1 else 0, doc_crlv_veiculo = if (docCrlvVeiculo) 1 else 0,
                             doc_antt_valida = if (docAnttValida) 1 else 0, doc_seguro_carga = if (docSeguroCarga) 1 else 0,
                             doc_ordem_coleta = if (docOrdemColeta) 1 else 0,
@@ -233,8 +233,7 @@ actual fun ChecklistPreViagemScreen(
                         )
                     )
                     if (resp.status == "ok") {
-                        val checklists = repository.getChecklistsPreParaSincronizar()
-                        checklists.lastOrNull()?.let { repository.marcarChecklistPreSincronizado(it.id) }
+                        repository.marcarChecklistPreSincronizado(idLocal)
                     }
                 } catch (_: Exception) { }
 
