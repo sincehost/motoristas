@@ -922,7 +922,7 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                             LinhaResumoDestaque("Total Outras:", formatarMoeda(totalOutras), Color(0xFFFF6F00))
                         }
 
-                        LinhaResumo("Total Despesas:", formatarMoeda(resumo!!.total_despesas + outrasDespesas.sumOf { it.valor }))
+                        LinhaResumo("Total Despesas:", formatarMoeda(resumo!!.total_despesas))
 
                         Spacer(Modifier.height(16.dp))
                         HorizontalDivider()
@@ -1568,7 +1568,7 @@ private fun exportarResumoPdfIos(res: ResumoViagem, outrasDespesas: List<OutraDe
 
             y += 4.0
             desenharLinha(); y += 16.0
-            drawItem("Total Despesas:", formatarMoeda(res.total_despesas + outrasDespesas.sumOf { it.valor }))
+            drawItem("Total Despesas:", formatarMoeda(res.total_despesas))
 
             drawSection("Faturamento", "#07275A")
             drawItem("Valor Frete:", formatarMoeda(res.valor_frete))

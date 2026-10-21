@@ -977,7 +977,7 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
 
             y += 4f
             paint.color = android.graphics.Color.parseColor("#CCCCCC"); canvas.drawLine(left, y, right, y, paint); y += 16f
-            drawItem("Total Despesas:", formatarMoeda(res.total_despesas + outrasDespesas.sumOf { it.valor }))
+            drawItem("Total Despesas:", formatarMoeda(res.total_despesas))
 
             drawSection("Faturamento", "#07275A")
             drawItem("Valor Frete:", formatarMoeda(res.valor_frete))
@@ -1161,7 +1161,7 @@ private fun ResumoViagemContent(repository: AppRepository, viagemId: Int, onVolt
                         Spacer(Modifier.height(8.dp))
                         HorizontalDivider(color = Color(0xFFE5E7EB))
                         Spacer(Modifier.height(8.dp))
-                        LinhaResumoDestaque("Total Despesas:", formatarMoeda(resumo!!.total_despesas + (if (outrasDespesas.isNotEmpty()) outrasDespesas.sumOf { it.valor } else 0.0)), AppColors.Error)
+                        LinhaResumoDestaque("Total Despesas:", formatarMoeda(resumo!!.total_despesas), AppColors.Error)
 
                         Spacer(Modifier.height(16.dp))
                         HorizontalDivider()

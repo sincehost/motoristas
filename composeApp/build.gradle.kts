@@ -108,8 +108,8 @@ android {
         applicationId = "br.com.lfsystem.app"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 15
-        versionName = "3.1"
+        versionCode = 18
+        versionName = "4.1"
     }
 
     packaging {
