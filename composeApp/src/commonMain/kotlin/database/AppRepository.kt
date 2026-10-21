@@ -15,7 +15,6 @@ import br.com.lfsystem.app.database.Abastecimento
 import br.com.lfsystem.app.database.ViagemAtual
 import api.ApiClient
 import api.EquipamentoDto
-import util.PasswordHasher
 
 /** Par (id, nome) não basta pra tipo de despesa — precisa também de
  * ícone/cor pro badge. Usado só por salvarTiposDespesa(). */
@@ -90,7 +89,9 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         usuario: String,
         senha: String
     ) {
-        val senhaHash = PasswordHasher.hash(senha)
+        // PBKDF2 com sal (util/SenhaSegura) — substitui o SHA-256 sem sal a
+        // cada login com internet; o formato antigo continua aceito offline.
+        val senhaHash = util.SenhaSegura.gerarHash(senha)
         queries.insertMotorista(
             motorista_id = motoristaId,
             nome = nome,
@@ -109,12 +110,16 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         val local = getMotoristaLogado() ?: return false
         return local.cnpj == cnpj &&
                local.usuario == usuario &&
-               PasswordHasher.verify(senha, local.senha)
+               util.SenhaSegura.verificar(senha, local.senha)
     }
 
     // ===============================
     // PREFERÊNCIAS LOCAIS — pré-preenchimento de Iniciar Viagem
     // ===============================
+
+    fun getPreferencia(chave: String): String? = queries.getPreferencia(chave).executeAsOneOrNull()
+
+    fun salvarPreferencia(chave: String, valor: String) = queries.salvarPreferencia(chave, valor)
 
     /** Gravado ao iniciar viagem — Iniciar Viagem seguinte já abre com esse veículo. */
     fun salvarUltimoVeiculoUsado(placa: String, veiculoId: Long?) {
@@ -176,13 +181,23 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
             .map { it.servidor_id to it.nome }
     }
 
+    // Lista vazia do servidor com cadastro local preenchido = resposta suspeita
+    // (falha momentânea do servidor) — mantém o que já tinha, senão o motorista
+    // ficaria sem rotas pra iniciar viagem até o próximo sync. A troca roda
+    // numa transação: erro no meio não deixa a lista pela metade.
     fun salvarDestinos(destinos: List<Pair<String, String>>) {
-        queries.deleteAllDestinos()
-        destinos.forEach { (id, nome) ->
-            queries.insertDestino(
-                servidor_id = id.toLong(),
-                nome = nome
-            )
+        if (destinos.isEmpty() && queries.getAllDestinos().executeAsList().isNotEmpty()) {
+            util.LogWriter.log("⚠️ Servidor devolveu lista de destinos vazia — mantendo os locais")
+            return
+        }
+        database.transaction {
+            queries.deleteAllDestinos()
+            destinos.forEach { (id, nome) ->
+                queries.insertDestino(
+                    servidor_id = id.toLong(),
+                    nome = nome
+                )
+            }
         }
     }
 
@@ -222,19 +237,28 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         return queries.getImplementos().executeAsList().map { it.servidor_id to it.placa }
     }
 
+    // Mesma proteção de salvarDestinos(): lista vazia suspeita não apaga os
+    // veículos locais, e a troca é atômica.
     fun salvarEquipamentos(equipamentos: List<EquipamentoDto>) {
-        queries.deleteAllEquipamentos()
-        equipamentos.forEach { e ->
-            queries.insertEquipamento(
-                servidor_id = e.id.toLong(),
-                placa = e.placa,
-                km = e.km,
-                categoria = e.categoria,
-                ativo = 1,
-                hodometro_tem_decimal = if (e.hodometro_tem_decimal) 1 else 0
-            )
+        if (equipamentos.isEmpty() && queries.getAllEquipamentos().executeAsList().isNotEmpty()) {
+            util.LogWriter.log("⚠️ Servidor devolveu lista de equipamentos vazia — mantendo os locais")
+            return
+        }
+        database.transaction {
+            queries.deleteAllEquipamentos()
+            equipamentos.forEach { e ->
+                queries.insertEquipamento(
+                    servidor_id = e.id.toLong(),
+                    placa = e.placa,
+                    km = e.km,
+                    categoria = e.categoria,
+                    ativo = 1,
+                    hodometro_tem_decimal = if (e.hodometro_tem_decimal) 1 else 0
+                )
+            }
         }
     }
+
 
     /**
      * Se o painel do hodômetro dessa placa mostra casa decimal ou não — usar

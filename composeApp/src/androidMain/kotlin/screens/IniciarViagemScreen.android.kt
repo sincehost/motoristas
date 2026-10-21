@@ -542,6 +542,7 @@ actual fun IniciarViagemScreen(
                             primaryColor = AppColors.Primary,
                             modifier = Modifier.fillMaxWidth()
                         )
+                        ui.AvisoDataFutura(dataViagem)
 
                         Spacer(Modifier.height(12.dp))
 

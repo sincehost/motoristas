@@ -55,9 +55,18 @@ fun LoginScreen(
 ) {
 
     // ================= STATES =================
-    var cnpj by remember { mutableStateOf("") }
-    var nomeEmpresaBusca by remember { mutableStateOf("") }
-    var empresaSelecionada by remember { mutableStateOf<EmpresaDto?>(null) }
+    // Empresa do último login neste aparelho já vem selecionada — o
+    // motorista só digita usuário e senha (pode trocar no "x" do campo).
+    val empresaLembrada = remember {
+        try {
+            val cnpjSalvo = repository.getPreferencia("ultima_empresa_cnpj")
+            val nomeSalvo = repository.getPreferencia("ultima_empresa_nome")
+            if (!cnpjSalvo.isNullOrBlank() && !nomeSalvo.isNullOrBlank()) EmpresaDto(cnpjSalvo, nomeSalvo) else null
+        } catch (_: Exception) { null }
+    }
+    var cnpj by remember { mutableStateOf(empresaLembrada?.cnpj ?: "") }
+    var nomeEmpresaBusca by remember { mutableStateOf(empresaLembrada?.nome_empresa ?: "") }
+    var empresaSelecionada by remember { mutableStateOf(empresaLembrada) }
     var usuario by remember { mutableStateOf("") }
     var senha by remember { mutableStateOf("") }
     var erro by remember { mutableStateOf<String?>(null) }
@@ -486,6 +495,11 @@ fun LoginScreen(
                                         } catch (e: Exception) {
                                             util.LogWriter.log("⚠️ syncDados após login falhou: ${e.message}")
                                         }
+
+                                        try {
+                                            repository.salvarPreferencia("ultima_empresa_cnpj", cnpj)
+                                            repository.salvarPreferencia("ultima_empresa_nome", nomeEmpresaBusca)
+                                        } catch (_: Exception) {}
 
                                         onLoginSuccess()
                                     } else {

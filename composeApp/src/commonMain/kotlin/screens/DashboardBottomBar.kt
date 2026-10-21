@@ -3,6 +3,8 @@ package screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -269,9 +271,14 @@ private fun RowScope.BottomBarItem(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            .clickable(
+            // selectable + Role.Tab: leitor de tela anuncia "aba, selecionada";
+            // ripple sem borda dá o retorno visual do toque (antes não havia
+            // nenhum — indication = null).
+            .selectable(
+                selected = selected,
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null,
+                indication = ripple(bounded = false, color = Color.White),
+                role = Role.Tab,
                 onClick = onClick
             ),
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -32,6 +32,22 @@ fun App(
     showMiuiSetup: Boolean = false,
     miuiSetupContent: (@Composable (onConcluir: () -> Unit) -> Unit)? = null
 ) {
+    // Tema claro/escuro escolhido no topo da tela inicial — antes voltava ao
+    // claro toda vez que o app abria. Carregado aqui, antes da primeira tela,
+    // pra não piscar no tema errado.
+    remember {
+        try {
+            repository.getPreferencia("tema")?.let { salvo ->
+                ui.ThemeMode.entries.firstOrNull { it.name == salvo }?.let { ui.ThemeManager.themeMode = it }
+            }
+        } catch (_: Exception) {}
+    }
+    LaunchedEffect(Unit) {
+        snapshotFlow { ui.ThemeManager.themeMode }.collect { modo ->
+            try { repository.salvarPreferencia("tema", modo.name) } catch (_: Exception) {}
+        }
+    }
+
     var isLoggedIn by remember {
         mutableStateOf(
             try { repository.getMotoristaLogado() != null }

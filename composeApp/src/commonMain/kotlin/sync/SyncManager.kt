@@ -7,6 +7,12 @@ import database.TipoCombustivelSync
 import br.com.lfsystem.app.database.Motorista
 import util.LogWriter
 import kotlinx.datetime.Clock
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.ContinuationInterceptor
 
 // ===============================
 // DATA CLASSES DE SINCRONIZAÇÃO
@@ -49,6 +55,14 @@ class SyncManager(private val repository: AppRepository) {
     companion object {
         private const val MAX_RETRIES = 3
         private val BACKOFF_DELAYS = longArrayOf(1000L, 2000L, 4000L) // 1s, 2s, 4s
+
+        /**
+         * Uma sincronização por vez no processo inteiro — a tela inicial e o
+         * envio em segundo plano (Android) usam instâncias diferentes de
+         * SyncManager. Duas ao mesmo tempo mandariam o mesmo lançamento duas
+         * vezes.
+         */
+        private val trava = Mutex()
     }
 
     /**
@@ -102,6 +116,33 @@ class SyncManager(private val repository: AppRepository) {
     suspend fun sincronizar(
         motorista: Motorista?,
         silencioso: Boolean = false,
+        onStatusUpdate: (SyncStatus) -> Unit
+    ) {
+        if (!trava.tryLock()) {
+            LogWriter.log("⏳ Sincronização já em andamento em outro ponto do app — ignorando")
+            if (!silencioso) onStatusUpdate(SyncStatus(state = SyncState.SYNCING, message = "Sincronização em andamento..."))
+            return
+        }
+        try {
+            coroutineScope {
+                // O trabalho pesado (ler lançamentos com fotos do banco, montar
+                // o JSON) roda fora da thread da tela; os avisos de progresso
+                // voltam pro dispatcher de quem chamou (a tela, na thread principal).
+                val despachanteDoChamador = coroutineContext[ContinuationInterceptor] ?: Dispatchers.Default
+                withContext(Dispatchers.Default) {
+                    executarSincronizacao(motorista, silencioso) { status ->
+                        this@coroutineScope.launch(despachanteDoChamador) { onStatusUpdate(status) }
+                    }
+                }
+            }
+        } finally {
+            trava.unlock()
+        }
+    }
+
+    private suspend fun executarSincronizacao(
+        motorista: Motorista?,
+        silencioso: Boolean,
         onStatusUpdate: (SyncStatus) -> Unit
     ) {
         LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

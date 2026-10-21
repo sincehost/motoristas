@@ -11,7 +11,20 @@ import platform.Foundation.*
 @OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 actual object LogWriter {
 
-    private val logs = mutableListOf<String>()
+    // Só as últimas MAX_LINHAS (antes crescia sem limite) e com trava: a
+    // sincronização roda fora da thread principal.
+    private const val MAX_LINHAS = 300
+    private val logs = ArrayDeque<String>()
+    private val trava = NSLock()
+
+    private fun <T> comTrava(bloco: () -> T): T {
+        trava.lock()
+        try {
+            return bloco()
+        } finally {
+            trava.unlock()
+        }
+    }
 
     actual fun log(message: String) {
         val formatter = NSDateFormatter()
@@ -19,7 +32,10 @@ actual object LogWriter {
         val timestamp = formatter.stringFromDate(NSDate())
         val logLine = "[$timestamp] $message"
 
-        logs.add(logLine)
+        comTrava {
+            logs.addLast(logLine)
+            while (logs.size > MAX_LINHAS) logs.removeFirst()
+        }
         println(logLine)
     }
 
@@ -47,7 +63,7 @@ actual object LogWriter {
             val fileName = "sync_${formatter.stringFromDate(NSDate())}.txt"
             val filePath = "$logsDir/$fileName"
 
-            val content = logs.joinToString("\n")
+            val content = getLogsAsText()
             val nsString = content as NSString
             nsString.writeToFile(filePath, atomically = true, encoding = NSUTF8StringEncoding, error = null)
 
@@ -59,10 +75,8 @@ actual object LogWriter {
     }
 
     actual fun clearLogs() {
-        logs.clear()
+        comTrava { logs.clear() }
     }
 
-    actual fun getLogsAsText(): String {
-        return logs.joinToString("\n")
-    }
+    actual fun getLogsAsText(): String = comTrava { logs.joinToString("\n") }
 }

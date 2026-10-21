@@ -264,7 +264,9 @@ fun PendenciasSyncScreen(
     val scrollState = rememberScrollState()
     val compartilharTexto = util.rememberCompartilharTexto()
 
-    val resultado = remember(refreshTrigger) {
+    // Monta a lista lendo o banco (com as fotos de cada lançamento) — roda
+    // fora da thread da tela, abaixo, pra não travar a navegação.
+    fun montarLista(): Pair<List<PendenciaItem>, String?> = run {
         try {
             val lista = buildList {
                 try {
@@ -470,8 +472,16 @@ fun PendenciasSyncScreen(
             emptyList<PendenciaItem>() to e.message
         }
     }
-    val itens = resultado.first
-    val erroGeral = resultado.second
+    // null = primeira carga ainda em andamento (mostra "Carregando…", não
+    // "Tudo sincronizado!"). Nas recargas, a lista anterior fica na tela até
+    // a nova chegar.
+    var resultado by remember { mutableStateOf<Pair<List<PendenciaItem>, String?>?>(null) }
+    LaunchedEffect(refreshTrigger) {
+        resultado = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { montarLista() }
+    }
+    val carregandoLista = resultado == null
+    val itens = resultado?.first ?: emptyList()
+    val erroGeral = resultado?.second
 
     Scaffold(
         topBar = {
@@ -497,7 +507,11 @@ fun PendenciasSyncScreen(
                 }
             }
 
-            if (itens.isEmpty() && erroGeral == null) {
+            if (carregandoLista) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AppColors.Primary)
+                }
+            } else if (itens.isEmpty() && erroGeral == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.CloudDone, null, tint = AppColors.Secondary, modifier = Modifier.size(64.dp))

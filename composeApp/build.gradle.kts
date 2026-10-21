@@ -5,9 +5,11 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.1.20"
+    // Mesma versão do Kotlin (libs.versions.toml) — antes estava 2.1.20 com o Kotlin em 2.1.0.
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.1.0"
     id("app.cash.sqldelight") version "2.0.1"
     id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 kotlin {
@@ -80,6 +82,12 @@ kotlin {
             // Notificações push (FCM)
             implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
             implementation("com.google.firebase:firebase-messaging")
+
+            // Relatório de falhas (util/LogFileWriter.kt manda o rastro junto)
+            implementation("com.google.firebase:firebase-crashlytics")
+
+            // Envio dos pendentes com o app fechado (SincronizacaoWorker)
+            implementation("androidx.work:work-runtime-ktx:2.9.1")
 
             // Scanner de KM ao vivo (câmera dentro do app + ML Kit) — ui/ScannerKm.android.kt
             implementation("androidx.camera:camera-camera2:1.3.4")

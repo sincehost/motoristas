@@ -549,6 +549,12 @@ private fun DashboardContent(
         )
     }
 
+    // Pedido de notificação (Android 13+), uma vez, depois do login — só quando
+    // não há mensagem da administração aberta, pra não empilhar janelas.
+    if (mensagemAtual == null) {
+        ui.PedidoPermissaoNotificacao(repository)
+    }
+
     Scaffold(
         topBar = {
             DashboardTopBar(

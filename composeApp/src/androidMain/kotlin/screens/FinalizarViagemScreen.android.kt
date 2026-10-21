@@ -766,6 +766,7 @@ actual fun FinalizarViagemScreen(
                             primaryColor = Color(0xFF10B981),
                             modifier = Modifier.fillMaxWidth()
                         )
+                        ui.AvisoDataFutura(dataChegada)
 
                         Spacer(Modifier.height(16.dp))
 
