@@ -583,45 +583,6 @@ actual fun AdicionarCombustivelScreen(
                                 Spacer(Modifier.height(16.dp))
                             }
 
-                            // Scanear Nota — OCR + QR/código de barras, preenche os campos abaixo
-                            Button(
-                                onClick = {
-                                    aguardandoScan = true
-                                    tirarFoto("cupom")
-                                },
-                                enabled = !escaneandoNota,
-                                modifier = Modifier.fillMaxWidth().height(52.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2))
-                            ) {
-                                if (escaneandoNota) {
-                                    CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Lendo cupom...", fontWeight = FontWeight.Bold)
-                                } else {
-                                    Icon(Icons.Default.DocumentScanner, null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("SCANEAR NOTA", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            Text(
-                                "Tire uma foto do cupom fiscal e a gente tenta preencher os campos abaixo. Sempre confira antes de salvar.",
-                                fontSize = 12.sp,
-                                color = AppColors.TextSecondary,
-                                modifier = Modifier.padding(top = 6.dp)
-                            )
-                            resultadoScan?.let { msg ->
-                                Spacer(Modifier.height(8.dp))
-                                Card(colors = CardDefaults.cardColors(containerColor = AppColors.Primary.copy(alpha = 0.1f))) {
-                                    Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Info, null, tint = AppColors.Primary, modifier = Modifier.size(18.dp))
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(msg, fontSize = 13.sp, color = AppColors.TextPrimary)
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.height(16.dp))
-
                             // Data
                             DateInputField(
                                 value = data,
@@ -885,7 +846,6 @@ actual fun AdicionarCombustivelScreen(
                             Text("Foto Cupom Fiscal *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                             Spacer(Modifier.height(8.dp))
                             FotoCapturaAbastecimento(foto = cameraStateCupom.bitmap, onClick = { tirarFoto("cupom") }, onEscolherGaleria = { escolherDaGaleria("cupom") }, onRemover = { cameraStateCupom.clear() })
-
 
                             Spacer(Modifier.height(24.dp))
 

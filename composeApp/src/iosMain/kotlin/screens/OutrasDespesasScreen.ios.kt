@@ -37,6 +37,7 @@ import kotlinx.cinterop.*
 import ui.AppColors
 import ui.GradientTopBar
 import util.CameraHelper
+import util.DateInputField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
 import androidx.compose.ui.graphics.toComposeImageBitmap
@@ -201,9 +202,14 @@ actual fun OutrasDespesasScreen(repository: AppRepository, onVoltar: () -> Unit,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
                     Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(dataDespesa, { dataDespesa = it }, label = { Text("Data") },
-                        leadingIcon = { Icon(Icons.Default.CalendarToday, null) },
-                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+                    // Mesmo campo de data das outras telas (máscara dd/mm/aaaa + calendário).
+                    DateInputField(
+                        value = dataDespesa,
+                        onValueChange = { dataDespesa = it },
+                        label = "Data *",
+                        primaryColor = AppColors.Primary,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(localDespesa, { localDespesa = it }, label = { Text("Local (opcional)") },
                         leadingIcon = { Icon(Icons.Default.LocationOn, null) },

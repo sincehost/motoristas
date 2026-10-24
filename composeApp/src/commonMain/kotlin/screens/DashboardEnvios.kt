@@ -77,18 +77,18 @@ fun horaDoDia(epochMs: Long): String {
 }
 
 // ===============================
-// CHIP DE ESTADO (ao lado do "Olá")
+// CHIP DE ESTADO (canto de cima, à direita, do card da viagem / sem viagem)
 // ===============================
 @Composable
 fun ChipEstadoEnvio(temInternet: Boolean, sincronizando: Boolean, pendentes: Int) {
-    val (texto, corPonto, fundo) = when {
-        !temInternet -> Triple("Sem internet", Color(0xFF9CA3AF), Color(0x73111827))
-        sincronizando -> Triple("Enviando…", Color(0xFF93C5FD), Color.White.copy(alpha = 0.16f))
-        pendentes > 0 -> Triple(if (pendentes == 1) "1 para enviar" else "$pendentes para enviar", Color(0xFFFBBF24), Color.White.copy(alpha = 0.16f))
-        else -> Triple("Tudo enviado", Color(0xFF34D399), Color.White.copy(alpha = 0.16f))
+    val (texto, corPonto) = when {
+        !temInternet -> "Sem internet" to Color(0xFF6B7280)
+        sincronizando -> "Enviando…" to Color(0xFF2563EB)
+        pendentes > 0 -> (if (pendentes == 1) "1 para enviar" else "$pendentes para enviar") to Ambar
+        else -> "Tudo enviado" to VerdeOk
     }
     Row(
-        modifier = Modifier.background(fundo, RoundedCornerShape(50)).padding(start = 7.dp, end = 9.dp, top = 3.dp, bottom = 3.dp),
+        modifier = Modifier.background(corPonto.copy(alpha = 0.14f), RoundedCornerShape(50)).padding(start = 7.dp, end = 9.dp, top = 3.dp, bottom = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -96,7 +96,7 @@ fun ChipEstadoEnvio(temInternet: Boolean, sincronizando: Boolean, pendentes: Int
             Modifier.size(11.dp).background(corPonto.copy(alpha = 0.25f), CircleShape),
             contentAlignment = Alignment.Center
         ) { Box(Modifier.size(7.dp).background(corPonto, CircleShape)) }
-        Text(texto, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White, maxLines = 1)
+        Text(texto, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary, maxLines = 1)
     }
 }
 
@@ -140,16 +140,22 @@ fun BotaoSincronizar(
             enter = scaleIn(), exit = scaleOut(),
             modifier = Modifier.align(Alignment.TopEnd)
         ) {
+            // Altura fixa: sem ela a altura de linha do Text (24 sp do tema)
+            // esticava a bolinha e ela ficava oval. 1 dígito = círculo.
             Box(
                 modifier = Modifier
                     .padding(top = 1.dp, end = 0.dp)
-                    .defaultMinSize(minWidth = 18.dp, minHeight = 18.dp)
+                    .height(18.dp)
+                    .widthIn(min = 18.dp)
                     .background(LaranjaContador, RoundedCornerShape(50))
                     .border(2.dp, Color.White, RoundedCornerShape(50))
-                    .padding(horizontal = 4.dp),
+                    .padding(horizontal = if (pendentes > 9) 4.dp else 0.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(if (pendentes > 99) "99+" else pendentes.toString(), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    if (pendentes > 99) "99+" else pendentes.toString(),
+                    fontSize = 10.sp, lineHeight = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1
+                )
             }
         }
     }
@@ -204,6 +210,8 @@ fun RodapeEnvios(
     falhouAgora: Boolean,
     onVer: () -> Unit
 ) {
+    // Nada guardado e nenhum envio ainda: o chip "Tudo enviado" já diz tudo.
+    if (pendentes.isEmpty() && ultimoEnvio <= 0) return
     Column {
         HorizontalDivider(color = AppColors.Divider, modifier = Modifier.padding(top = 10.dp, bottom = 10.dp))
         Row(
@@ -220,11 +228,9 @@ fun RodapeEnvios(
         ) {
             if (pendentes.isEmpty()) {
                 Icon(Icons.Default.CloudDone, null, tint = VerdeOk, modifier = Modifier.size(18.dp))
+                // "Tudo enviado" já está no chip do canto do card.
                 Text(
-                    buildString {
-                        append("Tudo enviado")
-                        if (ultimoEnvio > 0) append(" · último envio às ${horaDoDia(ultimoEnvio)}")
-                    },
+                    "Último envio às ${horaDoDia(ultimoEnvio)}",
                     fontSize = 13.sp, color = AppColors.TextSecondary
                 )
             } else {

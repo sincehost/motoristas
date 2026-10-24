@@ -214,6 +214,8 @@ fun ViagemStatusCard(
     kmInicio: String = "",
     dataInicio: String = "",
     placa: String = "",
+    /** Chip de estado do envio no canto de cima (DashboardEnvios.ChipEstadoEnvio). */
+    selo: @Composable () -> Unit = {},
     /** Linha de envios embaixo (DashboardEnvios.RodapeEnvios). */
     rodape: @Composable () -> Unit = {}
 ) {
@@ -228,10 +230,13 @@ fun ViagemStatusCard(
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             // Sem etiqueta "Offline" aqui: o aviso de sem internet fica no topo
             // do painel e os lançamentos guardados aparecem no rodapé.
-            Text(
-                "VIAGEM EM ANDAMENTO", fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp, color = AppColors.TextSecondary
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "VIAGEM EM ANDAMENTO", fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp, color = AppColors.TextSecondary, modifier = Modifier.weight(1f)
+                )
+                selo()
+            }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(ui.Lucide.Truck, null, tint = AppColors.Secondary, modifier = Modifier.size(28.dp))
                 Text(viagemInfo, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary, lineHeight = 24.sp)
@@ -340,7 +345,7 @@ fun VerificandoViagemCard() {
 // CARD DE NENHUMA VIAGEM (com ilustração)
 // ===============================
 @Composable
-fun SemViagemCard(rodape: @Composable () -> Unit = {}) {
+fun SemViagemCard(selo: @Composable () -> Unit = {}, rodape: @Composable () -> Unit = {}) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
@@ -350,6 +355,7 @@ fun SemViagemCard(rodape: @Composable () -> Unit = {}) {
             modifier = Modifier.fillMaxWidth().padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) { selo() }
             ui.TruckIdleIllustration()
             Spacer(Modifier.height(12.dp))
             Text(

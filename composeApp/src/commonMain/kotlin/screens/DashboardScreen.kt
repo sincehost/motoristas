@@ -810,6 +810,9 @@ private fun DashboardContent(
 
             // O andamento do envio fica no botão de sincronizar (anel) e no
             // rodapé do card da viagem — sem card colorido empurrando a tela.
+            val seloEnvio: @Composable () -> Unit = {
+                ChipEstadoEnvio(temInternet = temInternet, sincronizando = sincronizando, pendentes = pendentes.toInt())
+            }
             val rodapeEnvios: @Composable () -> Unit = {
                 RodapeEnvios(
                     pendentes = if (sincronizando) listaNoEnvio else listaPendentes,
@@ -843,11 +846,12 @@ private fun DashboardContent(
                         kmInicio = viagemLocal?.km_inicio ?: "",
                         dataInicio = viagemLocal?.data_inicio ?: "",
                         placa = viagemLocal?.placa ?: "",
+                        selo = seloEnvio,
                         rodape = rodapeEnvios
                     )
                 }
             } else {
-                SemViagemCard(rodape = rodapeEnvios)
+                SemViagemCard(selo = seloEnvio, rodape = rodapeEnvios)
             }
 
             val checklistSaidaPendente = remember(viagemAtualId, telaAtual) {
@@ -915,12 +919,8 @@ private fun DashboardTopBar(
 
     TopAppBar(
         title = {
-            // Estado do envio num chip embaixo do nome (DashboardEnvios.kt) —
-            // antes era "3 pendentes" solto, repetindo o número do botão.
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Olá, $nomeMotorista", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                ChipEstadoEnvio(temInternet = temInternet, sincronizando = sincronizando, pendentes = pendentes.toInt())
-            }
+            // O chip de estado do envio fica no canto do card da viagem.
+            Text("Olá, $nomeMotorista", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
         },
         navigationIcon = {
             IconButton(onClick = onHome) {
