@@ -847,7 +847,9 @@ private fun DashboardContent(
                         dataInicio = viagemLocal?.data_inicio ?: "",
                         placa = viagemLocal?.placa ?: "",
                         selo = seloEnvio,
-                        rodape = rodapeEnvios
+                        // Card compacto: sem "Último envio às…" (o chip já diz
+                        // "Tudo enviado"); os ícones aparecem só com algo guardado.
+                        rodape = { if (sincronizando || listaPendentes.isNotEmpty()) rodapeEnvios() }
                     )
                 }
             } else {

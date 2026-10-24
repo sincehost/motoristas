@@ -204,9 +204,10 @@ fun CnhAlertCard(status: api.CnhStatusResponse) {
 }
 
 // ===============================
-// CARD DE VIAGEM EM ANDAMENTO — destino em destaque, placa e há quantos
-// dias a viagem está aberta. Antes mostrava "ID: 1234", número que não diz
-// nada ao motorista, e tudo em letra de 11 sp.
+// CARD DE VIAGEM EM ANDAMENTO — compacto, três linhas: "Viagem em andamento"
+// com o chip de envio, o destino e "placa · dia · KM inicial". Antes era um
+// bloco verde alto com título, detalhes e "último envio": muita informação
+// para o motorista bater o olho com o celular no suporte.
 // ===============================
 @Composable
 fun ViagemStatusCard(
@@ -214,49 +215,54 @@ fun ViagemStatusCard(
     kmInicio: String = "",
     dataInicio: String = "",
     placa: String = "",
-    /** Chip de estado do envio no canto de cima (DashboardEnvios.ChipEstadoEnvio). */
+    /** Chip de estado do envio, à direita (DashboardEnvios.ChipEstadoEnvio). */
     selo: @Composable () -> Unit = {},
     /** Linha de envios embaixo (DashboardEnvios.RodapeEnvios). */
     rodape: @Composable () -> Unit = {}
 ) {
-    val isDarkMode = isDark()
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isDarkMode) AppColors.SurfaceVariant else AppColors.Secondary.copy(alpha = 0.1f)
-        ),
+        colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, AppColors.Divider),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         shape = RoundedCornerShape(14.dp)
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            // Sem etiqueta "Offline" aqui: o aviso de sem internet fica no topo
-            // do painel e os lançamentos guardados aparecem no rodapé.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "VIAGEM EM ANDAMENTO", fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp, color = AppColors.TextSecondary, modifier = Modifier.weight(1f)
-                )
-                selo()
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(ui.Lucide.Truck, null, tint = AppColors.Secondary, modifier = Modifier.size(28.dp))
-                Text(viagemInfo, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary, lineHeight = 24.sp)
-            }
-            val detalhes = listOfNotNull(
-                placa.takeIf { it.isNotBlank() },
-                textoDiasDeViagem(dataInicio),
-                kmInicio.takeIf { it.isNotBlank() }?.let { km ->
-                    "KM inicial ${km.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: km}"
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    modifier = Modifier.size(44.dp).background(AppColors.Secondary.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(ui.Lucide.Truck, null, tint = AppColors.Secondary, modifier = Modifier.size(24.dp))
                 }
-            )
-            if (detalhes.isNotEmpty()) {
-                Text(detalhes.joinToString("  ·  "), fontSize = 14.sp, color = AppColors.TextSecondary)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    // Chip na linha do título: embaixo a linha de detalhes usa a largura toda.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "Viagem em andamento", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                            color = AppColors.Secondary, modifier = Modifier.weight(1f)
+                        )
+                        selo()
+                    }
+                    Text(viagemInfo, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary, lineHeight = 23.sp, maxLines = 2)
+                    val detalhes = listOfNotNull(
+                        placa.takeIf { it.isNotBlank() },
+                        textoDiasDeViagem(dataInicio),
+                        kmInicio.takeIf { it.isNotBlank() }?.let { km ->
+                            "KM ${km.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: km}"
+                        }
+                    )
+                    if (detalhes.isNotEmpty()) {
+                        Text(detalhes.joinToString(" · "), fontSize = 13.sp, color = AppColors.TextSecondary)
+                    }
+                }
             }
             rodape()
         }
     }
 }
 
-/** "Iniciada hoje" / "2º dia de viagem" a partir da data de início (yyyy-MM-dd). */
+/** "Iniciada hoje" / "2º dia" a partir da data de início (yyyy-MM-dd). */
 private fun textoDiasDeViagem(dataInicio: String): String? {
     val inicio = try {
         kotlinx.datetime.LocalDate.parse(dataInicio.trim().take(10))
@@ -266,7 +272,7 @@ private fun textoDiasDeViagem(dataInicio: String): String? {
     val hoje = kotlinx.datetime.Clock.System.now()
         .toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault()).date
     val dias = inicio.daysUntil(hoje)
-    return if (dias <= 0) "Iniciada hoje" else "${dias + 1}º dia de viagem"
+    return if (dias <= 0) "Iniciada hoje" else "${dias + 1}º dia"
 }
 
 // ===============================
