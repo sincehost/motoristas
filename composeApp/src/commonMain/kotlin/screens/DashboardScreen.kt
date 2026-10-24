@@ -248,6 +248,20 @@ private fun DashboardContent(
     val sincronizando = syncStatus.state == SyncState.SYNCING
     val scope = rememberCoroutineScope()
 
+    // ===== Estado de envio (ver DashboardEnvios.kt) =====
+    // Lista do que está no celular esperando envio. Durante o envio fica
+    // congelada no que havia ao começar, e os primeiros [syncStatus.progress]
+    // aparecem com ✓.
+    var listaPendentes by remember { mutableStateOf(repository.getLancamentosPendentes()) }
+    var listaNoEnvio by remember { mutableStateOf<List<database.LancamentoPendente>>(emptyList()) }
+    var ultimoEnvio by remember { mutableStateOf(repository.getUltimoEnvio()) }
+    var semInternetDesde by remember { mutableStateOf<Long?>(null) }
+    var mostrarReconectado by remember { mutableStateOf(false) }
+    var avisoEnviados by remember { mutableStateOf<Int?>(null) }
+    var falhouUltimoEnvio by remember { mutableStateOf(false) }
+    var mostrarEnvios by remember { mutableStateOf(false) }
+    fun atualizarListaPendentes() { listaPendentes = repository.getLancamentosPendentes() }
+
     var mostrarDialogoLogout by remember { mutableStateOf(false) }
     var mostrarMenuDespesas by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -256,10 +270,6 @@ private fun DashboardContent(
     // Inicializar OfflineManager com escopo de coroutine
     LaunchedEffect(Unit) {
         offlineManager.init(scope)
-    }
-
-    fun mostrarSucesso(msg: String) {
-        mensagem = msg; tipoMensagem = TipoMensagem.SUCESSO
     }
 
     fun mostrarAviso(msg: String) {
@@ -282,12 +292,32 @@ private fun DashboardContent(
     // O OfflineManager tem lock de concorrência (isSyncing) que impede dois syncs
     // simultâneos. Antes, o Dashboard chamava SyncManager direto, ignorando esse lock.
     fun executarSync(silencioso: Boolean) {
+        val antes = repository.getLancamentosPendentes()
         offlineManager.syncPendentes(
             motorista = motorista,
             silencioso = silencioso,
             onStatusUpdate = { status ->
+                if (status.state == SyncState.SYNCING && syncStatus.state != SyncState.SYNCING) {
+                    listaNoEnvio = antes
+                }
                 syncStatus = status
                 pendentes = repository.countTotalPendentes()
+                when (status.state) {
+                    SyncState.SUCCESS, SyncState.ERROR, SyncState.NO_INTERNET -> {
+                        atualizarListaPendentes()
+                        val enviados = (antes.size - listaPendentes.size).coerceAtLeast(0)
+                        if (enviados > 0) avisoEnviados = enviados
+                        if (status.state == SyncState.SUCCESS) {
+                            ultimoEnvio = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                            repository.salvarUltimoEnvio(ultimoEnvio)
+                        }
+                        // Falha que não é recusa (servidor fora, sinal caiu no meio):
+                        // o card avisa com calma que o app tenta de novo sozinho.
+                        falhouUltimoEnvio = status.state == SyncState.ERROR && listaPendentes.any { !it.recusado }
+                        mostrarReconectado = false
+                    }
+                    else -> {}
+                }
                 if (status.state == SyncState.SUCCESS) {
                     LogWriter.log("Sync OK - re-buscando viagem...")
                     verificarViagem()
@@ -304,7 +334,19 @@ private fun DashboardContent(
         executarSync(silencioso = false)
     }
 
-    LaunchedEffect(Unit) { temInternet = AppEvents.online }
+    LaunchedEffect(Unit) {
+        temInternet = AppEvents.online
+        if (!temInternet) semInternetDesde = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+    }
+
+    // Aviso de concluído some sozinho; "Conectado de novo" também, se não
+    // houver nada pra enviar (com envio, some quando a rodada termina).
+    LaunchedEffect(avisoEnviados) {
+        if (avisoEnviados != null) { delay(3000); avisoEnviados = null }
+    }
+    LaunchedEffect(mostrarReconectado) {
+        if (mostrarReconectado) { delay(6000); if (syncStatus.state != SyncState.SYNCING) mostrarReconectado = false }
+    }
 
     LaunchedEffect(mensagem) {
         if (mensagem != null && tipoMensagem == TipoMensagem.SUCESSO) {
@@ -365,6 +407,12 @@ private fun DashboardContent(
         )
     }
 
+    // Lista do card/tela "Envios" acompanha o contador (fora do envio, que
+    // usa a lista congelada do começo da rodada).
+    LaunchedEffect(pendentes, telaAtual) {
+        if (syncStatus.state != SyncState.SYNCING) atualizarListaPendentes()
+    }
+
     // Atualiza viagem, pendentes e avisos ao voltar para o dashboard
     LaunchedEffect(telaAtual) {
         if (telaAtual == null) {
@@ -378,7 +426,16 @@ private fun DashboardContent(
         AppEvents.eventos.collect { evento ->
             when (evento) {
                 is AppEvent.Conectividade -> {
+                    val estavaSemInternet = !temInternet
                     temInternet = evento.online
+                    if (!evento.online) {
+                        if (semInternetDesde == null) semInternetDesde = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                        mostrarReconectado = false
+                    } else {
+                        semInternetDesde = null
+                        // "Conectado de novo" (verde) só faz sentido se estava sem.
+                        if (estavaSemInternet) mostrarReconectado = true
+                    }
                     if (evento.online && modoOffline && viagemAtualId != null) {
                         scope.launch {
                             offlineManager.verificarViagemAtual(
@@ -387,7 +444,6 @@ private fun DashboardContent(
                                 onModoOffline = { modoOffline = it },
                                 onViagemEncontrada = { id, destino ->
                                     viagemAtualId = id; viagemAtualInfo = destino
-                                    mostrarSucesso("Reconectado! Dados atualizados.")
                                 },
                                 onSemViagem = { viagemAtualId = null; viagemAtualInfo = null }
                             )
@@ -506,6 +562,19 @@ private fun DashboardContent(
         )
     }
 
+    if (mostrarEnvios) {
+        EnviosOverlay(
+            pendentes = listaPendentes,
+            temInternet = temInternet,
+            semInternetDesde = semInternetDesde,
+            ultimoEnvio = ultimoEnvio,
+            sincronizando = sincronizando,
+            onTentarAgora = { mostrarEnvios = false; sincronizarManual() },
+            onCorrigir = { mostrarEnvios = false; onNavigate(Screen.PENDENCIAS_SYNC) },
+            onFechar = { mostrarEnvios = false }
+        )
+    }
+
     // Mensagem do admin pro motorista — mostra a mais antiga que ainda não foi
     // fechada nesta sessão nem marcada como lida. "Fechar" só esconde por agora
     // (reaparece no próximo carregamento); "Marcar como lida" é definitivo.
@@ -571,6 +640,8 @@ private fun DashboardContent(
                 nomeMotorista = motorista?.nome?.split(" ")?.firstOrNull() ?: "",
                 pendentes = pendentes,
                 sincronizando = sincronizando,
+                temInternet = temInternet,
+                progresso = if (syncStatus.total > 0) syncStatus.progress.toFloat() / syncStatus.total else 0f,
                 onHome = {
                     verificarViagem()
                     pendentes = repository.countTotalPendentes()
@@ -624,6 +695,9 @@ private fun DashboardContent(
         ) {
             Spacer(Modifier.height(16.dp))
 
+            // Sem internet (cinza, calmo) / conectado de novo (verde, some sozinho).
+            AvisoConexao(semInternet = !temInternet, reconectado = temInternet && mostrarReconectado)
+
             // Recalcula sempre que o contador de pendentes muda, ao fim de
             // cada sync e ao voltar de outra tela (ex.: corrigiu na Pendências).
             val recusados = remember(pendentes, syncStatus.state, telaAtual) {
@@ -634,9 +708,17 @@ private fun DashboardContent(
                 Spacer(Modifier.height(12.dp))
             }
 
-            if (syncStatus.state != SyncState.IDLE) {
-                SyncStatusCard(syncStatus)
-                Spacer(Modifier.height(12.dp))
+            // O andamento do envio fica no botão de sincronizar (anel) e no
+            // rodapé do card da viagem — sem card colorido empurrando a tela.
+            val rodapeEnvios: @Composable () -> Unit = {
+                RodapeEnvios(
+                    pendentes = if (sincronizando) listaNoEnvio else listaPendentes,
+                    sincronizando = sincronizando,
+                    enviadosNestaRodada = syncStatus.progress,
+                    ultimoEnvio = ultimoEnvio,
+                    falhouAgora = falhouUltimoEnvio && temInternet,
+                    onVer = { mostrarEnvios = true }
+                )
             }
 
             if (planoManutencaoPendente.isNotEmpty()) {
@@ -658,26 +740,22 @@ private fun DashboardContent(
                 viagemAtualInfo?.let { info ->
                     ViagemStatusCard(
                         viagemInfo = info,
-                        modoOffline = modoOffline,
-                        temInternet = temInternet,
                         kmInicio = viagemLocal?.km_inicio ?: "",
                         dataInicio = viagemLocal?.data_inicio ?: "",
-                        placa = viagemLocal?.placa ?: ""
+                        placa = viagemLocal?.placa ?: "",
+                        rodape = rodapeEnvios
                     )
                 }
             } else {
-                SemViagemCard()
+                SemViagemCard(rodape = rodapeEnvios)
             }
 
-            // Botões grandes do que o motorista mais faz (ver AcoesPrincipais).
-            if (!verificandoViagem) {
+            // Sem viagem: botão grande "Iniciar viagem". Com viagem, nada aqui —
+            // Despesas e Finalizar ficam só na barra de baixo (decisão: dois
+            // lugares com nomes diferentes confundiam o motorista).
+            if (!verificandoViagem && viagemAtualId == null) {
                 Spacer(Modifier.height(12.dp))
-                AcoesPrincipais(
-                    temViagem = viagemAtualId != null,
-                    onIniciar = { mensagem = null; onNavigate(Screen.INICIAR_VIAGEM) },
-                    onAbastecer = { mensagem = null; onNavigate(Screen.ADICIONAR_COMBUSTIVEL) },
-                    onFinalizar = { mensagem = null; onNavigate(Screen.FINALIZAR_VIAGEM) }
-                )
+                BotaoIniciarViagem(onClick = { mensagem = null; onNavigate(Screen.INICIAR_VIAGEM) })
             }
 
             Spacer(Modifier.height(12.dp))
@@ -698,6 +776,12 @@ private fun DashboardContent(
 
             Spacer(Modifier.height(24.dp))
         }
+
+        // "N lançamentos enviados" — sobe por 3 s acima da barra de baixo.
+        AvisoEnviados(
+            quantidade = avisoEnviados,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 12.dp)
+        )
         }
     }
 
@@ -712,21 +796,22 @@ private fun DashboardTopBar(
     nomeMotorista: String,
     pendentes: Long,
     sincronizando: Boolean,
+    temInternet: Boolean,
+    progresso: Float,
     onHome: () -> Unit,
     onSync: () -> Unit,
     onLogout: () -> Unit
 ) {
     // Capturar estado do tema no contexto Composable
     val currentlyDark = ui.isDarkState
-    val warningColor = AppColors.Warning
 
     TopAppBar(
         title = {
-            Column {
+            // Estado do envio num chip embaixo do nome (DashboardEnvios.kt) —
+            // antes era "3 pendentes" solto, repetindo o número do botão.
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Olá, $nomeMotorista", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-                if (pendentes > 0) {
-                    Text("$pendentes pendente${if (pendentes > 1) "s" else ""}", fontSize = 12.sp, color = Color.White.copy(alpha = 0.9f))
-                }
+                ChipEstadoEnvio(temInternet = temInternet, sincronizando = sincronizando, pendentes = pendentes.toInt())
             }
         },
         navigationIcon = {
@@ -755,21 +840,13 @@ private fun DashboardTopBar(
                     tint = Color.White
                 )
             }
-            BadgedBox(badge = {
-                if (pendentes > 0) {
-                    Badge(containerColor = warningColor, contentColor = Color.White) {
-                        Text(pendentes.toString(), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }) {
-                IconButton(onClick = onSync, enabled = !sincronizando) {
-                    if (sincronizando) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
-                    } else {
-                        Icon(ui.Lucide.RefreshCw, "Sincronizar", tint = Color.White)
-                    }
-                }
-            }
+            // Anel com o andamento real + contador laranja de borda branca.
+            BotaoSincronizar(
+                pendentes = pendentes.toInt(),
+                sincronizando = sincronizando,
+                progresso = progresso,
+                onClick = onSync
+            )
             IconButton(onClick = onLogout) {
                 Icon(ui.Lucide.LogOut, "Sair", tint = Color.White)
             }

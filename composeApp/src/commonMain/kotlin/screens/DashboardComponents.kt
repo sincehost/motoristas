@@ -23,73 +23,6 @@ import ui.isDark
 import util.formatarKmExibicao
 
 // ===============================
-// CARD DE STATUS DE SINCRONIZAÇÃO
-// ===============================
-@Composable
-fun SyncStatusCard(status: SyncStatus) {
-    val isDarkMode = isDark()
-    val (backgroundColor, iconColor, icon, title) = when (status.state) {
-        SyncState.SYNCING -> Tuple4(
-            if (isDarkMode) Color(0xFF1A2940) else Color(0xFFE3F2FD),
-            if (isDarkMode) Color(0xFF5B8DEF) else Color(0xFF1976D2),
-            Icons.Default.Sync, "Sincronizando..."
-        )
-        SyncState.SUCCESS -> Tuple4(
-            if (isDarkMode) Color(0xFF1A3320) else Color(0xFFE8F5E9),
-            if (isDarkMode) Color(0xFF66D944) else Color(0xFF4CAF50),
-            Icons.Default.CheckCircle, "Sincronização concluída!"
-        )
-        SyncState.ERROR -> Tuple4(
-            if (isDarkMode) Color(0xFF3D1A1A) else Color(0xFFFFEBEE),
-            if (isDarkMode) Color(0xFFFF7070) else Color(0xFFD32F2F),
-            Icons.Default.Error, "Erro na sincronização"
-        )
-        SyncState.NO_INTERNET -> Tuple4(
-            if (isDarkMode) Color(0xFF3D2E1A) else Color(0xFFFFF3E0),
-            if (isDarkMode) Color(0xFFFFB74D) else Color(0xFFFF6F00),
-            Icons.Default.CloudOff, "Sem conexão com a internet"
-        )
-        else -> return
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(icon, null, tint = iconColor, modifier = Modifier.size(24.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = iconColor)
-                    if (status.message.isNotEmpty()) {
-                        Text(status.message, fontSize = 12.sp, color = AppColors.TextSecondary)
-                    }
-                }
-            }
-
-            if (status.state == SyncState.SYNCING && status.total > 0) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    LinearProgressIndicator(
-                        progress = { if (status.total > 0) status.progress.toFloat() / status.total.toFloat() else 0f },
-                        modifier = Modifier.fillMaxWidth().height(4.dp),
-                        color = iconColor,
-                        trackColor = iconColor.copy(alpha = 0.2f)
-                    )
-                    Text("${status.progress} de ${status.total} itens", fontSize = 11.sp, color = AppColors.TextSecondary)
-                }
-            }
-        }
-    }
-}
-
-// ===============================
 // CARD "ENVIO COM PROBLEMA" — lançamentos que o servidor recusou (erro de
 // dado, não de conexão). Só aparece quando há algo pro motorista corrigir;
 // some sozinho quando ele corrige ou descarta na tela de Pendências.
@@ -278,11 +211,11 @@ fun CnhAlertCard(status: api.CnhStatusResponse) {
 @Composable
 fun ViagemStatusCard(
     viagemInfo: String,
-    modoOffline: Boolean,
-    temInternet: Boolean,
     kmInicio: String = "",
     dataInicio: String = "",
-    placa: String = ""
+    placa: String = "",
+    /** Linha de envios embaixo (DashboardEnvios.RodapeEnvios). */
+    rodape: @Composable () -> Unit = {}
 ) {
     val isDarkMode = isDark()
     Card(
@@ -293,20 +226,12 @@ fun ViagemStatusCard(
         shape = RoundedCornerShape(14.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "VIAGEM EM ANDAMENTO", fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp, color = AppColors.TextSecondary
-                )
-                if (modoOffline && !temInternet) {
-                    ConnectivityBadge("Sem internet", Color(0xFFFF9800).copy(alpha = 0.2f), Color(0xFFFF6F00), Icons.Default.CloudOff)
-                } else if (modoOffline && temInternet) {
-                    ConnectivityBadge("Reconectado", Color(0xFF4CAF50).copy(alpha = 0.2f), Color(0xFF2E7D32), Icons.Default.Wifi)
-                }
-            }
+            // Sem etiqueta "Offline" aqui: o aviso de sem internet fica no topo
+            // do painel e os lançamentos guardados aparecem no rodapé.
+            Text(
+                "VIAGEM EM ANDAMENTO", fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp, color = AppColors.TextSecondary
+            )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(ui.Lucide.Truck, null, tint = AppColors.Secondary, modifier = Modifier.size(28.dp))
                 Text(viagemInfo, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary, lineHeight = 24.sp)
@@ -321,6 +246,7 @@ fun ViagemStatusCard(
             if (detalhes.isNotEmpty()) {
                 Text(detalhes.joinToString("  ·  "), fontSize = 14.sp, color = AppColors.TextSecondary)
             }
+            rodape()
         }
     }
 }
@@ -339,68 +265,22 @@ private fun textoDiasDeViagem(dataInicio: String): String? {
 }
 
 // ===============================
-// AÇÕES PRINCIPAIS — o que o motorista mais faz, grande e logo abaixo da
-// viagem. Antes ficava só na barra de baixo, com ícone pequeno e texto de
-// 11 sp, e "Iniciar" e "Finalizar" apareciam sempre, com ou sem viagem.
+// BOTÃO "INICIAR VIAGEM" — grande, logo abaixo do card, só quando não há
+// viagem aberta. Com viagem, Despesas e Finalizar ficam só na barra de baixo:
+// botões grandes com nomes diferentes dos de baixo ("Abastecer" x
+// "Despesas") confundiam o motorista.
 // ===============================
 @Composable
-fun AcoesPrincipais(
-    temViagem: Boolean,
-    onIniciar: () -> Unit,
-    onAbastecer: () -> Unit,
-    onFinalizar: () -> Unit
-) {
-    if (!temViagem) {
-        Button(
-            onClick = onIniciar,
-            modifier = Modifier.fillMaxWidth().height(64.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
-        ) {
-            Icon(ui.Lucide.Truck, null, modifier = Modifier.size(26.dp))
-            Spacer(Modifier.width(10.dp))
-            Text("Iniciar viagem", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        }
-    } else {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                onClick = onAbastecer,
-                modifier = Modifier.weight(1f).height(64.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
-            ) {
-                Icon(ui.Lucide.Fuel, null, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Abastecer", fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            }
-            Button(
-                onClick = onFinalizar,
-                modifier = Modifier.weight(1f).height(64.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981), contentColor = Color.White)
-            ) {
-                Icon(ui.Lucide.Flag, null, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Finalizar", fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            }
-        }
-    }
-}
-
-// ===============================
-// BADGE DE CONECTIVIDADE
-// ===============================
-@Composable
-private fun ConnectivityBadge(text: String, backgroundColor: Color, textColor: Color, icon: ImageVector) {
-    Surface(color = backgroundColor, shape = RoundedCornerShape(4.dp)) {
-        Row(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, null, modifier = Modifier.size(12.dp), tint = textColor)
-            Text(text, fontSize = 11.sp, color = textColor, fontWeight = FontWeight.Bold)
-        }
+fun BotaoIniciarViagem(onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
+    ) {
+        Icon(ui.Lucide.Truck, null, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.width(10.dp))
+        Text("Iniciar viagem", fontSize = 18.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -429,7 +309,7 @@ fun VerificandoViagemCard() {
 // CARD DE NENHUMA VIAGEM (com ilustração)
 // ===============================
 @Composable
-fun SemViagemCard() {
+fun SemViagemCard(rodape: @Composable () -> Unit = {}) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
@@ -453,6 +333,7 @@ fun SemViagemCard() {
                 fontSize = 14.sp,
                 color = AppColors.TextSecondary
             )
+            rodape()
         }
     }
 }

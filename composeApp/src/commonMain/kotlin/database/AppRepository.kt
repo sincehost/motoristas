@@ -27,6 +27,16 @@ data class TipoCombustivelSync(val id: String, val nome: String, val requerHoras
 /** Lançamento pendente recusado pelo servidor — ver getLancamentosRecusados(). */
 data class LancamentoRecusado(val tipo: String, val data: String, val erro: String)
 
+/** Lançamento ainda no celular, esperando envio (painel / tela "Envios"). */
+data class LancamentoPendente(
+    val tipo: String,
+    val descricao: String,
+    val data: String,
+    val valor: String,
+    /** Servidor recusou (erro de dado) — precisa corrigir em Pendências. */
+    val recusado: Boolean
+)
+
 class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     private val driver = driverFactory.createDriver()
@@ -903,6 +913,28 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
      * card "Envio com problema" do Dashboard. Falha passageira (sem
      * internet etc.) fica de fora: o sync tenta de novo sozinho.
      */
+    /** Tudo o que ainda espera envio (sem fotos) — painel e tela "Envios". */
+    fun getLancamentosPendentes(): List<LancamentoPendente> = try {
+        queries.lancamentosPendentes().executeAsList().map {
+            LancamentoPendente(
+                tipo = it.tipo,
+                descricao = it.descricao.orEmpty(),
+                data = it.data_lancamento.orEmpty(),
+                valor = it.valor.orEmpty(),
+                recusado = it.ultimo_erro != null && !util.isErroTransitorio(it.ultimo_erro)
+            )
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+
+    /** Horário (epoch ms) do último envio que terminou sem erro; 0 se nunca. */
+    fun getUltimoEnvio(): Long = try { getPreferencia("ultimo_envio")?.toLongOrNull() ?: 0L } catch (_: Exception) { 0L }
+
+    fun salvarUltimoEnvio(epochMs: Long) {
+        try { salvarPreferencia("ultimo_envio", epochMs.toString()) } catch (_: Exception) {}
+    }
+
     fun getLancamentosRecusados(): List<LancamentoRecusado> =
         queries.lancamentosComErro().executeAsList()
             .filter { !util.isErroTransitorio(it.ultimo_erro) }

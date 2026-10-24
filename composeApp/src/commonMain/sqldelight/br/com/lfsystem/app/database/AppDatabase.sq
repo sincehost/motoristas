@@ -1171,3 +1171,17 @@ UNION ALL SELECT viagem_id FROM ChecklistPosViagem WHERE sincronizado = 0;
 -- da viagem em andamento pelo id do servidor.
 atualizarIdViagemAtual:
 UPDATE ViagemAtual SET viagem_id = :viagem_id_novo WHERE viagem_id = :viagem_id_antigo;
+
+-- Tudo o que ainda não foi enviado, pro painel (ícones no card da viagem)
+-- e pra tela "Envios". Sem fotos. Ordem: o que foi lançado antes primeiro.
+lancamentosPendentes:
+SELECT 'Viagem' AS tipo, destino_nome AS descricao, data_viagem AS data_lancamento, '' AS valor, ultimo_erro FROM Viagem WHERE sincronizado = 0
+UNION ALL SELECT 'Abastecimento', posto, data, valor, ultimo_erro FROM Abastecimento WHERE sincronizado = 0
+UNION ALL SELECT 'ARLA 32', posto, data, valor, ultimo_erro FROM Arla WHERE sincronizado = 0
+UNION ALL SELECT 'Descarga', '', data, valor, ultimo_erro FROM Descarga WHERE sincronizado = 0
+UNION ALL SELECT 'Frete', tipo, '', valor, ultimo_erro FROM Frete WHERE sincronizado = 0
+UNION ALL SELECT 'Outra despesa', tipo, data, valor, ultimo_erro FROM OutraDespesa WHERE sincronizado = 0
+UNION ALL SELECT 'Manutenção', '', data_manutencao, valor, ultimo_erro FROM Manutencao WHERE sincronizado = 0
+UNION ALL SELECT 'Checklist pré-viagem', '', data_checklist, '', ultimo_erro FROM ChecklistPreViagem WHERE sincronizado = 0
+UNION ALL SELECT 'Checklist pós-viagem', '', data_checklist, '', ultimo_erro FROM ChecklistPosViagem WHERE sincronizado = 0
+UNION ALL SELECT 'Finalização de viagem', '', data_chegada, '', ultimo_erro FROM FinalizacaoViagem WHERE sincronizado = 0;
