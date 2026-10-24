@@ -75,13 +75,36 @@ fun DashboardScreen(
         setBackStack(parseBackStack().dropLast(1))
     }
 
+    // Checklist na hora certa, sem bloquear (ver ChecklistComum.kt):
+    // depois de iniciar a viagem pergunta pelo de saída; antes de finalizar,
+    // pelo de chegada. "Depois"/"Finalizar sem" sempre deixa seguir.
+    var perguntarChecklistSaida by remember { mutableStateOf(false) }
+    var perguntarChecklistChegada by remember { mutableStateOf(false) }
+    var finalizarDepoisDoChecklist by remember { mutableStateOf(false) }
+
+    fun checklistChegadaFeito(): Boolean {
+        val v = repository.getViagemAtual() ?: return true
+        return repository.getChecklistPosPorViagem(v.viagem_id) != null
+    }
+
+    /** Finalizar passa pela pergunta do checklist de chegada, se faltar. */
+    fun abrirFinalizar(substituirTelaAtual: Boolean = false) {
+        if (!checklistChegadaFeito()) {
+            if (substituirTelaAtual) voltar()
+            perguntarChecklistChegada = true
+            return
+        }
+        if (substituirTelaAtual) setBackStack(parseBackStack().dropLast(1) + Screen.FINALIZAR_VIAGEM)
+        else navegar(Screen.FINALIZAR_VIAGEM)
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
 
         // Dashboard sempre vivo embaixo
         DashboardContent(
             repository = repository,
             onLogout = onLogout,
-            onNavigate = { navegar(it) },
+            onNavigate = { if (it == Screen.FINALIZAR_VIAGEM) abrirFinalizar() else navegar(it) },
             telaAtual = telaAtual
         )
 
@@ -115,12 +138,11 @@ fun DashboardScreen(
                             onSucesso = {
                                 voltar()
                                 AppEvents.emitir(AppEvent.ViagemAtualizada)
+                                if (repository.getViagemAtual() != null) perguntarChecklistSaida = true
                             },
                             // Troca o Iniciar pelo Finalizar na pilha — voltar
                             // do Finalizar cai no painel, não no Iniciar.
-                            onFinalizarViagem = {
-                                setBackStack(parseBackStack().dropLast(1) + Screen.FINALIZAR_VIAGEM)
-                            }
+                            onFinalizarViagem = { abrirFinalizar(substituirTelaAtual = true) }
                         )
                         Screen.MINHAS_VIAGENS -> MinhasViagensScreen(
                             repository = repository,
@@ -197,10 +219,13 @@ fun DashboardScreen(
                         )
                         Screen.CHECKLIST_POS_VIAGEM -> ChecklistPosViagemScreen(
                             repository = repository,
-                            onVoltar = { voltar() },
+                            onVoltar = { finalizarDepoisDoChecklist = false; voltar() },
                             onSucesso = {
-                                voltar()
                                 AppEvents.emitir(AppEvent.DadosPendentesAlterados)
+                                if (finalizarDepoisDoChecklist) {
+                                    finalizarDepoisDoChecklist = false
+                                    setBackStack(parseBackStack().dropLast(1) + Screen.FINALIZAR_VIAGEM)
+                                } else voltar()
                             }
                         )
                         Screen.PENDENCIAS_SYNC -> PendenciasSyncScreen(
@@ -213,7 +238,82 @@ fun DashboardScreen(
             }
         }
         }
+
+        if (perguntarChecklistSaida) {
+            PerguntaChecklist(
+                titulo = "Viagem iniciada",
+                texto = "Antes de sair, faça o checklist do caminhão. Leva uns 2 minutos.",
+                botaoSim = "Fazer checklist agora",
+                botaoNao = "Depois",
+                iconeSucesso = true,
+                onSim = { perguntarChecklistSaida = false; navegar(Screen.CHECKLIST_PRE_VIAGEM) },
+                onNao = { perguntarChecklistSaida = false }
+            )
+        }
+        if (perguntarChecklistChegada) {
+            PerguntaChecklist(
+                titulo = "Checklist de chegada",
+                texto = "Você ainda não fez o checklist de chegada desta viagem.",
+                botaoSim = "Fazer agora",
+                botaoNao = "Finalizar sem checklist",
+                iconeSucesso = false,
+                onSim = {
+                    perguntarChecklistChegada = false
+                    finalizarDepoisDoChecklist = true
+                    navegar(Screen.CHECKLIST_POS_VIAGEM)
+                },
+                onNao = { perguntarChecklistChegada = false; navegar(Screen.FINALIZAR_VIAGEM) }
+            )
+        }
     }
+}
+
+@Composable
+private fun PerguntaChecklist(
+    titulo: String,
+    texto: String,
+    botaoSim: String,
+    botaoNao: String,
+    iconeSucesso: Boolean,
+    onSim: () -> Unit,
+    onNao: () -> Unit
+) {
+    AppAlertDialog(
+        onDismissRequest = onNao,
+        containerColor = AppColors.Surface,
+        icon = {
+            Box(
+                Modifier.size(56.dp).background(
+                    if (iconeSucesso) Color(0xFFD1FAE5) else Color(0xFF0097A7).copy(alpha = 0.12f),
+                    androidx.compose.foundation.shape.CircleShape
+                ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (iconeSucesso) Icons.Default.Check else ui.Lucide.ClipboardCheck, null,
+                    tint = if (iconeSucesso) Color(0xFF059669) else Color(0xFF0097A7),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        },
+        title = { Text(titulo, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
+        text = { Text(texto, fontSize = 14.sp, textAlign = TextAlign.Center, color = AppColors.TextSecondary, modifier = Modifier.fillMaxWidth()) },
+        confirmButton = {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onSim,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+                    shape = RoundedCornerShape(10.dp)
+                ) { Text(botaoSim, fontWeight = FontWeight.Bold) }
+                OutlinedButton(
+                    onClick = onNao,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) { Text(botaoNao) }
+            }
+        }
+    )
 }
 
 // ===============================
@@ -748,6 +848,14 @@ private fun DashboardContent(
                 }
             } else {
                 SemViagemCard(rodape = rodapeEnvios)
+            }
+
+            val checklistSaidaPendente = remember(viagemAtualId, telaAtual) {
+                viagemAtualId?.let { repository.getChecklistPrePorViagem(it) == null } ?: false
+            }
+            if (!verificandoViagem && checklistSaidaPendente) {
+                Spacer(Modifier.height(12.dp))
+                ChecklistPendenteCard(onFazer = { onNavigate(Screen.CHECKLIST_PRE_VIAGEM) })
             }
 
             // Sem viagem: botão grande "Iniciar viagem". Com viagem, nada aqui —

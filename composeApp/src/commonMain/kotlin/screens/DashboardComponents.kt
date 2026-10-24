@@ -265,6 +265,37 @@ private fun textoDiasDeViagem(dataInicio: String): String? {
 }
 
 // ===============================
+// CARD "CHECKLIST DE SAÍDA PENDENTE" — discreto, fica até o checklist da
+// viagem em andamento ser feito (o motorista escolheu "Depois").
+// ===============================
+@Composable
+fun ChecklistPendenteCard(onFazer: () -> Unit) {
+    val ciano = Color(0xFF0097A7)
+    Card(
+        onClick = onFazer,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, ciano.copy(alpha = 0.35f)),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(Modifier.size(40.dp).background(ciano.copy(alpha = 0.1f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(ui.Lucide.ClipboardCheck, null, tint = ciano, modifier = Modifier.size(22.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text("Checklist de saída pendente", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
+                Text("35 itens · uns 2 minutos", fontSize = 13.sp, color = AppColors.TextSecondary)
+            }
+            Text("Fazer", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = AppColors.Primary)
+        }
+    }
+}
+
+// ===============================
 // BOTÃO "INICIAR VIAGEM" — grande, logo abaixo do card, só quando não há
 // viagem aberta. Com viagem, Despesas e Finalizar ficam só na barra de baixo:
 // botões grandes com nomes diferentes dos de baixo ("Abastecer" x
