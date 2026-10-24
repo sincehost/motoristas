@@ -515,9 +515,15 @@ actual fun EditarCombustivelScreen(
                         // Forma de Pagamento
                         Text("Forma de Pagamento *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            formasPagamento.forEach { fp ->
-                                BotaoOpcaoCombEdit(fp.nome, Icons.Default.CreditCard, tipoPagamento == fp.codigo, { tipoPagamento = fp.codigo }, Modifier.weight(1f))
+                        // Grade de 2 colunas (mesma da tela de adicionar).
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            formasPagamento.chunked(2).forEach { linha ->
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    linha.forEach { fp ->
+                                        BotaoOpcaoCombEdit(fp.nome, Icons.Default.CreditCard, tipoPagamento == fp.codigo, { tipoPagamento = fp.codigo }, Modifier.weight(1f))
+                                    }
+                                    if (linha.size == 1) Spacer(Modifier.weight(1f))
+                                }
                             }
                         }
 

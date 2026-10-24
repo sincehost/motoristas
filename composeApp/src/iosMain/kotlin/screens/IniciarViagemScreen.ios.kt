@@ -118,7 +118,8 @@ private class CameraDelegate(
 actual fun IniciarViagemScreen(
     repository: AppRepository,
     onVoltar: () -> Unit,
-    onSucesso: () -> Unit
+    onSucesso: () -> Unit,
+    onFinalizarViagem: () -> Unit
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
     val destinos = remember { repository.getAllDestinos() }
@@ -140,6 +141,7 @@ actual fun IniciarViagemScreen(
     // Estados de verificação de viagem em andamento
     var carregando by remember { mutableStateOf(true) }
     var viagemEmAndamento by remember { mutableStateOf<api.ViagemAberta?>(null) }
+    var finalizacaoAnteriorNaFila by remember { mutableStateOf(false) }
 
     // Verifica se já tem viagem em andamento (LOCAL primeiro, depois API)
     LaunchedEffect(Unit) {
@@ -165,7 +167,12 @@ actual fun IniciarViagemScreen(
                     motorista_id = motorista?.motorista_id ?: ""
                 )
             )
-            if (response.status == "ok" && response.viagens.isNotEmpty()) {
+            if (response.status == "ok" && response.viagens.isNotEmpty() &&
+                repository.temFinalizacaoPendenteDaViagem(response.viagens.first().id.toLong())) {
+                // Já finalizada no celular, mas a finalização espera os
+                // lançamentos dela subirem — o servidor recusaria a nova.
+                finalizacaoAnteriorNaFila = true
+            } else if (response.status == "ok" && response.viagens.isNotEmpty()) {
                 val viagem = response.viagens.first()
                 viagemEmAndamento = viagem
                 // Salva localmente para funcionar offline depois
@@ -179,11 +186,18 @@ actual fun IniciarViagemScreen(
         carregando = false
     }
 
-    var numerobd by remember { mutableStateOf("") }
-    var cte by remember { mutableStateOf("") }
-    var mostrarCampos2 by remember { mutableStateOf(false) }
-    var numerobd2 by remember { mutableStateOf("") }
-    var cte2 by remember { mutableStateOf("") }
+    // Rascunho (util/Rascunho.kt): ordem de frete, CT-e, rota e peso voltam
+    // se o motorista sair da tela antes de iniciar. Placa e KM já são
+    // preenchidos sozinhos (último veículo / último KM da placa).
+    val rascunho = util.rememberRascunho(repository, "iniciar_viagem", motorista?.motorista_id ?: "")
+    val r = rascunho.valores
+    var mostrarAvisoRascunho by remember { mutableStateOf(rascunho.recuperado) }
+
+    var numerobd by remember { mutableStateOf(r["numerobd"] ?: "") }
+    var cte by remember { mutableStateOf(r["cte"] ?: "") }
+    var mostrarCampos2 by remember { mutableStateOf(!r["numerobd2"].isNullOrBlank() || !r["cte2"].isNullOrBlank()) }
+    var numerobd2 by remember { mutableStateOf(r["numerobd2"] ?: "") }
+    var cte2 by remember { mutableStateOf(r["cte2"] ?: "") }
 
     // Rota Fixa (padrão) x Rota Contínua — ver admin_config.php?tab=app.
     // Em Rota Contínua: destino vira texto livre, Peso da Carga/Valor do
@@ -192,11 +206,20 @@ actual fun IniciarViagemScreen(
     val rotaContinua = remember { repository.isRotaContinua() }
 
     var destinoExpandido by remember { mutableStateOf(false) }
-    var destinoSelecionado by remember { mutableStateOf<Pair<Long, String>?>(null) }
+    var buscaRota by remember { mutableStateOf("") }
+    // Rota do rascunho só volta se ainda existir na lista.
+    var destinoSelecionado by remember {
+        mutableStateOf(
+            r["destinoId"]?.toLongOrNull()
+                ?.let { id -> destinos.firstOrNull { it.servidor_id == id } }
+                ?.let { Pair(it.servidor_id, it.nome) }
+        )
+    }
     // Só usado quando rotaContinua — texto digitado livremente pelo motorista.
-    var destinoLivre by remember { mutableStateOf("") }
+    var destinoLivre by remember { mutableStateOf(r["destinoLivre"] ?: "") }
 
     var placaExpandida by remember { mutableStateOf(false) }
+    var buscaPlaca by remember { mutableStateOf("") }
     var veiculoSelecionadoId by remember { mutableStateOf<Long?>(null) }
     var placaSelecionada by remember { mutableStateOf<String?>(null) }
 
@@ -244,7 +267,22 @@ actual fun IniciarViagemScreen(
         kmInicio = TextFieldValue(texto, TextRange(texto.length))
         kmAutoPreenchido = texto.isNotEmpty()
     }
-    var pesoCarga by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
+    var pesoCarga by remember { mutableStateOf(TextFieldValue(r["peso"] ?: "", selection = TextRange((r["peso"] ?: "").length))) }
+
+    util.SalvarRascunhoAutomatico(
+        rascunho,
+        "numerobd" to numerobd, "cte" to cte, "numerobd2" to numerobd2, "cte2" to cte2,
+        "destinoId" to (destinoSelecionado?.first?.toString() ?: ""),
+        "destinoLivre" to destinoLivre, "peso" to pesoCarga.text
+    )
+
+    fun limparFormulario() {
+        numerobd = ""; cte = ""; numerobd2 = ""; cte2 = ""; mostrarCampos2 = false
+        destinoSelecionado = null; destinoLivre = ""
+        pesoCarga = TextFieldValue("")
+        rascunho.limpar(encerrar = false)
+        mostrarAvisoRascunho = false
+    }
 
     var fotoBase64 by remember { mutableStateOf<String?>(null) }
     var fotoImageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -347,6 +385,10 @@ actual fun IniciarViagemScreen(
                 }
             }
         }
+        // Viagem anterior finalizada, mas ainda subindo — BLOQUEIA com explicação
+        else if (finalizacaoAnteriorNaFila) {
+            FinalizacaoAnteriorNaFilaAviso(modifier = Modifier.padding(padding), onVoltar = onVoltar)
+        }
         // Já tem viagem em andamento - BLOQUEIA
         else if (viagemEmAndamento != null) {
             Column(
@@ -423,13 +465,23 @@ actual fun IniciarViagemScreen(
 
                         Spacer(Modifier.height(20.dp))
 
+                        // Atalho direto — antes só tinha "Voltar", e o motorista
+                        // tinha que achar o Finalizar na barra de baixo.
                         Button(
-                            onClick = onVoltar,
+                            onClick = onFinalizarViagem,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Voltar ao Dashboard", fontWeight = FontWeight.Bold)
+                            Text("Finalizar esta viagem", fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = onVoltar,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Voltar ao Início")
                         }
                     }
                 }
@@ -456,6 +508,10 @@ actual fun IniciarViagemScreen(
                     colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground)
                 ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                        if (mostrarAvisoRascunho) {
+                            util.RascunhoRecuperadoAviso(onLimpar = { limparFormulario() })
+                            Spacer(Modifier.height(12.dp))
+                        }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -569,13 +625,16 @@ actual fun IniciarViagemScreen(
                                 onExpandedChange = {
                                     focusManager.clearFocus()
                                     destinoExpandido = it
+                                    buscaRota = ""
                                 },
                                 leadingIcon = {
                                     Icon(Icons.Default.Route, null, tint = AppColors.Primary)
                                 },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                busca = if (destinos.size >= ui.ITENS_PARA_BUSCA) buscaRota else null,
+                                onBuscaChange = { buscaRota = it }
                             ) {
-                                destinos.forEach { destino ->
+                                destinos.filter { ui.combinaBusca(it.nome, buscaRota) }.forEach { destino ->
                                     ui.AppDropdownMenuItem(
                                         text = { Text(destino.nome) },
                                         onClick = {
@@ -596,13 +655,16 @@ actual fun IniciarViagemScreen(
                             onExpandedChange = {
                                 focusManager.clearFocus()
                                 placaExpandida = it
+                                buscaPlaca = ""
                             },
                             leadingIcon = {
                                 Icon(Icons.Default.LocalShipping, null, tint = AppColors.Primary)
                             },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            busca = if (veiculos.size >= ui.ITENS_PARA_BUSCA) buscaPlaca else null,
+                            onBuscaChange = { buscaPlaca = it }
                         ) {
-                            veiculos.forEach { equip ->
+                            veiculos.filter { ui.combinaBusca(it.placa, buscaPlaca) }.forEach { equip ->
                                 ui.AppDropdownMenuItem(
                                     text = { Text(equip.placa) },
                                     onClick = {
@@ -826,50 +888,23 @@ actual fun IniciarViagemScreen(
                             onClick = {
                                 focusManager.clearFocus()
                                 scope.launch {
-                                    if (numerobd.isBlank()) {
-                                        mostrarMensagem("Informe a Ordem de Frete", isErro = true)
-                                        return@launch
-                                    }
-                                    if (cte.isBlank()) {
-                                        mostrarMensagem("Informe o Nº do CTE", isErro = true)
-                                        return@launch
-                                    }
-                                    if (rotaContinua) {
-                                        if (destinoLivre.isBlank()) {
-                                            mostrarMensagem("Informe o destino", isErro = true)
-                                            return@launch
-                                        }
-                                    } else {
-                                        if (destinoSelecionado == null) {
-                                            mostrarMensagem("Selecione uma Rota", isErro = true)
-                                            return@launch
-                                        }
-                                    }
-                                    if (placaSelecionada == null) {
-                                        mostrarMensagem("Selecione a Placa", isErro = true)
-                                        return@launch
-                                    }
-                                    if (dataViagem.isBlank()) {
-                                        mostrarMensagem("Informe a Data da Viagem", isErro = true)
-                                        return@launch
-                                    }
-                                    if (kmInicio.text.isBlank()) {
-                                        mostrarMensagem("Informe o KM de Início", isErro = true)
-                                        return@launch
-                                    }
+                                    // Tudo o que falta numa janela só (ver mensagemCamposFaltando).
                                     // Peso da Carga não é exigido em Rota Contínua. Valor do
                                     // Frete não é mais pedido aqui em nenhum dos dois modos —
                                     // frete agora é lançado só em "Adicionar Frete" (Despesas).
-                                    if (!rotaContinua) {
-                                        if (pesoCarga.text.isBlank()) {
-                                            mostrarMensagem("Informe o Peso da Carga", isErro = true)
-                                            return@launch
-                                        }
+                                    val faltando = buildList {
+                                        if (numerobd.isBlank()) add("Ordem de Frete")
+                                        if (cte.isBlank()) add("Nº do CT-e")
+                                        if (rotaContinua) {
+                                            if (destinoLivre.isBlank()) add("Destino")
+                                        } else if (destinoSelecionado == null) add("Rota")
+                                        if (placaSelecionada == null) add("Veículo (placa)")
+                                        if (dataViagem.isBlank()) add("Data da viagem")
+                                        if (kmInicio.text.isBlank()) add("KM de início")
+                                        if (!rotaContinua && pesoCarga.text.isBlank()) add("Peso da carga")
+                                        if (fotoBase64 == null) add("Foto do hodômetro na saída")
                                     }
-                                    if (fotoBase64 == null) {
-                                        mostrarMensagem("Tire a foto do painel de saída", isErro = true)
-                                        return@launch
-                                    }
+                                    util.mensagemCamposFaltando(faltando)?.let { mostrarMensagem(it, isErro = true); return@launch }
 
                                     loading = true
 
@@ -890,7 +925,7 @@ actual fun IniciarViagemScreen(
                                     val pesoCargaParaApi = if (rotaContinua) null else pesoCarga.text
 
                                     try {
-                                        val response = ApiClient.inserirViagem(
+                                        val response = kotlinx.coroutines.withTimeoutOrNull(ESPERA_MAXIMA_INICIAR_VIAGEM_MS) { ApiClient.inserirViagem(
                                             ViagemRequest(
 
                                                 motorista_id = motorista?.motorista_id ?: "",
@@ -910,7 +945,7 @@ actual fun IniciarViagemScreen(
                                                 valorfrete = null,
                                                 foto_painel_saida = fotoBase64
                                             )
-                                        )
+                                        ) } ?: throw Exception("timeout: servidor não respondeu a tempo")
 
                                         if (response.status == "ok") {
                                             val viagemIdReal = response.viagem_id ?: 0
@@ -925,6 +960,7 @@ actual fun IniciarViagemScreen(
                                                 implemento2Placa = if (implemento2Visivel) implemento2Placa else null
                                             )
                                             repository.salvarUltimoVeiculoUsado(placaSelecionada ?: "", veiculoSelecionadoId)
+                                            rascunho.limpar()
                                             sucessoMsg = "Viagem registrada com sucesso!"
                                         } else {
                                             // API retornou erro de VALIDAÇÃO (dados inválidos, motorista não encontrado, etc.)
@@ -1000,6 +1036,7 @@ actual fun IniciarViagemScreen(
                                             implemento2Placa = if (implemento2Visivel) implemento2Placa else null
                                         )
                                         repository.salvarUltimoVeiculoUsado(placaSelecionada ?: "", veiculoSelecionadoId)
+                                        rascunho.limpar()
                                         sucessoMsg = "Sem internet. Viagem salva e será sincronizada automaticamente quando conectar."
                                     }
 

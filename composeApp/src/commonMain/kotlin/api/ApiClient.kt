@@ -153,6 +153,14 @@ object ApiClient {
     }
 
     // ===============================
+    // TESTE DE CONEXÃO (leve) — index.php só responde "API Motorista ONLINE".
+    // Lança exceção se não chegar no servidor.
+    // ===============================
+    suspend fun ping() {
+        client.get("${getBaseUrl()}/index.php")
+    }
+
+    // ===============================
     // BUSCAR DESTINOS
     // ===============================
     suspend fun getDestinos(): DestinosResponse {

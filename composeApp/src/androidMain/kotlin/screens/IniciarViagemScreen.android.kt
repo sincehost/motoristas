@@ -60,7 +60,8 @@ import util.lerKmDaFoto
 actual fun IniciarViagemScreen(
     repository: AppRepository,
     onVoltar: () -> Unit,
-    onSucesso: () -> Unit
+    onSucesso: () -> Unit,
+    onFinalizarViagem: () -> Unit
 ) {
     val context = LocalContext.current
     val motorista = remember { repository.getMotoristaLogado() }
@@ -75,6 +76,7 @@ actual fun IniciarViagemScreen(
     // Estados de verificação de viagem em andamento
     var carregando by remember { mutableStateOf(true) }
     var viagemEmAndamento by remember { mutableStateOf<api.ViagemAberta?>(null) }
+    var finalizacaoAnteriorNaFila by remember { mutableStateOf(false) }
 
     // Verifica se já tem viagem em andamento (LOCAL primeiro, depois API)
     LaunchedEffect(Unit) {
@@ -100,7 +102,12 @@ actual fun IniciarViagemScreen(
                     motorista_id = motorista?.motorista_id ?: ""
                 )
             )
-            if (response.status == "ok" && response.viagens.isNotEmpty()) {
+            if (response.status == "ok" && response.viagens.isNotEmpty() &&
+                repository.temFinalizacaoPendenteDaViagem(response.viagens.first().id.toLong())) {
+                // Já finalizada no celular, mas a finalização espera os
+                // lançamentos dela subirem — o servidor recusaria a nova.
+                finalizacaoAnteriorNaFila = true
+            } else if (response.status == "ok" && response.viagens.isNotEmpty()) {
                 val viagem = response.viagens.first()
                 viagemEmAndamento = viagem
                 // Salva localmente para funcionar offline depois
@@ -115,13 +122,20 @@ actual fun IniciarViagemScreen(
         carregando = false
     }
 
-    var numerobd by rememberSaveable { mutableStateOf("") }
-    var cte by rememberSaveable { mutableStateOf("") }
+    // Rascunho (util/Rascunho.kt): ordem de frete, CT-e, rota e peso voltam
+    // se o motorista sair da tela antes de iniciar. Placa e KM já são
+    // preenchidos sozinhos (último veículo / último KM da placa).
+    val rascunho = util.rememberRascunho(repository, "iniciar_viagem", motorista?.motorista_id ?: "")
+    val r = rascunho.valores
+    var mostrarAvisoRascunho by remember { mutableStateOf(rascunho.recuperado) }
+
+    var numerobd by rememberSaveable { mutableStateOf(r["numerobd"] ?: "") }
+    var cte by rememberSaveable { mutableStateOf(r["cte"] ?: "") }
     // ★ FIX PROCESS-DEATH: todos os campos do formulário usam rememberSaveable
     // para sobreviver quando o Android mata o processo ao abrir a câmera
-    var mostrarCampos2 by rememberSaveable { mutableStateOf(false) }
-    var numerobd2 by rememberSaveable { mutableStateOf("") }
-    var cte2 by rememberSaveable { mutableStateOf("") }
+    var mostrarCampos2 by rememberSaveable { mutableStateOf(!r["numerobd2"].isNullOrBlank() || !r["cte2"].isNullOrBlank()) }
+    var numerobd2 by rememberSaveable { mutableStateOf(r["numerobd2"] ?: "") }
+    var cte2 by rememberSaveable { mutableStateOf(r["cte2"] ?: "") }
 
     // Rota Fixa (padrão) x Rota Contínua — ver admin_config.php?tab=app.
     // Em Rota Contínua: destino vira texto livre, Peso da Carga/Valor do
@@ -130,15 +144,21 @@ actual fun IniciarViagemScreen(
     val rotaContinua = remember { repository.isRotaContinua() }
 
     var destinoExpandido by remember { mutableStateOf(false) }
+    var buscaRota by remember { mutableStateOf("") }
     // destinoSelecionado: salva id e nome como strings separadas
-    var destinoSelecionadoId by rememberSaveable { mutableStateOf(-1L) }
-    var destinoSelecionadoNome by rememberSaveable { mutableStateOf("") }
+    // Rota do rascunho só volta se ainda existir na lista.
+    val destinoDoRascunho = remember {
+        r["destinoId"]?.toLongOrNull()?.let { id -> destinos.firstOrNull { it.servidor_id == id } }
+    }
+    var destinoSelecionadoId by rememberSaveable { mutableStateOf(destinoDoRascunho?.servidor_id ?: -1L) }
+    var destinoSelecionadoNome by rememberSaveable { mutableStateOf(destinoDoRascunho?.nome ?: "") }
     val destinoSelecionado: Pair<Long, String>? =
         if (destinoSelecionadoId >= 0) Pair(destinoSelecionadoId, destinoSelecionadoNome) else null
     // Só usado quando rotaContinua — texto digitado livremente pelo motorista.
-    var destinoLivre by rememberSaveable { mutableStateOf("") }
+    var destinoLivre by rememberSaveable { mutableStateOf(r["destinoLivre"] ?: "") }
 
     var placaExpandida by remember { mutableStateOf(false) }
+    var buscaPlaca by remember { mutableStateOf("") }
     var veiculoSelecionadoId by rememberSaveable { mutableStateOf(-1L) }
     var placaSelecionada by rememberSaveable { mutableStateOf("") }
 
@@ -186,8 +206,23 @@ actual fun IniciarViagemScreen(
         kmInicio = TextFieldValue(texto, TextRange(texto.length))
         kmAutoPreenchido = texto.isNotEmpty()
     }
-    var pesoCarga by rememberSaveableTextField("")
+    var pesoCarga by rememberSaveableTextField(r["peso"] ?: "")
     val cameraState = rememberCameraState(context, prefix = "VIAG")
+
+    util.SalvarRascunhoAutomatico(
+        rascunho,
+        "numerobd" to numerobd, "cte" to cte, "numerobd2" to numerobd2, "cte2" to cte2,
+        "destinoId" to if (destinoSelecionadoId >= 0) destinoSelecionadoId.toString() else "",
+        "destinoLivre" to destinoLivre, "peso" to pesoCarga.text
+    )
+
+    fun limparFormulario() {
+        numerobd = ""; cte = ""; numerobd2 = ""; cte2 = ""; mostrarCampos2 = false
+        destinoSelecionadoId = -1L; destinoSelecionadoNome = ""; destinoLivre = ""
+        pesoCarga = TextFieldValue("")
+        rascunho.limpar(encerrar = false)
+        mostrarAvisoRascunho = false
+    }
 
     var loading by remember { mutableStateOf(false) }
 
@@ -326,6 +361,10 @@ actual fun IniciarViagemScreen(
                 }
             }
         }
+        // Viagem anterior finalizada, mas ainda subindo — BLOQUEIA com explicação
+        else if (finalizacaoAnteriorNaFila) {
+            FinalizacaoAnteriorNaFilaAviso(modifier = Modifier.padding(padding), onVoltar = onVoltar)
+        }
         // Já tem viagem em andamento - BLOQUEIA
         else if (viagemEmAndamento != null) {
             Column(
@@ -377,13 +416,23 @@ actual fun IniciarViagemScreen(
 
                         Spacer(Modifier.height(20.dp))
 
+                        // Atalho direto — antes só tinha "Voltar", e o motorista
+                        // tinha que achar o Finalizar na barra de baixo.
                         Button(
-                            onClick = onVoltar,
+                            onClick = onFinalizarViagem,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Voltar ao Início", fontWeight = FontWeight.Bold)
+                            Text("Finalizar esta viagem", fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = onVoltar,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Voltar ao Início")
                         }
                     }
                 }
@@ -405,6 +454,10 @@ actual fun IniciarViagemScreen(
                     colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground)
                 ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                        if (mostrarAvisoRascunho) {
+                            util.RascunhoRecuperadoAviso(onLimpar = { limparFormulario() })
+                            Spacer(Modifier.height(12.dp))
+                        }
 
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             OutlinedTextField(
@@ -475,56 +528,52 @@ actual fun IniciarViagemScreen(
                                 singleLine = true
                             )
                         } else {
-                            ExposedDropdownMenuBox(expanded = destinoExpandido, onExpandedChange = { destinoExpandido = it }) {
-                                OutlinedTextField(
-                                    value = destinoSelecionado?.second ?: "",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    label = { Text("Rota *") },
-                                    leadingIcon = { Icon(Icons.Default.Route, null, tint = AppColors.Primary) },
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = destinoExpandido) },
-                                    modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                    colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp)
-                                )
-                                ExposedDropdownMenu(expanded = destinoExpandido, onDismissRequest = { destinoExpandido = false }) {
-                                    destinos.forEach { destino ->
-                                        DropdownMenuItem(
-                                            text = { Text(destino.nome) },
-                                            onClick = {
-                                                destinoSelecionadoId = destino.servidor_id
-                                                destinoSelecionadoNome = destino.nome
-                                                destinoExpandido = false
-                                            }
-                                        )
-                                    }
+                            // Mesmo campo do iOS (lista dentro da tela), com busca
+                            // quando a empresa tem muitas rotas.
+                            ui.AppDropdownField(
+                                label = "Rota *",
+                                selectedText = destinoSelecionado?.second ?: "",
+                                expanded = destinoExpandido,
+                                onExpandedChange = { destinoExpandido = it; buscaRota = "" },
+                                leadingIcon = { Icon(Icons.Default.Route, null, tint = AppColors.Primary) },
+                                modifier = Modifier.fillMaxWidth(),
+                                busca = if (destinos.size >= ui.ITENS_PARA_BUSCA) buscaRota else null,
+                                onBuscaChange = { buscaRota = it }
+                            ) {
+                                destinos.filter { ui.combinaBusca(it.nome, buscaRota) }.forEach { destino ->
+                                    ui.AppDropdownMenuItem(
+                                        text = { Text(destino.nome) },
+                                        onClick = {
+                                            destinoSelecionadoId = destino.servidor_id
+                                            destinoSelecionadoNome = destino.nome
+                                            destinoExpandido = false
+                                        }
+                                    )
                                 }
                             }
                         }
 
                         Spacer(Modifier.height(12.dp))
 
-                        ExposedDropdownMenuBox(expanded = placaExpandida, onExpandedChange = { placaExpandida = it }) {
-                            OutlinedTextField(
-                                value = placaSelecionada,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Veículo (Cavalo Mecânico / Caminhão) *") },
-                                leadingIcon = { Icon(Icons.Default.LocalShipping, null, tint = AppColors.Primary) },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = placaExpandida) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(),
-                                colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp)
-                            )
-                            ExposedDropdownMenu(expanded = placaExpandida, onDismissRequest = { placaExpandida = false }) {
-                                veiculos.forEach { equip ->
-                                    DropdownMenuItem(
-                                        text = { Text(equip.placa) },
-                                        onClick = {
-                                            veiculoSelecionadoId = equip.servidor_id
-                                            placaSelecionada = equip.placa
-                                            placaExpandida = false
-                                        }
-                                    )
-                                }
+                        ui.AppDropdownField(
+                            label = "Veículo (Cavalo Mecânico / Caminhão) *",
+                            selectedText = placaSelecionada,
+                            expanded = placaExpandida,
+                            onExpandedChange = { placaExpandida = it; buscaPlaca = "" },
+                            leadingIcon = { Icon(Icons.Default.LocalShipping, null, tint = AppColors.Primary) },
+                            modifier = Modifier.fillMaxWidth(),
+                            busca = if (veiculos.size >= ui.ITENS_PARA_BUSCA) buscaPlaca else null,
+                            onBuscaChange = { buscaPlaca = it }
+                        ) {
+                            veiculos.filter { ui.combinaBusca(it.placa, buscaPlaca) }.forEach { equip ->
+                                ui.AppDropdownMenuItem(
+                                    text = { Text(equip.placa) },
+                                    onClick = {
+                                        veiculoSelecionadoId = equip.servidor_id
+                                        placaSelecionada = equip.placa
+                                        placaExpandida = false
+                                    }
+                                )
                             }
                         }
 
@@ -688,25 +737,23 @@ actual fun IniciarViagemScreen(
                         Button(
                             onClick = {
                                 scope.launch {
-                                    if (numerobd.isBlank()) { mostrarMensagem("Informe a Ordem de Frete", isErro = true); return@launch }
-                                    if (cte.isBlank()) { mostrarMensagem("Informe o Nº do CTE", isErro = true); return@launch }
-                                    if (rotaContinua) {
-                                        if (destinoLivre.isBlank()) { mostrarMensagem("Informe o destino", isErro = true); return@launch }
-                                    } else {
-                                        if (destinoSelecionado == null) { mostrarMensagem("Selecione uma Rota", isErro = true); return@launch }
-                                    }
-                                    if (placaSelecionada.isBlank()) { mostrarMensagem("Selecione a Placa", isErro = true); return@launch }
-                                    if (dataViagem.isBlank()) { mostrarMensagem("Informe a Data da Viagem", isErro = true); return@launch }
-                                    if (kmInicio.text.isBlank()) { mostrarMensagem("Informe o KM de Início", isErro = true); return@launch }
-
+                                    // Tudo o que falta numa janela só (ver mensagemCamposFaltando).
                                     // Peso da Carga não é exigido em Rota Contínua. Valor do
                                     // Frete não é mais pedido aqui em nenhum dos dois modos —
                                     // frete agora é lançado só em "Adicionar Frete" (Despesas).
-                                    if (!rotaContinua) {
-                                        if (pesoCarga.text.isBlank()) { mostrarMensagem("Informe o Peso da Carga", isErro = true); return@launch }
+                                    val faltando = buildList {
+                                        if (numerobd.isBlank()) add("Ordem de Frete")
+                                        if (cte.isBlank()) add("Nº do CT-e")
+                                        if (rotaContinua) {
+                                            if (destinoLivre.isBlank()) add("Destino")
+                                        } else if (destinoSelecionado == null) add("Rota")
+                                        if (placaSelecionada.isBlank()) add("Veículo (placa)")
+                                        if (dataViagem.isBlank()) add("Data da viagem")
+                                        if (kmInicio.text.isBlank()) add("KM de início")
+                                        if (!rotaContinua && pesoCarga.text.isBlank()) add("Peso da carga")
+                                        if (cameraState.base64 == null) add("Foto do hodômetro na saída")
                                     }
-
-                                    if (cameraState.base64 == null) { mostrarMensagem("Tire a foto do painel de saída", isErro = true); return@launch }
+                                    util.mensagemCamposFaltando(faltando)?.let { mostrarMensagem(it, isErro = true); return@launch }
 
                                     loading = true
 
@@ -732,7 +779,7 @@ actual fun IniciarViagemScreen(
 
                                     // PRIMEIRO: Tentar API
                                     try {
-                                        val response = ApiClient.inserirViagem(
+                                        val response = kotlinx.coroutines.withTimeoutOrNull(ESPERA_MAXIMA_INICIAR_VIAGEM_MS) { ApiClient.inserirViagem(
                                             ViagemRequest(
 
                                                 motorista_id = motorista?.motorista_id ?: "",
@@ -752,7 +799,7 @@ actual fun IniciarViagemScreen(
                                                 valorfrete = null,
                                                 foto_painel_saida = cameraState.base64
                                             )
-                                        )
+                                        ) } ?: throw Exception("timeout: servidor não respondeu a tempo")
 
                                         if (response.status == "ok") {
                                             // API salvou com sucesso
@@ -768,6 +815,7 @@ actual fun IniciarViagemScreen(
                                                 implemento2Placa = if (implemento2Visivel) implemento2Placa.ifBlank { null } else null
                                             )
                                             repository.salvarUltimoVeiculoUsado(placaSelecionada, veiculoSelecionadoId.takeIf { it > 0 })
+                                            rascunho.limpar()
                                             mostrarMensagem("Viagem registrada com sucesso!")
                                         } else {
                                             // API retornou erro de VALIDAÇÃO (dados inválidos, motorista não encontrado, etc.)
@@ -843,6 +891,7 @@ actual fun IniciarViagemScreen(
                                             implemento2Placa = if (implemento2Visivel) implemento2Placa.ifBlank { null } else null
                                         )
                                         repository.salvarUltimoVeiculoUsado(placaSelecionada, veiculoSelecionadoId.takeIf { it > 0 })
+                                        rascunho.limpar()
                                         mostrarMensagem("Sem internet. Viagem salva e será sincronizada automaticamente quando conectar.")
                                     }
 

@@ -24,8 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import api.ApiClient
 import database.AppRepository
-import database.TipoDespesaSync
-import database.TipoCombustivelSync
 import kotlinx.coroutines.delay
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -117,6 +115,11 @@ fun DashboardScreen(
                             onSucesso = {
                                 voltar()
                                 AppEvents.emitir(AppEvent.ViagemAtualizada)
+                            },
+                            // Troca o Iniciar pelo Finalizar na pilha — voltar
+                            // do Finalizar cai no painel, não no Iniciar.
+                            onFinalizarViagem = {
+                                setBackStack(parseBackStack().dropLast(1) + Screen.FINALIZAR_VIAGEM)
                             }
                         )
                         Screen.MINHAS_VIAGENS -> MinhasViagensScreen(
@@ -327,8 +330,15 @@ private fun DashboardContent(
     // admin marcasse um item como resolvido, o motorista só via sumir
     // deslogando e logando de novo. Agora também recarrega ao voltar pro
     // Dashboard e no pull-to-refresh (ver mais abaixo).
-    suspend fun carregarAvisos() {
+    // Cada volta ao painel disparava essas 3 chamadas de novo — com 2G,
+    // atrasava o resto. Agora no máximo a cada 10 min (o puxar pra atualizar
+    // força).
+    var ultimaCargaAvisos by remember { mutableStateOf(0L) }
+    suspend fun carregarAvisos(forcar: Boolean = false) {
         val motoristaId = motorista?.motorista_id ?: return
+        val agora = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+        if (!forcar && agora - ultimaCargaAvisos < 10 * 60 * 1000L) return
+        ultimaCargaAvisos = agora
         try {
             val resp = api.ApiClient.planoManutencaoPendente(motoristaId)
             if (resp.status == "ok") planoManutencaoPendente = resp.itens
@@ -593,7 +603,8 @@ private fun DashboardContent(
                 scope.launch {
                     verificarViagem()
                     pendentes = repository.countTotalPendentes()
-                    carregarAvisos()
+                    carregarAvisos(forcar = true)
+                    sync.CatalogoSync.atualizar(repository, forcar = true)
                     if (temInternet && pendentes > 0 && syncStatus.state == SyncState.IDLE) {
                         executarSync(silencioso = true)
                     }
@@ -629,7 +640,7 @@ private fun DashboardContent(
             }
 
             if (planoManutencaoPendente.isNotEmpty()) {
-                PlanoManutencaoAlertCard(planoManutencaoPendente)
+                PlanoManutencaoAlertCard(planoManutencaoPendente, onRegistrar = { onNavigate(Screen.MANUTENCAO) })
                 Spacer(Modifier.height(12.dp))
             }
 
@@ -644,18 +655,29 @@ private fun DashboardContent(
                 VerificandoViagemCard()
             } else if (viagemAtualInfo != null) {
                 val viagemLocal = remember(viagemAtualId) { repository.getViagemAtual() }
-                viagemAtualInfo?.let { info -> viagemAtualId?.let { id ->
+                viagemAtualInfo?.let { info ->
                     ViagemStatusCard(
                         viagemInfo = info,
-                        viagemId = id,
                         modoOffline = modoOffline,
                         temInternet = temInternet,
                         kmInicio = viagemLocal?.km_inicio ?: "",
-                        dataInicio = viagemLocal?.data_inicio ?: ""
+                        dataInicio = viagemLocal?.data_inicio ?: "",
+                        placa = viagemLocal?.placa ?: ""
                     )
-                } }
+                }
             } else {
                 SemViagemCard()
+            }
+
+            // Botões grandes do que o motorista mais faz (ver AcoesPrincipais).
+            if (!verificandoViagem) {
+                Spacer(Modifier.height(12.dp))
+                AcoesPrincipais(
+                    temViagem = viagemAtualId != null,
+                    onIniciar = { mensagem = null; onNavigate(Screen.INICIAR_VIAGEM) },
+                    onAbastecer = { mensagem = null; onNavigate(Screen.ADICIONAR_COMBUSTIVEL) },
+                    onFinalizar = { mensagem = null; onNavigate(Screen.FINALIZAR_VIAGEM) }
+                )
             }
 
             Spacer(Modifier.height(12.dp))
@@ -770,21 +792,10 @@ private fun DashboardMenuItems(
     // Agora navega sempre e tenta sync em background. As telas internas
     // devem lidar com dados desatualizados mostrando aviso.
     //
-    // Antes esse sync rodava e o resultado era simplesmente descartado (nem
-    // destino/equipamento eram salvos) — persiste os 5 catálogos agora,
-    // senão essa sincronização periódica nunca serve pra nada de verdade.
+    // Catálogos no máximo uma vez por hora (ver CatalogoSync) — antes cada
+    // toque nestes botões baixava tudo de novo.
     suspend fun sincronizarCatalogos() {
-        try {
-            val sync = ApiClient.syncDados(repository.getMotoristaLogado()?.motorista_id ?: "")
-            if (sync.status == "ok") {
-                repository.salvarDestinos(sync.destinos.map { it.id to it.nome })
-                repository.salvarEquipamentos(sync.equipamentos)
-                repository.salvarConfiguracaoEmpresa(sync.configuracoes.tipo_operacao)
-                repository.salvarFormasPagamento(sync.formas_pagamento.map { Triple(it.id, it.nome, it.codigo) })
-                repository.salvarTiposDespesa(sync.tipos_despesa.map { TipoDespesaSync(it.id, it.nome, it.icone, it.cor) })
-                repository.salvarTiposCombustivel(sync.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) })
-            }
-        } catch (_: Exception) { }
+        sync.CatalogoSync.atualizar(repository)
     }
 
     MenuButton(ui.Lucide.List, "Minhas Viagens", AppColors.Purple) {

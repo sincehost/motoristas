@@ -2,8 +2,6 @@ package sync
 
 import api.*
 import database.AppRepository
-import database.TipoDespesaSync
-import database.TipoCombustivelSync
 import br.com.lfsystem.app.database.Motorista
 import util.LogWriter
 import kotlinx.datetime.Clock
@@ -106,8 +104,9 @@ class SyncManager(private val repository: AppRepository) {
 
     /**
      * Executa sincronização completa de todos os dados pendentes.
-     * Ordem: Viagens → Atualizar IDs → Abastecimentos → ARLAs → Descargas
-     *        → Manutenções → Finalizações → Outras Despesas → Checklists
+     * Ordem: Viagens → Atualizar IDs → Abastecimentos → ARLAs → Fretes
+     *        → Descargas → Manutenções → Outras Despesas → Checklists
+     *        → Finalizações (sempre por último)
      *
      * @param motorista Motorista logado (nullable para segurança)
      * @param silencioso Se true, não emite status SUCCESS quando não há pendentes
@@ -196,8 +195,27 @@ class SyncManager(private val repository: AppRepository) {
         val mapaIdsViagens = mutableMapOf<Long, Long>()
 
         // ========================================
+        // PASSO 0: FINALIZAÇÕES JÁ PRONTAS (viagem com id do servidor e sem
+        // lançamento pendente). Têm que sair ANTES das viagens novas: com a
+        // anterior ainda aberta no servidor, a nova é recusada ("Você já tem
+        // uma viagem em andamento"). As que ainda esperam lançamentos ficam
+        // pro último passo.
+        // ========================================
+        val finalizacoesJaTentadas = mutableSetOf<Long>()
+        for (finalizacao in repository.getFinalizacoesParaSincronizar()) {
+            if (repository.idViagemNoServidor(finalizacao.viagem_id) <= 0) continue
+            if (repository.temLancamentosPendentesDaViagem(finalizacao.viagem_id)) continue
+            finalizacoesJaTentadas += finalizacao.id
+            val resultado = sincronizarFinalizacao(finalizacao, motorista)
+            if (resultado.sucesso) sucessos++ else erros.add(resultado.erro)
+            progresso++
+            onStatusUpdate(SyncStatus(state = SyncState.SYNCING, progress = progresso, total = totalItens))
+        }
+
+        // ========================================
         // PASSO 1: SINCRONIZAR VIAGENS PRIMEIRO
         // ========================================
+        val progressoAntesViagens = progresso
         val viagens = repository.getViagensParaSincronizar()
         LogWriter.log("📤 Sincronizando ${viagens.size} viagens...")
         for (viagem in viagens) {
@@ -215,7 +233,7 @@ class SyncManager(private val repository: AppRepository) {
             progresso++
             onStatusUpdate(SyncStatus(
                 state = SyncState.SYNCING,
-                message = "Viagens: $progresso/${viagens.size}",
+                message = "Viagens: ${progresso - progressoAntesViagens}/${viagens.size}",
                 progress = progresso,
                 total = totalItens
             ))
@@ -232,18 +250,19 @@ class SyncManager(private val repository: AppRepository) {
             for ((idLocal, idServidor) in mapaIdsViagens) {
                 LogWriter.log("   📝 Atualizando: $idLocal -> $idServidor")
 
-                // CORREÇÃO: Dependentes podem ter viagem_id = idLocal (positivo)
-                // OU viagem_id = -idLocal (negativo, formato usado pelo ViagemAtual offline).
-                // Precisamos atualizar AMBOS os formatos.
-
-                // 1. Atualizar itens com viagem_id = idLocal (formato da tabela Viagem)
-                repository.atualizarViagemIdEmDependentes(idLocal, idServidor)
-                LogWriter.log("   ✅ Atualizados dependentes com viagem_id=$idLocal -> $idServidor")
-
-                // 2. Atualizar itens com viagem_id = -idLocal (formato negativo do ViagemAtual offline)
+                // Dependentes de viagem offline guardam viagem_id = -idLocal
+                // (formato do ViagemAtual offline). Antes também trocava os
+                // que tinham viagem_id = +idLocal, mas nenhuma tela grava
+                // assim — e um id positivo é id de viagem do servidor: numa
+                // empresa com ids baixos, movia lançamentos de outra viagem.
                 val idNegativo = -idLocal
                 repository.atualizarViagemIdEmDependentes(idNegativo, idServidor)
                 LogWriter.log("   ✅ Atualizados dependentes com viagem_id=$idNegativo -> $idServidor")
+
+                // A viagem em andamento também troca pro id do servidor — senão
+                // o que for lançado depois (até o painel recarregar com sinal)
+                // ainda sai com o id provisório.
+                repository.atualizarIdViagemAtual(idNegativo, idServidor)
             }
 
             LogWriter.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -270,7 +289,7 @@ class SyncManager(private val repository: AppRepository) {
             progresso++
             onStatusUpdate(SyncStatus(
                 state = SyncState.SYNCING,
-                message = "Abastecimentos: ${progresso - viagens.size}/${abastecimentos.size}",
+                message = "Abastecimentos: ${progresso - progressoAntesViagens - viagens.size}/${abastecimentos.size}",
                 progress = progresso,
                 total = totalItens
             ))
@@ -287,7 +306,7 @@ class SyncManager(private val repository: AppRepository) {
             progresso++
             onStatusUpdate(SyncStatus(
                 state = SyncState.SYNCING,
-                message = "ARLAS: ${progresso - viagens.size - abastecimentos.size}/${arlas.size}",
+                message = "ARLAS: ${progresso - progressoAntesViagens - viagens.size - abastecimentos.size}/${arlas.size}",
                 progress = progresso,
                 total = totalItens
             ))
@@ -330,19 +349,7 @@ class SyncManager(private val repository: AppRepository) {
         }
 
         // ========================================
-        // PASSO 7: SINCRONIZAR FINALIZAÇÕES
-        // ========================================
-        val finalizacoes = repository.getFinalizacoesParaSincronizar()
-        LogWriter.log("📤 Sincronizando ${finalizacoes.size} finalizações...")
-        for (finalizacao in finalizacoes) {
-            val resultado = sincronizarFinalizacao(finalizacao, motorista)
-            if (resultado.sucesso) sucessos++ else erros.add(resultado.erro)
-            progresso++
-            onStatusUpdate(SyncStatus(state = SyncState.SYNCING, progress = progresso, total = totalItens))
-        }
-
-        // ========================================
-        // PASSO 8: SINCRONIZAR OUTRAS DESPESAS
+        // PASSO 7: SINCRONIZAR OUTRAS DESPESAS
         // ========================================
         val outrasDespesas = repository.getOutrasDespesasParaSincronizar()
         LogWriter.log("📤 Sincronizando ${outrasDespesas.size} outras despesas...")
@@ -354,7 +361,7 @@ class SyncManager(private val repository: AppRepository) {
         }
 
         // ========================================
-        // PASSO 9: SINCRONIZAR CHECKLISTS PRÉ-VIAGEM
+        // PASSO 8: SINCRONIZAR CHECKLISTS PRÉ-VIAGEM
         // ========================================
         val checklistsPre = repository.getChecklistsPreParaSincronizar()
         LogWriter.log("📤 Sincronizando ${checklistsPre.size} checklists pré-viagem...")
@@ -366,12 +373,33 @@ class SyncManager(private val repository: AppRepository) {
         }
 
         // ========================================
-        // PASSO 10: SINCRONIZAR CHECKLISTS PÓS-VIAGEM
+        // PASSO 9: SINCRONIZAR CHECKLISTS PÓS-VIAGEM
         // ========================================
         val checklistsPos = repository.getChecklistsPosParaSincronizar()
         LogWriter.log("📤 Sincronizando ${checklistsPos.size} checklists pós-viagem...")
         for (checklist in checklistsPos) {
             val resultado = sincronizarChecklistPos(checklist, motorista)
+            if (resultado.sucesso) sucessos++ else erros.add(resultado.erro)
+            progresso++
+            onStatusUpdate(SyncStatus(state = SyncState.SYNCING, progress = progresso, total = totalItens))
+        }
+
+        // ========================================
+        // PASSO 10: SINCRONIZAR FINALIZAÇÕES — sempre por último. O servidor
+        // recusa qualquer lançamento numa viagem já finalizada, então a
+        // finalização só sai quando nada daquela viagem estiver pendente
+        // (inclusive o que falhou agora há pouco por sinal fraco).
+        // ========================================
+        val finalizacoes = repository.getFinalizacoesParaSincronizar().filter { it.id !in finalizacoesJaTentadas }
+        LogWriter.log("📤 Sincronizando ${finalizacoes.size} finalizações...")
+        for (finalizacao in finalizacoes) {
+            val resultado = if (repository.temLancamentosPendentesDaViagem(finalizacao.viagem_id)) {
+                LogWriter.log("  ⏳ Finalização da viagem ${finalizacao.viagem_id} aguardando lançamentos pendentes")
+                repository.marcarFinalizacaoErro(finalizacao.id, util.MSG_FINALIZACAO_AGUARDANDO_LANCAMENTOS)
+                SyncItemResult(sucesso = false, erro = "Finalização: ${util.MSG_FINALIZACAO_AGUARDANDO_LANCAMENTOS}")
+            } else {
+                sincronizarFinalizacao(finalizacao, motorista)
+            }
             if (resultado.sucesso) sucessos++ else erros.add(resultado.erro)
             progresso++
             onStatusUpdate(SyncStatus(state = SyncState.SYNCING, progress = progresso, total = totalItens))
@@ -424,8 +452,10 @@ class SyncManager(private val repository: AppRepository) {
 
     suspend fun verificarConectividade(): Boolean {
         return try {
+            // Chamada leve (index.php) — antes baixava o catálogo inteiro
+            // (sync.php) só pra saber se tinha internet, a cada sincronização.
             LogWriter.log("🌐 Verificando conectividade...")
-            ApiClient.syncDados(repository.getMotoristaLogado()?.motorista_id ?: "")
+            ApiClient.ping()
             LogWriter.log("✅ Internet OK")
             true
         } catch (e: Exception) {
@@ -477,6 +507,18 @@ class SyncManager(private val repository: AppRepository) {
                 if (response.viagens.isNotEmpty()) {
                     val viagem = response.viagens.first()
 
+                    // Já finalizada no celular, finalização ainda na fila
+                    // (esperando lançamentos subirem): o servidor ainda a vê
+                    // aberta, mas pro motorista ela acabou — não reabrir.
+                    if (repository.temFinalizacaoPendenteDaViagem(viagem.id.toLong())) {
+                        LogWriter.log("⏳ Viagem ${viagem.id} aberta no servidor, mas finalização está na fila — não reabrindo")
+                        repository.limparViagemAtual()
+                        onLoading(false)
+                        onModoOffline(false)
+                        onSemViagem()
+                        return
+                    }
+
                     // Preservar km_inicio local se API retornar vazio
                     val viagemLocalExistente = repository.getViagemAtual()
                     val kmInicioParaSalvar = if (viagem.km_inicio.isNotEmpty()) {
@@ -488,29 +530,23 @@ class SyncManager(private val repository: AppRepository) {
                     // Preservar km_rota que já estava salvo localmente
                     val kmRotaExistente = viagemLocalExistente?.km_rota ?: "0"
 
-                    repository.salvarViagemAtual(
+                    repository.salvarViagemAtualComComposicao(
                         viagemId = viagem.id.toLong(),
                         destino = viagem.destino,
                         dataInicio = viagem.data,
                         kmInicio = kmInicioParaSalvar,
-                        kmRota = kmRotaExistente
+                        kmRota = kmRotaExistente,
+                        placa = viagem.placa,
+                        veiculoId = viagem.veiculo_id?.toLong(),
+                        implemento1Placa = viagem.implemento1_placa,
+                        implemento2Placa = viagem.implemento2_placa
                     )
                     onLoading(false)
                     onModoOffline(false)
                     onViagemEncontrada(viagem.id.toLong(), viagem.destino)
 
-                    // Tenta sincronizar destinos/equipamentos/catálogos em background
-                    try {
-                        val syncResp = ApiClient.syncDados(repository.getMotoristaLogado()?.motorista_id ?: "")
-                        if (syncResp.status == "ok") {
-                            repository.salvarDestinos(syncResp.destinos.map { it.id to it.nome })
-                            repository.salvarEquipamentos(syncResp.equipamentos)
-                            repository.salvarConfiguracaoEmpresa(syncResp.configuracoes.tipo_operacao)
-                            repository.salvarFormasPagamento(syncResp.formas_pagamento.map { Triple(it.id, it.nome, it.codigo) })
-                            repository.salvarTiposDespesa(syncResp.tipos_despesa.map { TipoDespesaSync(it.id, it.nome, it.icone, it.cor) })
-                            repository.salvarTiposCombustivel(syncResp.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) })
-                        }
-                    } catch (_: Exception) { }
+                    // Catálogos: no máximo uma vez por hora (ver CatalogoSync)
+                    CatalogoSync.atualizar(repository)
                     return
                 } else {
                     val viagemLocal = repository.getViagemAtual()
@@ -696,10 +732,21 @@ class SyncManager(private val repository: AppRepository) {
             LogWriter.log("   mensagem: ${resp.mensagem ?: "sem mensagem"}")
             LogWriter.log("   viagem_id: ${resp.viagem_id ?: "NULL"}")
 
-            if (resp.status == "ok") {
+            // Reenvio depois de tempo esgotado: a 1ª tentativa chegou e foi
+            // salva, a resposta é que não voltou. O servidor responde "já foi
+            // cadastrada" sem dizer o id — sem ele, a viagem e tudo lançado
+            // nela ficavam presos pra sempre. Como o motorista só pode ter uma
+            // viagem aberta, a aberta dele com a mesma placa e data é esta.
+            val idJaCadastrada = if (resp.status != "ok" && resp.mensagem?.contains("já foi cadastrada", ignoreCase = true) == true)
+                buscarViagemAbertaIgual(viagem, motorista) else null
+            if (idJaCadastrada != null) {
+                LogWriter.log("✅ Viagem ${viagem.id} já estava no servidor (id $idJaCadastrada) — reaproveitando")
+            }
+
+            if (resp.status == "ok" || idJaCadastrada != null) {
                 repository.marcarViagemSincronizada(viagem.id)
                 repository.marcarViagemErro(viagem.id, null)
-                val viagemIdServidor = resp.viagem_id?.toLong()
+                val viagemIdServidor = idJaCadastrada ?: resp.viagem_id?.toLong()
 
                 if (viagemIdServidor != null) {
                     // Salvar mapeamento idLocal -> idServidor
@@ -727,6 +774,21 @@ class SyncManager(private val repository: AppRepository) {
             repository.marcarViagemErro(viagem.id, util.mensagemErroAmigavel(e.message))
             SyncItemResult(sucesso = false, erro = "Viagem: ${util.mensagemErroAmigavel(e.message)}")
         }
+    }
+
+    /** Id da viagem aberta do motorista no servidor com a mesma placa e data
+     * desta viagem local, ou null se não houver / sem conexão. */
+    private suspend fun buscarViagemAbertaIgual(
+        viagem: br.com.lfsystem.app.database.Viagem,
+        motorista: Motorista?
+    ): Long? = try {
+        ApiClient.abastecimentoDados(AbastecimentoDadosRequest(motorista_id = motorista?.motorista_id ?: ""))
+            .viagens
+            .firstOrNull { it.placa == viagem.placa && it.data.take(10) == viagem.data_viagem.take(10) }
+            ?.id?.toLong()
+    } catch (e: Exception) {
+        LogWriter.log("⚠️ Não deu pra conferir viagem já cadastrada: ${e.message}")
+        null
     }
 
     private suspend fun sincronizarAbastecimento(
@@ -984,9 +1046,11 @@ class SyncManager(private val repository: AppRepository) {
             // no fallback "última viagem do servidor" e a manutenção ia parar
             // numa viagem que não tinha nada a ver (ou travava se não houvesse
             // nenhuma).
+            // Sem plano B "última viagem do servidor": se a viagem offline
+            // ainda não subiu, a manutenção espera em vez de cair noutra viagem.
             val semViagem = manutencao.viagem_id == 0L
             val viagemIdParaEnviar = if (semViagem) 0L
-                else resolverViagemId(manutencao.viagem_id, repository.getUltimaViagemServidor(), "Manutenção")
+                else resolverViagemId(manutencao.viagem_id, null, "Manutenção")
 
             if (!semViagem && viagemIdParaEnviar <= 0) {
                 LogWriter.log("  ⏳ Manutenção viagem_id ainda não resolvido ($viagemIdParaEnviar), aguardando próximo sync")
@@ -1039,10 +1103,12 @@ class SyncManager(private val repository: AppRepository) {
         return try {
             val teveRetorno = finalizacao.teve_retorno == 1L
 
-            // CORREÇÃO: Resolver viagem_id negativo para o ID real do servidor
-            // Antes, enviava finalizacao.viagem_id direto (que pode ser -1, -2, etc.)
+            // Resolve viagem_id negativo para o ID real do servidor. Sem plano
+            // B "última viagem do servidor": com a viagem offline ainda sem
+            // subir, ele mandava a finalização pra viagem ANTERIOR — o servidor
+            // dizia "já foi finalizada", ela era marcada como enviada e sumia.
             val viagemIdOriginal = finalizacao.viagem_id
-            val viagemIdParaEnviar = resolverViagemId(viagemIdOriginal, repository.getUltimaViagemServidor(), "Finalização")
+            val viagemIdParaEnviar = resolverViagemId(viagemIdOriginal, null, "Finalização")
 
             LogWriter.log("━━━ SYNC FINALIZAÇÃO ━━━")
             LogWriter.log("  viagem_id original: $viagemIdOriginal")
@@ -1152,8 +1218,8 @@ class SyncManager(private val repository: AppRepository) {
                     SyncItemResult(sucesso = false, erro = "OutraDespesa: ${resp.mensagem}")
                 }
             } catch (e: Exception) {
-                LogWriter.log("⚠️ API de outras despesas não disponível, mantendo para próxima sync: ${e.message}")
-                repository.marcarOutraDespesaErro(despesa.id, "API não disponível ainda")
+                LogWriter.log("⚠️ Falha ao enviar outra despesa, mantendo para próxima sync: ${e.message}")
+                repository.marcarOutraDespesaErro(despesa.id, util.mensagemErroAmigavel(e.message))
                 SyncItemResult(sucesso = false, erro = "OutraDespesa: ${util.mensagemErroAmigavel(e.message)}")
             }
         } catch (e: Exception) {
@@ -1167,10 +1233,17 @@ class SyncManager(private val repository: AppRepository) {
         motorista: Motorista?
     ): SyncItemResult {
         return try {
+            // Mesma resolução de id dos outros lançamentos — checklist feito
+            // numa viagem iniciada offline sai com o id provisório (negativo).
+            val viagemIdParaEnviar = resolverViagemId(checklist.viagem_id, null, "ChecklistPré")
+            if (viagemIdParaEnviar <= 0) {
+                LogWriter.log("  ⏳ ChecklistPré viagem_id ainda não resolvido ($viagemIdParaEnviar), aguardando próximo sync")
+                return SyncItemResult(sucesso = false, erro = "ChecklistPré: aguardando viagem ser sincronizada primeiro")
+            }
             val resp = comRetry("ChecklistPré") { ApiClient.salvarChecklistPre(
                 SalvarChecklistPreRequest(
                     motorista_id = motorista?.motorista_id ?: "",
-                    viagem_id = checklist.viagem_id.toInt(),
+                    viagem_id = viagemIdParaEnviar.toInt(),
                     data_checklist = checklist.data_checklist, placa = checklist.placa,
                     doc_cnh_valida = checklist.doc_cnh_valida.toInt(), doc_crlv_veiculo = checklist.doc_crlv_veiculo.toInt(),
                     doc_antt_valida = checklist.doc_antt_valida.toInt(), doc_seguro_carga = checklist.doc_seguro_carga.toInt(),
@@ -1214,10 +1287,15 @@ class SyncManager(private val repository: AppRepository) {
         motorista: Motorista?
     ): SyncItemResult {
         return try {
+            val viagemIdParaEnviar = resolverViagemId(checklist.viagem_id, null, "ChecklistPós")
+            if (viagemIdParaEnviar <= 0) {
+                LogWriter.log("  ⏳ ChecklistPós viagem_id ainda não resolvido ($viagemIdParaEnviar), aguardando próximo sync")
+                return SyncItemResult(sucesso = false, erro = "ChecklistPós: aguardando viagem ser sincronizada primeiro")
+            }
             val resp = comRetry("ChecklistPós") { ApiClient.salvarChecklistPos(
                 SalvarChecklistPosRequest(
                     motorista_id = motorista?.motorista_id ?: "",
-                    viagem_id = checklist.viagem_id.toInt(),
+                    viagem_id = viagemIdParaEnviar.toInt(),
                     data_checklist = checklist.data_checklist, placa = checklist.placa,
                     avaria_carroceria = checklist.avaria_carroceria.toInt(), avaria_cabine = checklist.avaria_cabine.toInt(),
                     avaria_pneus = checklist.avaria_pneus.toInt(), avaria_espelhos = checklist.avaria_espelhos.toInt(),

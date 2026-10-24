@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -38,6 +39,10 @@ fun AppDropdownField(
     modifier: Modifier = Modifier,
     leadingIcon: (@Composable () -> Unit)? = null,
     isError: Boolean = false,
+    /** Texto da busca no topo da lista aberta; null = sem campo de busca.
+     * Quem chama filtra os itens. Útil em frota/rotas grandes. */
+    busca: String? = null,
+    onBuscaChange: (String) -> Unit = {},
     content: @Composable () -> Unit
 ) {
     Column(modifier = modifier) {
@@ -78,6 +83,17 @@ fun AppDropdownField(
                 colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
+                if (busca != null) {
+                    OutlinedTextField(
+                        value = busca,
+                        onValueChange = onBuscaChange,
+                        placeholder = { Text("Buscar") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(8.dp),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -89,6 +105,17 @@ fun AppDropdownField(
             }
         }
     }
+}
+
+/** Quantos itens a lista precisa ter pra mostrar o campo de busca. */
+const val ITENS_PARA_BUSCA = 7
+
+/** Busca simples pra listas de seleção: ignora maiúsculas, espaço e hífen
+ * ("abc1d23" acha "ABC-1D23"). */
+fun combinaBusca(texto: String, busca: String): Boolean {
+    if (busca.isBlank()) return true
+    fun limpar(s: String) = s.lowercase().filterNot { it == '-' || it == ' ' }
+    return limpar(texto).contains(limpar(busca))
 }
 
 @Composable

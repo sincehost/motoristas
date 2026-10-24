@@ -1,5 +1,6 @@
 package screens
 
+import sync.CatalogoSync
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -484,6 +485,7 @@ fun LoginScreen(
                                                 repository.salvarTiposCombustivel(
                                                     sync.tipos_combustivel.map { TipoCombustivelSync(it.id, it.nome, it.requer_horas) }
                                                 )
+                                                CatalogoSync.marcarAtualizado()
                                             } else {
                                                 // Login prossegue mesmo assim (não bloqueia o motorista),
                                                 // mas antes essa falha ficava totalmente invisível — se

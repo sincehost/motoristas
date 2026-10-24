@@ -50,8 +50,8 @@ import util.rememberCameraState
 import util.rememberSaveableTextField
 import util.dataAtualFormatada
 import util.converterDataParaAPI
-import util.formatarKmInput
-import util.normalizarKmParaEnvio
+import util.formatarKmVeiculo
+import util.normalizarKmVeiculoParaEnvio
 import util.formatarKmExibicao
 import util.analisarTextoCupom
 import util.mensagemErroAmigavel
@@ -70,6 +70,7 @@ actual fun AdicionarCombustivelScreen(
 ) {
     val context = LocalContext.current
     val motorista = remember { repository.getMotoristaLogado() }
+    val postosRecentes = remember { repository.getPostosRecentes() }
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
@@ -153,7 +154,8 @@ actual fun AdicionarCombustivelScreen(
                     motorista_id = motorista?.motorista_id ?: ""
                 )
             )
-            if (response.status == "ok" && response.viagens.isNotEmpty()) {
+            if (response.status == "ok" && response.viagens.isNotEmpty() &&
+                !repository.temFinalizacaoPendenteDaViagem(response.viagens.first().id.toLong())) {
                 val viagem = response.viagens.first()
                 // Salva localmente para funcionar offline depois
                 repository.salvarViagemAtualComComposicao(
@@ -167,11 +169,10 @@ actual fun AdicionarCombustivelScreen(
                 )
                 modoOffline = false
 
-                // Atualiza equipamentos da API
-                val syncResp = api.ApiClient.syncDados(motorista?.motorista_id ?: "")
-                if (syncResp.status == "ok") {
-                    repository.salvarEquipamentos(syncResp.equipamentos)
-                    repository.salvarConfiguracaoEmpresa(syncResp.configuracoes.tipo_operacao)
+                // Atualiza equipamentos da API (no máximo 1x/hora). Antes, se
+                // esse download falhasse, caía no catch abaixo e a tela dizia
+                // "Nenhuma viagem em andamento" com a viagem já encontrada.
+                if (sync.CatalogoSync.atualizar(repository)) {
                     equipamentos = repository.getEquipamentosParaDropdown()
                 }
                 aplicarViagem(viagem, equipamentos)
@@ -187,21 +188,42 @@ actual fun AdicionarCombustivelScreen(
         carregando = false
     }
 
+    // Rascunho (util/Rascunho.kt): o que foi digitado volta se o motorista
+    // sair da tela antes de salvar. Amarrado à viagem em andamento.
+    val rascunho = util.rememberRascunho(repository, "abastecimento", repository.getViagemAtual()?.viagem_id?.toString() ?: "")
+    val r = rascunho.valores
+    var mostrarAvisoRascunho by remember { mutableStateOf(rascunho.recuperado) }
+
     // Campos do formulário
     var data by rememberSaveable { mutableStateOf(dataAtualFormatada()) }
-    var nomePosto by rememberSaveable { mutableStateOf("") }
-    var kmPosto by rememberSaveableTextField("")
-    var tipoCombustivel by rememberSaveable { mutableStateOf("") }
-    var horas by rememberSaveable { mutableStateOf("") }
-    var litrosAbastecidos by rememberSaveableTextField("")
-    var valorLitro by rememberSaveableTextField("")
-    var valorTotal by rememberSaveableTextField("")
-    var tipoPagamento by rememberSaveable { mutableStateOf("") }
+    var nomePosto by rememberSaveable { mutableStateOf(r["posto"] ?: "") }
+    var kmPosto by rememberSaveableTextField(r["km"] ?: "")
+    var tipoCombustivel by rememberSaveable { mutableStateOf(r["combustivel"] ?: "") }
+    var horas by rememberSaveable { mutableStateOf(r["horas"] ?: "") }
+    var litrosAbastecidos by rememberSaveableTextField(r["litros"] ?: "")
+    var valorLitro by rememberSaveableTextField(r["valorLitro"] ?: "")
+    var valorTotal by rememberSaveableTextField(r["valorTotal"] ?: "")
+    var tipoPagamento by rememberSaveable { mutableStateOf(r["pagamento"] ?: "") }
 
     // Valor do litro = total ÷ litros, calculado sozinho enquanto o motorista
     // não digitar nele. Se ele digitar (bomba mostra 3 casas, desconto etc.),
     // o app respeita o valor dele; apagar o campo volta pro automático.
-    var valorLitroManual by rememberSaveable { mutableStateOf(false) }
+    var valorLitroManual by rememberSaveable { mutableStateOf(r["valorLitroManual"] == "1") }
+
+    util.SalvarRascunhoAutomatico(
+        rascunho,
+        "posto" to nomePosto, "km" to kmPosto.text, "combustivel" to tipoCombustivel, "horas" to horas,
+        "litros" to litrosAbastecidos.text, "valorLitro" to valorLitro.text, "valorTotal" to valorTotal.text,
+        "pagamento" to tipoPagamento, "valorLitroManual" to if (valorLitroManual) "1" else ""
+    )
+
+    fun limparFormulario() {
+        nomePosto = ""; kmPosto = TextFieldValue(""); tipoCombustivel = ""; horas = ""
+        litrosAbastecidos = TextFieldValue(""); valorLitro = TextFieldValue(""); valorTotal = TextFieldValue("")
+        tipoPagamento = ""; valorLitroManual = false
+        rascunho.limpar(encerrar = false)
+        mostrarAvisoRascunho = false
+    }
     fun recalcularValorLitro() {
         if (valorLitroManual) return
         val litros = valorBrParaDouble(litrosAbastecidos.text)
@@ -232,6 +254,7 @@ actual fun AdicionarCombustivelScreen(
     ).maxOrNull()?.takeIf { it > 0.0 }
 
     fun temDecimalPlaca(): Boolean = repository.hodometroTemDecimal(placaSelecionadaNome)
+    val hodometroTemDecimal = remember(placaSelecionadaNome) { temDecimalPlaca() }
 
     fun aplicarKmLido(km: Double) {
         val texto = if (temDecimalPlaca()) formatarKmExibicao(km) else km.toLong().toString()
@@ -395,23 +418,28 @@ actual fun AdicionarCombustivelScreen(
     fun salvarLocal() {
         // Validação
         if (viagemEmAndamento == null) { erro = "Nenhuma viagem em andamento"; return }
-        if (placaSelecionada == null) { erro = "Selecione uma placa"; return }
-        if (nomePosto.isEmpty()) { erro = "Informe o nome do posto"; return }
-        if (kmPosto.text.isEmpty()) { erro = "Informe o KM no posto"; return }
-        if (tipoCombustivel.isEmpty()) { erro = "Selecione o tipo de combustível"; return }
-        if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L && horas.isEmpty()) { erro = "Informe as horas"; return }
-        if (litrosAbastecidos.text.isEmpty()) { erro = "Informe os litros abastecidos"; return }
-        if (valorLitro.text.isEmpty()) { erro = "Informe o valor do litro"; return }
-        if (valorTotal.text.isEmpty()) { erro = "Informe o valor total"; return }
-        if (tipoPagamento.isEmpty()) { erro = "Selecione a forma de pagamento"; return }
-        if (cameraStateMarcador.base64 == null) { erro = "Tire a foto da quilometragem"; return }
-        if (cameraStateCupom.base64 == null) { erro = "Tire a foto do cupom fiscal"; return }
+        // Tudo o que falta numa janela só (ver mensagemCamposFaltando).
+        val faltando = buildList {
+            if (placaSelecionada == null) add("Veículo (placa)")
+            if (cameraStateMarcador.base64 == null) add("Foto da quilometragem")
+            if (nomePosto.isEmpty()) add("Nome do posto")
+            if (kmPosto.text.isEmpty()) add("KM no posto")
+            if (tipoCombustivel.isEmpty()) add("Tipo de combustível")
+            if (tiposCombustivel.find { it.nome == tipoCombustivel }?.requer_horas == 1L && horas.isEmpty()) add("Horas")
+            if (litrosAbastecidos.text.isEmpty()) add("Litros abastecidos")
+            if (valorTotal.text.isEmpty()) add("Valor total")
+            if (valorLitro.text.isEmpty()) add("Valor do litro")
+            if (tipoPagamento.isEmpty()) add("Forma de pagamento")
+            if (cameraStateCupom.base64 == null) add("Foto do cupom fiscal")
+        }
+        util.mensagemCamposFaltando(faltando)?.let { erro = it; return }
 
         scope.launch {
             salvando = true
             erro = null
             try {
                 // Salva localmente no SQLite
+                repository.salvarPostoRecente(nomePosto)
                 repository.salvarAbastecimento(
                     motoristaId = motorista?.motorista_id ?: "",
                     viagemId = viagemEmAndamento!!.id.toLong(),
@@ -420,7 +448,7 @@ actual fun AdicionarCombustivelScreen(
                     valor = valorTotal.text,
                     litros = litrosAbastecidos.text,
                     posto = nomePosto,
-                    kmPosto = normalizarKmParaEnvio(kmPosto.text),
+                    kmPosto = normalizarKmVeiculoParaEnvio(kmPosto.text, hodometroTemDecimal),
                     foto = cameraStateCupom.base64,
                     fotoMarcador = cameraStateMarcador.base64,
                     tipoPagamento = tipoPagamento,
@@ -429,6 +457,7 @@ actual fun AdicionarCombustivelScreen(
                     valorLitro = valorLitro.text
                 )
 
+                rascunho.limpar()
                 sucesso = "Abastecimento salvo! Será enviado automaticamente."
 
             } catch (e: Exception) {
@@ -500,7 +529,7 @@ actual fun AdicionarCombustivelScreen(
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.CloudOff, null, tint = AppColors.Orange)
                             Spacer(Modifier.width(8.dp))
-                            Text("Sem conexão. Conecte para registrar abastecimento.", color = AppColors.Orange, fontSize = 14.sp)
+                            Text("Sem internet e sem viagem salva neste celular. Conecte uma vez para o app buscar sua viagem; depois dá para lançar sem internet.", color = AppColors.Orange, fontSize = 14.sp)
                         }
                     }
                     Spacer(Modifier.height(16.dp))
@@ -548,6 +577,11 @@ actual fun AdicionarCombustivelScreen(
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+
+                            if (mostrarAvisoRascunho) {
+                                util.RascunhoRecuperadoAviso(onLimpar = { limparFormulario() })
+                                Spacer(Modifier.height(16.dp))
+                            }
 
                             // Scanear Nota — OCR + QR/código de barras, preenche os campos abaixo
                             Button(
@@ -661,6 +695,7 @@ actual fun AdicionarCombustivelScreen(
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
                                 leadingIcon = { Icon(Icons.Default.Business, null, tint = AppColors.Primary) }
                             )
+                            SugestoesPosto(nomePosto, postosRecentes) { nomePosto = it }
 
                             Spacer(Modifier.height(16.dp))
 
@@ -669,8 +704,10 @@ actual fun AdicionarCombustivelScreen(
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = kmPosto,
+                                // Mesma formatação do Iniciar Viagem: respeita se o
+                                // hodômetro desta placa tem casa decimal.
                                 onValueChange = { newValue ->
-                                    val formatted = formatarKmInput(newValue.text)
+                                    val formatted = formatarKmVeiculo(newValue.text, hodometroTemDecimal)
                                     if (formatted != kmPosto.text) kmLidoPelaCamera = false
                                     kmPosto = TextFieldValue(
                                         text = formatted,
@@ -679,17 +716,11 @@ actual fun AdicionarCombustivelScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ui.darkTextFieldColors(), shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                placeholder = { Text("Ex.: 115670.5") },
+                                keyboardOptions = KeyboardOptions(keyboardType = if (hodometroTemDecimal) KeyboardType.Decimal else KeyboardType.Number),
+                                placeholder = { Text(if (hodometroTemDecimal) "Ex.: 115670.5" else "Ex.: 115670") },
                                 leadingIcon = { Icon(Icons.Default.Speed, null, tint = AppColors.Primary) }
                             )
-                            Text(
-                                if (kmLidoPelaCamera) "Lido pela câmera. Confira com o painel antes de salvar."
-                                else "Digite como aparece no painel. Ex.: 115670.5",
-                                fontSize = 12.sp,
-                                color = AppColors.Primary,
-                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
-                            )
+                            DicaKmNoPosto(kmPosto.text, viagemEmAndamento?.km_inicio, hodometroTemDecimal, kmLidoPelaCamera)
 
                             Spacer(Modifier.height(16.dp))
 
@@ -835,9 +866,16 @@ actual fun AdicionarCombustivelScreen(
                             // Forma de Pagamento
                             Text("Forma de Pagamento *", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                             Spacer(Modifier.height(8.dp))
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                formasPagamento.forEach { fp ->
-                                    BotaoOpcaoComb(fp.nome, Icons.Default.CreditCard, tipoPagamento == fp.codigo, { tipoPagamento = fp.codigo }, Modifier.weight(1f))
+                            // Grade de 2 colunas — numa linha só, com 3 ou mais
+                            // formas cadastradas o texto ficava espremido.
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                formasPagamento.chunked(2).forEach { linha ->
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        linha.forEach { fp ->
+                                            BotaoOpcaoComb(fp.nome, Icons.Default.CreditCard, tipoPagamento == fp.codigo, { tipoPagamento = fp.codigo }, Modifier.weight(1f))
+                                        }
+                                        if (linha.size == 1) Spacer(Modifier.weight(1f))
+                                    }
                                 }
                             }
 

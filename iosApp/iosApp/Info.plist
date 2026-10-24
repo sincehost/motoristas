@@ -32,5 +32,17 @@
 <string>Precisamos acessar suas fotos para selecionar imagens</string>
 <key>NSFaceIDUsageDescription</key>
 <string>Usamos Face ID para proteger o acesso ao app com sua sessão já conectada</string>
+
+	<!-- Envio dos lançamentos pendentes com o app em segundo plano
+	     (AppDelegate.swift → SincronizacaoSegundoPlano). O identificador tem
+	     que ser igual a AppDelegate.idTarefaSincronizacao. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>br.com.lfsystem.app.Motorista.sincronizacao</string>
+	</array>
 </dict>
 </plist>

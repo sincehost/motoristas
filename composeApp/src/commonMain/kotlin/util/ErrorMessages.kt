@@ -156,9 +156,37 @@ fun isErroDeConectividade(erro: String?): Boolean {
  * Compara com as mensagens que mensagemErroAmigavel() produz, porque é isso
  * que o SyncManager grava em ultimo_erro quando a falha é exceção.
  */
+/**
+ * Uma janela só com tudo o que falta preencher — antes cada campo vazio
+ * abria uma janela, e o motorista com 8 campos vazios fechava 8 janelas.
+ * Null quando não falta nada.
+ */
+fun mensagemCamposFaltando(faltando: List<String>): String? = when (faltando.size) {
+    0 -> null
+    1 -> "Falta preencher: ${faltando[0]}."
+    else -> "Faltam ${faltando.size} itens:\n\n" + faltando.joinToString("\n") { "• $it" }
+}
+
+/** Servidor recusou por já ter um lançamento igual. Cada API usa um texto:
+ * abastecimento/despesa "Já existe um registro…", ARLA "Registro duplicado…",
+ * descarga "Descarga já registrada". */
+fun isErroRegistroJaExiste(erro: String?): Boolean {
+    val msg = erro ?: return false
+    return msg.contains("Já existe um registro", ignoreCase = true) ||
+            msg.contains("Registro duplicado", ignoreCase = true) ||
+            msg.contains("já registrada", ignoreCase = true) ||
+            msg.contains("já registrado", ignoreCase = true)
+}
+
+/** Finalização segurada pelo SyncManager até a viagem não ter mais nada
+ * pendente — não é recusa, sai sozinha quando os lançamentos subirem. */
+const val MSG_FINALIZACAO_AGUARDANDO_LANCAMENTOS =
+    "Aguardando os lançamentos desta viagem serem enviados. A finalização sai logo depois, sozinha."
+
 fun isErroTransitorio(erro: String?): Boolean {
     val msg = erro ?: return true
-    return isErroDeConectividade(msg) ||
+    return msg == MSG_FINALIZACAO_AGUARDANDO_LANCAMENTOS ||
+            isErroDeConectividade(msg) ||
             isErroDeAutenticacao(msg) ||
             msg.startsWith("Sem conexão com a internet") ||
             msg.startsWith("Sua conexão com a internet está lenta") ||

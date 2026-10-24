@@ -185,7 +185,8 @@ actual fun AdicionarDescargaScreen(
                     if (response.status == "ok") {
                         // Se não havia viagem em andamento localmente, tenta achar via API
                         // (evita bloquear o usuário quando o cache local de ViagemAtual está vazio)
-                        if (viagemAtual == null && response.viagens.isNotEmpty()) {
+                        if (viagemAtual == null && response.viagens.isNotEmpty() &&
+                            !repository.temFinalizacaoPendenteDaViagem(response.viagens.first().id.toLong())) {
                             val viagem = response.viagens.first()
                             repository.salvarViagemAtualComComposicao(
                                 viagemId = viagem.id.toLong(),

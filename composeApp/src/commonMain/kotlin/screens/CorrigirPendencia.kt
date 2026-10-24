@@ -285,8 +285,11 @@ fun CorrigirLancamentoScreen(
     var kmLidoDaFoto by remember { mutableStateOf<Double?>(null) }
 
     val referenciaKm = remember { if (correcao.chaveKm != null) kmReferenciaDoErro(correcao.erro) else null }
-    val jaExisteNoServidor = correcao.erro.contains("Já existe um registro", ignoreCase = true) && correcao.marcarComoEnviado != null
+    val jaExisteNoServidor = util.isErroRegistroJaExiste(correcao.erro) && correcao.marcarComoEnviado != null
     val viagemEncerrada = correcao.erro.contains("já foi finalizada e não aceita", ignoreCase = true)
+    // Viagem que o servidor diz já ter, mas que o app não achou aberta (já foi
+    // finalizada lá, ou com outra placa/data). Editar não resolve.
+    val viagemJaCadastrada = correcao.erro.contains("já foi cadastrada", ignoreCase = true)
     val fotoBitmap = remember(correcao.fotoPainel) {
         correcao.fotoPainel?.takeIf { it.isNotBlank() }?.let { util.decodificarFotoBase64(it) }
     }
@@ -373,9 +376,19 @@ fun CorrigirLancamentoScreen(
                             "Avise o escritório (use \"Exportar e enviar\" na lista) e depois descarte.",
                         Color(0xFF9A3412), Color(0xFFFDEBDD)
                     )
+                    viagemJaCadastrada -> Aviso(
+                        "O servidor já tem uma viagem com esta ordem de frete, CT-e, placa e data. " +
+                            "Editar não resolve: avise o escritório (use \"Exportar e enviar\" na lista) para conferir se é a mesma viagem.",
+                        Color(0xFF9A3412), Color(0xFFFDEBDD)
+                    )
+                    // O servidor compara só alguns campos (valor, litros…), então
+                    // "igual" pode ser um 2º lançamento de verdade com o mesmo
+                    // valor — não dá pra prometer que remover não perde nada.
                     jaExisteNoServidor -> Aviso(
-                        "O servidor já tem este lançamento — ele foi enviado antes e a confirmação não chegou ao celular. " +
-                            "Pode remover da lista sem perder nada.",
+                        "O servidor já tem um lançamento igual a este nesta viagem. Normalmente é o mesmo, " +
+                            "enviado de novo porque a confirmação não chegou ao celular — aí pode remover da lista.\n\n" +
+                            "Se foram dois lançamentos de verdade com o mesmo valor (ex.: dois abastecimentos iguais), " +
+                            "não remova: avise o escritório.",
                         AppColors.Primary, AppColors.Primary.copy(alpha = 0.08f)
                     )
                     referenciaKm != null -> Aviso(
@@ -409,7 +422,7 @@ fun CorrigirLancamentoScreen(
                     )
                 }
 
-                if (!viagemEncerrada) {
+                if (!viagemEncerrada && !viagemJaCadastrada) {
                     correcao.campos.forEach { campo ->
                         val destaque = campo.chave == correcao.chaveKm
                         OutlinedTextField(
@@ -452,7 +465,7 @@ fun CorrigirLancamentoScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
                     ) { Text("Já está no servidor — remover da lista", fontWeight = FontWeight.Bold) }
                 }
-                if (!viagemEncerrada) {
+                if (!viagemEncerrada && !viagemJaCadastrada) {
                     Button(
                         onClick = { salvar() },
                         modifier = Modifier.fillMaxWidth().height(54.dp),
@@ -464,7 +477,7 @@ fun CorrigirLancamentoScreen(
                     onClick = onFechar,
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     shape = RoundedCornerShape(12.dp)
-                ) { Text(if (viagemEncerrada) "Fechar" else "Cancelar") }
+                ) { Text(if (viagemEncerrada || viagemJaCadastrada) "Fechar" else "Cancelar") }
                 Spacer(Modifier.height(24.dp))
             }
         }

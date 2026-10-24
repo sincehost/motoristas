@@ -145,3 +145,11 @@ fun kmParaCampoVeiculo(km: String, temDecimal: Boolean): String {
     if (valor <= 0.0) return ""
     return if (temDecimal) formatarKmExibicao(valor) else round(valor).toLong().toString()
 }
+
+/**
+ * Quanto o KM percorrido pode passar da distância cadastrada da rota antes do
+ * aviso "KM suspeito" no Finalizar. Antes eram 5 km fixos: qualquer desvio
+ * até um posto ou um pátio já disparava o aviso, e o motorista aprendia a
+ * tocar "Continuar" sem ler. 15% da rota, nunca menos de 20 km.
+ */
+fun toleranciaKmRota(kmRota: Double): Double = maxOf(20.0, kmRota * 0.15)

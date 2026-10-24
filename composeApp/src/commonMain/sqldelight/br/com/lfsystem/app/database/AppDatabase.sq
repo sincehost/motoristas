@@ -1153,3 +1153,21 @@ UNION ALL SELECT 'Checklist pós-viagem', data_checklist, ultimo_erro FROM Check
 -- com o insert (ver AppRepository.salvarChecklistPre/Pos).
 lastInsertRowId:
 SELECT last_insert_rowid();
+
+-- viagem_id de todo lançamento ainda não enviado que pertence a uma viagem.
+-- Usado pra segurar a finalização até a viagem não ter mais nada pendente —
+-- o servidor recusa lançamento em viagem já finalizada. Só a coluna de id,
+-- sem carregar fotos.
+viagemIdsComLancamentosPendentes:
+SELECT viagem_id FROM Abastecimento WHERE sincronizado = 0
+UNION ALL SELECT viagem_id FROM Arla WHERE sincronizado = 0
+UNION ALL SELECT viagem_id FROM Frete WHERE sincronizado = 0
+UNION ALL SELECT viagem_id FROM Descarga WHERE sincronizado = 0
+UNION ALL SELECT viagem_id FROM OutraDespesa WHERE sincronizado = 0
+UNION ALL SELECT viagem_id FROM ChecklistPreViagem WHERE sincronizado = 0
+UNION ALL SELECT viagem_id FROM ChecklistPosViagem WHERE sincronizado = 0;
+
+-- Viagem iniciada offline acabou de subir: troca o id provisório (negativo)
+-- da viagem em andamento pelo id do servidor.
+atualizarIdViagemAtual:
+UPDATE ViagemAtual SET viagem_id = :viagem_id_novo WHERE viagem_id = :viagem_id_antigo;

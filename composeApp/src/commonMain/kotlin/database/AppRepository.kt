@@ -121,6 +121,21 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     fun salvarPreferencia(chave: String, valor: String) = queries.salvarPreferencia(chave, valor)
 
+    /** Últimos postos usados (abastecimento e ARLA), mais recente primeiro —
+     * sugestões no campo "Nome do posto" pra não digitar toda vez. */
+    fun getPostosRecentes(): List<String> = try {
+        getPreferencia("postos_recentes")?.split("\n")?.filter { it.isNotBlank() } ?: emptyList()
+    } catch (_: Exception) {
+        emptyList()
+    }
+
+    fun salvarPostoRecente(nome: String) {
+        val posto = nome.trim()
+        if (posto.isEmpty()) return
+        val lista = (listOf(posto) + getPostosRecentes().filterNot { it.equals(posto, ignoreCase = true) }).take(8)
+        try { salvarPreferencia("postos_recentes", lista.joinToString("\n")) } catch (_: Exception) {}
+    }
+
     /** Gravado ao iniciar viagem — Iniciar Viagem seguinte já abre com esse veículo. */
     fun salvarUltimoVeiculoUsado(placa: String, veiculoId: Long?) {
         queries.salvarPreferencia("ultima_placa", placa)
@@ -540,6 +555,31 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         }
     }
 
+    /** Id da viagem como o servidor conhece: id provisório (negativo) vira o
+     * id do servidor quando a viagem já subiu; senão volta o próprio id. */
+    fun idViagemNoServidor(viagemId: Long): Long =
+        if (viagemId < 0) getMapeamentoIdServidor(-viagemId) ?: viagemId else viagemId
+
+    /** true se ainda há abastecimento/ARLA/frete/descarga/despesa/checklist
+     * desta viagem sem enviar — a finalização tem que esperar por eles. */
+    fun temLancamentosPendentesDaViagem(viagemId: Long): Boolean {
+        val alvo = idViagemNoServidor(viagemId)
+        return queries.viagemIdsComLancamentosPendentes().executeAsList()
+            .any { it == viagemId || idViagemNoServidor(it) == alvo }
+    }
+
+    /** true se o motorista já finalizou esta viagem no celular e a finalização
+     * ainda está na fila — o servidor continua mostrando a viagem aberta até
+     * ela chegar, e o app não pode tratá-la como viagem em andamento. */
+    fun temFinalizacaoPendenteDaViagem(viagemIdServidor: Long): Boolean =
+        getFinalizacoesParaSincronizar().any {
+            it.viagem_id == viagemIdServidor || idViagemNoServidor(it.viagem_id) == viagemIdServidor
+        }
+
+    fun atualizarIdViagemAtual(idAntigo: Long, idNovo: Long) {
+        queries.atualizarIdViagemAtual(viagem_id_novo = idNovo, viagem_id_antigo = idAntigo)
+    }
+
     fun deletarMapeamentoViagem(idLocal: Long) {
         try {
             queries.deletarMapeamentoViagem(id_local = idLocal)
@@ -776,7 +816,7 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
     }
 
     fun salvarViagemAtual(viagemId: Long, destino: String, dataInicio: String, kmInicio: String = "", kmRota: String = "0") {
-        queries.insertViagemAtual(viagemId, destino, dataInicio, kmInicio, kmRota)
+        salvarViagemAtualComComposicao(viagemId, destino, dataInicio, kmInicio, kmRota)
     }
 
     /** Mesma coisa, mas guardando também a composição da viagem — permite que
@@ -792,8 +832,22 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
         implemento1Placa: String? = null,
         implemento2Placa: String? = null
     ) {
+        // INSERT OR REPLACE troca a linha inteira: quem chamava sem placa/KM
+        // (painel recarregando do servidor, Finalizar, Abastecimento) apagava
+        // a placa, o veículo e o KM de início já guardados — e as telas
+        // voltavam a pedir a placa, o KM sugerido da próxima viagem sumia.
+        // Pra mesma viagem, o que vier vazio mantém o valor que já estava.
+        val atual = getViagemAtual()?.takeIf { it.viagem_id == viagemId }
         queries.insertViagemAtualComComposicao(
-            viagemId, destino, dataInicio, kmInicio, kmRota, placa, veiculoId, implemento1Placa, implemento2Placa
+            viagemId,
+            destino,
+            dataInicio,
+            kmInicio.ifBlank { atual?.km_inicio ?: "" },
+            kmRota.takeUnless { it.isBlank() || it == "0" } ?: atual?.km_rota ?: "0",
+            placa.ifBlank { atual?.placa ?: "" },
+            veiculoId ?: atual?.veiculo_id,
+            implemento1Placa ?: atual?.implemento1_placa,
+            implemento2Placa ?: atual?.implemento2_placa
         )
     }
 
@@ -1216,7 +1270,14 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     fun getChecklistPrePorViagem(viagemId: Long): br.com.lfsystem.app.database.ChecklistPreViagem? {
         return queries.getChecklistPrePorViagem(viagemId).executeAsOneOrNull()
+            ?: idProvisorioDaViagem(viagemId)?.let { queries.getChecklistPrePorViagem(it).executeAsOneOrNull() }
     }
+
+    /** Viagem iniciada offline: depois que ela sobe, a viagem em andamento
+     * passa a ter o id do servidor, mas o checklist feito antes continua
+     * gravado com o id provisório (negativo). Devolve esse id provisório. */
+    private fun idProvisorioDaViagem(idServidor: Long): Long? =
+        if (idServidor > 0) queries.getMapeamentoViagemPorServidor(idServidor).executeAsList().firstOrNull()?.let { -it } else null
 
     // ===============================
     // CHECKLIST PÓS-VIAGEM
@@ -1281,6 +1342,7 @@ class AppRepository(driverFactory: DatabaseDriverFactory) {
 
     fun getChecklistPosPorViagem(viagemId: Long): br.com.lfsystem.app.database.ChecklistPosViagem? {
         return queries.getChecklistPosPorViagem(viagemId).executeAsOneOrNull()
+            ?: idProvisorioDaViagem(viagemId)?.let { queries.getChecklistPosPorViagem(it).executeAsOneOrNull() }
     }
 
 }

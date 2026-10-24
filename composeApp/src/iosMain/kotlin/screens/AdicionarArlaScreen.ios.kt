@@ -115,6 +115,7 @@ actual fun AdicionarArlaScreen(
     onSucesso: () -> Unit
 ) {
     val motorista = remember { repository.getMotoristaLogado() }
+    val postosRecentes = remember { repository.getPostosRecentes() }
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
@@ -270,30 +271,16 @@ actual fun AdicionarArlaScreen(
             mostrarMensagem("Nenhuma viagem em andamento", isErro = true)
             return
         }
-        if (data.isEmpty()) {
-            mostrarMensagem("Informe a data", isErro = true)
-            return
+        // Tudo o que falta numa janela só (ver mensagemCamposFaltando).
+        val faltando = buildList {
+            if (data.isEmpty()) add("Data")
+            if (valor.text.isEmpty() || valor.text.replace(",", ".").toDoubleOrNull() == 0.0) add("Valor")
+            if (litros.text.isEmpty() || litros.text.replace(",", ".").toDoubleOrNull() == 0.0) add("Litros")
+            if (posto.isEmpty()) add("Nome do posto")
+            if (kmPosto.text.isEmpty()) add("KM no posto")
+            if (fotoBase64 == null) add("Foto do comprovante")
         }
-        if (valor.text.isEmpty() || valor.text.replace(",", ".").toDoubleOrNull() == 0.0) {
-            mostrarMensagem("Informe o valor", isErro = true)
-            return
-        }
-        if (litros.text.isEmpty() || litros.text.replace(",", ".").toDoubleOrNull() == 0.0) {
-            mostrarMensagem("Informe os litros", isErro = true)
-            return
-        }
-        if (posto.isEmpty()) {
-            mostrarMensagem("Informe o nome do posto", isErro = true)
-            return
-        }
-        if (kmPosto.text.isEmpty()) {
-            mostrarMensagem("Informe o KM no posto", isErro = true)
-            return
-        }
-        if (fotoBase64 == null) {
-            mostrarMensagem("Tire a foto do comprovante", isErro = true)
-            return
-        }
+        util.mensagemCamposFaltando(faltando)?.let { mostrarMensagem(it, isErro = true); return }
 
         val dataAPI = converterDataParaAPI(data)
         val kmPostoNormalizado = normalizarKmParaEnvio(kmPosto.text)
@@ -307,6 +294,7 @@ actual fun AdicionarArlaScreen(
                 // Grava primeiro no celular e a fila envia (na hora, se tiver internet).
                 // Antes tentava o servidor primeiro: se ele recusasse o dado, nada
                 // ficava salvo e o lançamento se perdia.
+                repository.salvarPostoRecente(posto)
                 repository.salvarArla(
                     motoristaId = motorista?.motorista_id ?: "",
                     viagemId = viagemEmAndamento!!.id.toLong(),
@@ -372,7 +360,7 @@ actual fun AdicionarArlaScreen(
                             Icon(Icons.Default.CloudOff, null, tint = AppColors.Orange)
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                "Sem conexão. Conecte para registrar ARLA.",
+                                "Sem internet e sem viagem salva neste celular. Conecte uma vez para o app buscar sua viagem; depois dá para lançar sem internet.",
                                 color = AppColors.Orange,
                                 fontSize = 14.sp
                             )
@@ -543,7 +531,7 @@ actual fun AdicionarArlaScreen(
                                 leadingIcon = {
                                     Icon(Icons.Default.Business, null, tint = Color(0xFF06B6D4))
                                 })
-                            
+                            SugestoesPosto(posto, postosRecentes) { posto = it }
 
                             Spacer(Modifier.height(16.dp))
 

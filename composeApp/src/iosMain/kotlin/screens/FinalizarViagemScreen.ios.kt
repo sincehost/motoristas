@@ -234,16 +234,37 @@ actual fun FinalizarViagemScreen(
     val rotaContinua = remember { repository.isRotaContinua() }
 
     // Campos do formulário
-    var kmChegada by remember { mutableStateOf(TextFieldValue("")) }
+    // Rascunho (util/Rascunho.kt): KM, observação e dados de retorno voltam
+    // se o motorista sair da tela antes de finalizar. Amarrado à viagem.
+    val rascunho = util.rememberRascunho(repository, "finalizar_viagem", repository.getViagemAtual()?.viagem_id?.toString() ?: "")
+    val r = rascunho.valores
+    var mostrarAvisoRascunho by remember { mutableStateOf(rascunho.recuperado) }
+    fun campoTexto(valor: String?) = TextFieldValue(valor ?: "", selection = TextRange((valor ?: "").length))
+
+    var kmChegada by remember { mutableStateOf(campoTexto(r["km"])) }
     var dataChegada by remember { mutableStateOf(dataAtualFormatada()) }
-    var observacao by remember { mutableStateOf("") }
-    var teveRetorno by remember { mutableStateOf(false) }
+    var observacao by remember { mutableStateOf(r["obs"] ?: "") }
+    var teveRetorno by remember { mutableStateOf(r["retorno"] == "1") }
 
     // Campos de retorno (opcionais) - COM TextFieldValue
-    var pesoCargaRetorno by remember { mutableStateOf(TextFieldValue("", selection = TextRange(0))) }
-    var localCarregou by remember { mutableStateOf("") }
-    var ordemRetorno by remember { mutableStateOf("") }
-    var cteRetorno by remember { mutableStateOf("") }
+    var pesoCargaRetorno by remember { mutableStateOf(campoTexto(r["pesoRetorno"])) }
+    var localCarregou by remember { mutableStateOf(r["localCarregou"] ?: "") }
+    var ordemRetorno by remember { mutableStateOf(r["ordemRetorno"] ?: "") }
+    var cteRetorno by remember { mutableStateOf(r["cteRetorno"] ?: "") }
+
+    util.SalvarRascunhoAutomatico(
+        rascunho,
+        "km" to kmChegada.text, "obs" to observacao, "retorno" to if (teveRetorno) "1" else "",
+        "pesoRetorno" to pesoCargaRetorno.text, "localCarregou" to localCarregou,
+        "ordemRetorno" to ordemRetorno, "cteRetorno" to cteRetorno
+    )
+
+    fun limparFormulario() {
+        kmChegada = TextFieldValue(""); observacao = ""; teveRetorno = false
+        pesoCargaRetorno = TextFieldValue(""); localCarregou = ""; ordemRetorno = ""; cteRetorno = ""
+        rascunho.limpar(encerrar = false)
+        mostrarAvisoRascunho = false
+    }
 
     // Foto
     var fotoPainel by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -268,6 +289,14 @@ actual fun FinalizarViagemScreen(
 
     // Diálogo de confirmação e aviso de KM suspeito
     var mostrarDialogoConfirmacao by remember { mutableStateOf(false) }
+    // Resumo (litros, média, gastos) carregado quando a confirmação abre.
+    var resumoFinalizacao by remember { mutableStateOf<ResumoFinalizacao?>(null) }
+    LaunchedEffect(mostrarDialogoConfirmacao) {
+        if (!mostrarDialogoConfirmacao) return@LaunchedEffect
+        resumoFinalizacao = null
+        val id = viagemAtual?.viagem_id ?: return@LaunchedEffect
+        resumoFinalizacao = carregarResumoParaFinalizar(repository, id, motorista?.motorista_id ?: "")
+    }
     var mostrarAvisoKm by remember { mutableStateOf(false) }
     var mensagemAvisoKm by remember { mutableStateOf("") }
 
@@ -338,6 +367,15 @@ actual fun FinalizarViagemScreen(
         viewController.presentViewController(picker, true, null)
     }
 
+    // Campos de retorno obrigatórios quando teve retorno — frete de retorno
+    // não é mais pedido aqui; é lançado em "Adicionar Frete" (Despesas).
+    fun camposRetornoFaltando(): List<String> = if (!teveRetorno) emptyList() else buildList {
+        if (pesoCargaRetorno.text.isEmpty()) add("Peso da carga de retorno")
+        if (localCarregou.isEmpty()) add("Local onde carregou")
+        if (ordemRetorno.isEmpty()) add("Ordem de retorno")
+        if (cteRetorno.isEmpty()) add("CT-e de retorno")
+    }
+
     // Função de validação antes de mostrar diálogo de confirmação
     fun validarEConfirmar() {
         focusManager.clearFocus()
@@ -346,18 +384,14 @@ actual fun FinalizarViagemScreen(
             mostrarMensagem("Nenhuma viagem em andamento", isErro = true)
             return
         }
-        if (kmChegada.text.isEmpty()) {
-            mostrarMensagem("Informe o KM de chegada", isErro = true)
-            return
-        }
-        if (dataChegada.isEmpty()) {
-            mostrarMensagem("Informe a data de chegada", isErro = true)
-            return
-        }
-        if (fotoPainelBase64 == null) {
-            mostrarMensagem("Tire a foto do painel", isErro = true)
-            return
-        }
+        // Tudo o que falta numa janela só, incluindo os dados de retorno
+        // (ver mensagemCamposFaltando) — antes eram até 7 janelas seguidas.
+        util.mensagemCamposFaltando(buildList {
+            if (kmChegada.text.isEmpty()) add("KM de chegada")
+            if (dataChegada.isEmpty()) add("Data de chegada")
+            if (fotoPainelBase64 == null) add("Foto do painel")
+            addAll(camposRetornoFaltando())
+        })?.let { mostrarMensagem(it, isErro = true); return }
 
         // ═══════════════════════════════════════════════════
         // VALIDAÇÃO PROFISSIONAL DE KM (numérica, com 1 casa decimal —
@@ -418,8 +452,8 @@ actual fun FinalizarViagemScreen(
                 return
             }
 
-            // 3c. KM percorrido ultrapassa a rota em mais de 5 km = AVISO (não bloqueia, mas confirma)
-            if (kmRotaEsperado > 0 && kmPercorrido > kmRotaEsperado + 5) {
+            // 3c. KM percorrido passa da rota além da tolerância (15%, mín. 20 km) = AVISO (não bloqueia, mas confirma)
+            if (kmRotaEsperado > 0 && kmPercorrido > kmRotaEsperado + util.toleranciaKmRota(kmRotaEsperado)) {
                 val excedente = kmPercorrido - kmRotaEsperado
                 mensagemAvisoKm = "Atenção: KM ultrapassado!\n\n" +
                         "• KM Início: ${formatarKmExibicao(kmInicioNum)}\n" +
@@ -433,49 +467,14 @@ actual fun FinalizarViagemScreen(
             }
         }
 
-        if (teveRetorno) {
-            if (pesoCargaRetorno.text.isEmpty()) {
-                mostrarMensagem("Informe o peso da carga de retorno", isErro = true)
-                return
-            }
-            if (localCarregou.isEmpty()) {
-                mostrarMensagem("Informe o local onde carregou", isErro = true)
-                return
-            }
-            if (ordemRetorno.isEmpty()) {
-                mostrarMensagem("Informe a ordem de retorno", isErro = true)
-                return
-            }
-            if (cteRetorno.isEmpty()) {
-                mostrarMensagem("Informe o CTE de retorno", isErro = true)
-                return
-            }
-        }
-
+        // Campos de retorno já conferidos lá em cima, junto com os outros.
         mostrarDialogoConfirmacao = true
     }
 
     // Função chamada quando o motorista confirma o aviso de KM e quer prosseguir
     fun prosseguirAposAvisoKm() {
         mostrarAvisoKm = false
-        if (teveRetorno) {
-            if (pesoCargaRetorno.text.isEmpty()) {
-                mostrarMensagem("Informe o peso da carga de retorno", isErro = true)
-                return
-            }
-            if (localCarregou.isEmpty()) {
-                mostrarMensagem("Informe o local onde carregou", isErro = true)
-                return
-            }
-            if (ordemRetorno.isEmpty()) {
-                mostrarMensagem("Informe a ordem de retorno", isErro = true)
-                return
-            }
-            if (cteRetorno.isEmpty()) {
-                mostrarMensagem("Informe o CTE de retorno", isErro = true)
-                return
-            }
-        }
+        util.mensagemCamposFaltando(camposRetornoFaltando())?.let { mostrarMensagem(it, isErro = true); return }
         mostrarDialogoConfirmacao = true
     }
 
@@ -488,10 +487,15 @@ actual fun FinalizarViagemScreen(
         scope.launch {
             salvando = true
             try {
-                // PRIMEIRO: Tentar API se viagem já foi sincronizada (ID > 0)
+                // PRIMEIRO: Tentar API se viagem já foi sincronizada (ID > 0) e
+                // não tem lançamento dela esperando envio — finalizar antes faria
+                // o servidor recusar esses lançamentos ("viagem já finalizada").
+                // Com pendência, a finalização entra na fila e o SyncManager só
+                // a envia depois deles.
                 var salvouOnline = false
                 var recusadoPeloServidor: String? = null
-                if (viagemId > 0) {
+                val aguardaLancamentos = repository.temLancamentosPendentesDaViagem(viagemId)
+                if (viagemId > 0 && !aguardaLancamentos) {
                     try {
                         val response = api.ApiClient.finalizarViagem(
                             api.FinalizarViagemRequest(
@@ -554,9 +558,12 @@ actual fun FinalizarViagemScreen(
 
                 // Limpa viagem atual local
                 repository.limparViagemAtual()
+                rascunho.limpar()
 
                 if (salvouOnline) {
                     sucessoMsg = "Viagem finalizada com sucesso!"
+                } else if (aguardaLancamentos) {
+                    sucessoMsg = "Viagem salva! Ela será finalizada logo depois que os lançamentos pendentes desta viagem forem enviados."
                 } else {
                     sucessoMsg = "Viagem salva! Será sincronizada quando houver conexão."
                 }
@@ -641,6 +648,8 @@ actual fun FinalizarViagemScreen(
                             }
                         }
                     }
+
+                    ResumoViagemFinalizar(resumoFinalizacao, kmPerc)
 
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -818,6 +827,15 @@ actual fun FinalizarViagemScreen(
                             color = Color(0xFF10B981)
                         )
                         Spacer(Modifier.height(16.dp))
+
+                        if (mostrarAvisoRascunho) {
+
+                            util.RascunhoRecuperadoAviso(onLimpar = { limparFormulario() })
+
+                            Spacer(Modifier.height(16.dp))
+
+                        }
+
 
                         // KM Chegada
                         Text(

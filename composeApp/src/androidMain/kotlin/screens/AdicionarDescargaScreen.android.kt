@@ -105,7 +105,8 @@ actual fun AdicionarDescargaScreen(
             )
             if (response.status == "ok") {
                 // Verifica viagem
-                if (response.viagens.isNotEmpty()) {
+                if (response.viagens.isNotEmpty() &&
+                    !repository.temFinalizacaoPendenteDaViagem(response.viagens.first().id.toLong())) {
                     val viagem = response.viagens.first()
                     viagemEmAndamento = viagem
                     // Salva localmente
@@ -287,7 +288,7 @@ actual fun AdicionarDescargaScreen(
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.CloudOff, null, tint = AppColors.Orange)
                             Spacer(Modifier.width(8.dp))
-                            Text("Sem conexão. Conecte para registrar descarga.", color = AppColors.Orange, fontSize = 14.sp)
+                            Text("Sem internet e sem viagem salva neste celular. Conecte uma vez para o app buscar sua viagem; depois dá para lançar sem internet.", color = AppColors.Orange, fontSize = 14.sp)
                         }
                     }
                     Spacer(Modifier.height(16.dp))

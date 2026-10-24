@@ -438,11 +438,16 @@ actual fun EditarCombustivelScreen(
                         // Pagamento
                         Text("Forma de pagamento", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = AppColors.TextSecondary)
                         Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            formasPagamento.forEach { fp ->
-                                FilterChip(selected = tipoPagamento == fp.codigo, onClick = { tipoPagamento = fp.codigo },
-                                    label = { Text(fp.nome, fontSize = 13.sp) },
-                                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AppColors.Primary, selectedLabelColor = Color.White))
+                        // Até 3 por linha — numa linha só, formas a mais saíam da tela.
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            formasPagamento.chunked(3).forEach { linha ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    linha.forEach { fp ->
+                                        FilterChip(selected = tipoPagamento == fp.codigo, onClick = { tipoPagamento = fp.codigo },
+                                            label = { Text(fp.nome, fontSize = 13.sp) },
+                                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = AppColors.Primary, selectedLabelColor = Color.White))
+                                    }
+                                }
                             }
                         }
                         Spacer(Modifier.height(12.dp))

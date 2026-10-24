@@ -229,7 +229,7 @@ fun BottomNavigationBar(
         // 3. Manutenção
         BottomBarItem(
             icon = ui.Lucide.Wrench,
-            label = "Manut.",
+            label = "Manutenção",
             selected = telaAtual == Screen.MANUTENCAO,
             onClick = {
                 scope.launch {
@@ -284,9 +284,10 @@ private fun RowScope.BottomBarItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(22.dp))
+        // Ícone e texto maiores — 11 sp era ilegível com o celular no suporte.
+        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(24.dp))
         Spacer(Modifier.height(4.dp))
-        Text(label, fontSize = 11.sp, maxLines = 1, fontWeight = FontWeight.Medium, color = contentColor)
+        Text(label, fontSize = 12.sp, maxLines = 1, softWrap = false, fontWeight = FontWeight.SemiBold, color = contentColor)
     }
 }
 

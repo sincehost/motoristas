@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import sync.SyncState
 import sync.SyncStatus
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.toLocalDateTime
 import ui.AppColors
 import ui.isDark
 import util.formatarKmExibicao
@@ -180,7 +182,7 @@ private fun formatarDiaMes(data: String): String {
 // cadastrados pelo admin — mesmo alerta que aparece no painel).
 // ===============================
 @Composable
-fun PlanoManutencaoAlertCard(itens: List<api.PlanoManutencaoItem>) {
+fun PlanoManutencaoAlertCard(itens: List<api.PlanoManutencaoItem>, onRegistrar: (() -> Unit)? = null) {
     if (itens.isEmpty()) return
     val isDarkMode = isDark()
     val backgroundColor = if (isDarkMode) Color(0xFF3D2E1A) else Color(0xFFFFF3E0)
@@ -205,12 +207,24 @@ fun PlanoManutencaoAlertCard(itens: List<api.PlanoManutencaoItem>) {
                 val prazo = if (item.vencido) "Vencido" else "Vence em ${item.dias} dia(s)"
                 Text(
                     "${item.placa} — ${item.item} ($prazo)",
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     color = AppColors.TextSecondary
                 )
             }
             if (itens.size > 4) {
-                Text("+ ${itens.size - 4} outro(s) item(ns)", fontSize = 11.sp, color = AppColors.TextSecondary)
+                Text("+ ${itens.size - 4} outro(s) item(ns)", fontSize = 12.sp, color = AppColors.TextSecondary)
+            }
+            // Antes o aviso só informava — o motorista tinha que achar a
+            // tela de manutenção sozinho.
+            if (onRegistrar != null) {
+                OutlinedButton(
+                    onClick = onRegistrar,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, iconColor)
+                ) {
+                    Text("Registrar manutenção", color = iconColor, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }
@@ -249,7 +263,7 @@ fun CnhAlertCard(status: api.CnhStatusResponse) {
             Column {
                 Text(titulo, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = iconColor)
                 status.data_vencimento?.let {
-                    Text("Validade: ${formatarDataBR(it)}", fontSize = 12.sp, color = AppColors.TextSecondary)
+                    Text("Validade: ${formatarDataBR(it)}", fontSize = 13.sp, color = AppColors.TextSecondary)
                 }
             }
         }
@@ -257,16 +271,18 @@ fun CnhAlertCard(status: api.CnhStatusResponse) {
 }
 
 // ===============================
-// CARD DE VIAGEM EM ANDAMENTO
+// CARD DE VIAGEM EM ANDAMENTO — destino em destaque, placa e há quantos
+// dias a viagem está aberta. Antes mostrava "ID: 1234", número que não diz
+// nada ao motorista, e tudo em letra de 11 sp.
 // ===============================
 @Composable
 fun ViagemStatusCard(
     viagemInfo: String,
-    viagemId: Long,
     modoOffline: Boolean,
     temInternet: Boolean,
     kmInicio: String = "",
-    dataInicio: String = ""
+    dataInicio: String = "",
+    placa: String = ""
 ) {
     val isDarkMode = isDark()
     Card(
@@ -274,63 +290,98 @@ fun ViagemStatusCard(
         colors = CardDefaults.cardColors(
             containerColor = if (isDarkMode) AppColors.SurfaceVariant else AppColors.Secondary.copy(alpha = 0.1f)
         ),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(14.dp)
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        ui.Lucide.Truck, null,
-                        tint = AppColors.Secondary, modifier = Modifier.size(24.dp)
-                    )
-                    Column {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Viagem em andamento", fontSize = 12.sp, color = AppColors.TextSecondary)
-
-                            if (modoOffline && !temInternet) {
-                                ConnectivityBadge("Offline", Color(0xFFFF9800).copy(alpha = 0.2f), Color(0xFFFF6F00), Icons.Default.CloudOff)
-                            } else if (modoOffline && temInternet) {
-                                ConnectivityBadge("Reconectado", Color(0xFF4CAF50).copy(alpha = 0.2f), Color(0xFF2E7D32), Icons.Default.Wifi)
-                            }
-                        }
-                        Text(viagemInfo, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.Secondary)
-                    }
+                Text(
+                    "VIAGEM EM ANDAMENTO", fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp, color = AppColors.TextSecondary
+                )
+                if (modoOffline && !temInternet) {
+                    ConnectivityBadge("Sem internet", Color(0xFFFF9800).copy(alpha = 0.2f), Color(0xFFFF6F00), Icons.Default.CloudOff)
+                } else if (modoOffline && temInternet) {
+                    ConnectivityBadge("Reconectado", Color(0xFF4CAF50).copy(alpha = 0.2f), Color(0xFF2E7D32), Icons.Default.Wifi)
                 }
-                Text("ID: $viagemId", fontSize = 11.sp, color = AppColors.TextSecondary)
             }
-
-            // Informações extras da viagem
-            if (kmInicio.isNotBlank() || dataInicio.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    if (dataInicio.isNotBlank()) {
-                        val dataFormatada = formatarDataBR(dataInicio)
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(ui.Lucide.Calendar, null, modifier = Modifier.size(14.dp), tint = AppColors.TextSecondary)
-                            Text(dataFormatada, fontSize = 11.sp, color = AppColors.TextSecondary)
-                        }
-                    }
-                    if (kmInicio.isNotBlank()) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(ui.Lucide.Gauge, null, modifier = Modifier.size(14.dp), tint = AppColors.TextSecondary)
-                            val kmInicioTexto = kmInicio.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: kmInicio
-                            Text("KM de Início: $kmInicioTexto", fontSize = 11.sp, color = AppColors.TextSecondary)
-                        }
-                    }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(ui.Lucide.Truck, null, tint = AppColors.Secondary, modifier = Modifier.size(28.dp))
+                Text(viagemInfo, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary, lineHeight = 24.sp)
+            }
+            val detalhes = listOfNotNull(
+                placa.takeIf { it.isNotBlank() },
+                textoDiasDeViagem(dataInicio),
+                kmInicio.takeIf { it.isNotBlank() }?.let { km ->
+                    "KM inicial ${km.toDoubleOrNull()?.let { formatarKmExibicao(it) } ?: km}"
                 }
+            )
+            if (detalhes.isNotEmpty()) {
+                Text(detalhes.joinToString("  ·  "), fontSize = 14.sp, color = AppColors.TextSecondary)
+            }
+        }
+    }
+}
+
+/** "Iniciada hoje" / "2º dia de viagem" a partir da data de início (yyyy-MM-dd). */
+private fun textoDiasDeViagem(dataInicio: String): String? {
+    val inicio = try {
+        kotlinx.datetime.LocalDate.parse(dataInicio.trim().take(10))
+    } catch (_: Exception) {
+        return dataInicio.takeIf { it.isNotBlank() }?.let { "Desde ${formatarDataBR(it)}" }
+    }
+    val hoje = kotlinx.datetime.Clock.System.now()
+        .toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault()).date
+    val dias = inicio.daysUntil(hoje)
+    return if (dias <= 0) "Iniciada hoje" else "${dias + 1}º dia de viagem"
+}
+
+// ===============================
+// AÇÕES PRINCIPAIS — o que o motorista mais faz, grande e logo abaixo da
+// viagem. Antes ficava só na barra de baixo, com ícone pequeno e texto de
+// 11 sp, e "Iniciar" e "Finalizar" apareciam sempre, com ou sem viagem.
+// ===============================
+@Composable
+fun AcoesPrincipais(
+    temViagem: Boolean,
+    onIniciar: () -> Unit,
+    onAbastecer: () -> Unit,
+    onFinalizar: () -> Unit
+) {
+    if (!temViagem) {
+        Button(
+            onClick = onIniciar,
+            modifier = Modifier.fillMaxWidth().height(64.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
+        ) {
+            Icon(ui.Lucide.Truck, null, modifier = Modifier.size(26.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("Iniciar viagem", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+    } else {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = onAbastecer,
+                modifier = Modifier.weight(1f).height(64.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary)
+            ) {
+                Icon(ui.Lucide.Fuel, null, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Abastecer", fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+            Button(
+                onClick = onFinalizar,
+                modifier = Modifier.weight(1f).height(64.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981), contentColor = Color.White)
+            ) {
+                Icon(ui.Lucide.Flag, null, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Finalizar", fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
         }
     }
@@ -347,8 +398,8 @@ private fun ConnectivityBadge(text: String, backgroundColor: Color, textColor: C
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, null, modifier = Modifier.size(10.dp), tint = textColor)
-            Text(text, fontSize = 9.sp, color = textColor, fontWeight = FontWeight.Bold)
+            Icon(icon, null, modifier = Modifier.size(12.dp), tint = textColor)
+            Text(text, fontSize = 11.sp, color = textColor, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -360,7 +411,7 @@ private fun ConnectivityBadge(text: String, backgroundColor: Color, textColor: C
 fun VerificandoViagemCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)),
+        colors = CardDefaults.cardColors(containerColor = AppColors.Warning.copy(alpha = 0.12f)),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
@@ -369,7 +420,7 @@ fun VerificandoViagemCard() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFFF57C00))
-            Text("Verificando viagens...", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text("Verificando viagens...", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AppColors.TextPrimary)
         }
     }
 }
@@ -381,7 +432,7 @@ fun VerificandoViagemCard() {
 fun SemViagemCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFAFAFA)),
+        colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
@@ -392,15 +443,15 @@ fun SemViagemCard() {
             Spacer(Modifier.height(12.dp))
             Text(
                 "Nenhuma viagem em andamento",
-                fontSize = 15.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.Medium,
                 color = AppColors.TextSecondary
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "Inicie uma viagem na barra inferior",
-                fontSize = 12.sp,
-                color = Color(0xFFBDBDBD)
+                "Quando sair, toque em Iniciar viagem aqui embaixo.",
+                fontSize = 14.sp,
+                color = AppColors.TextSecondary
             )
         }
     }
