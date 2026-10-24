@@ -46,9 +46,8 @@ fun DateInputField(
     Column(modifier = modifier) {
         Text(
             text = label,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color(0xFF374151),
+            fontWeight = FontWeight.SemiBold, // igual aos outros nomes de campo dos formulários
+            color = ui.AppColors.TextPrimary,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
