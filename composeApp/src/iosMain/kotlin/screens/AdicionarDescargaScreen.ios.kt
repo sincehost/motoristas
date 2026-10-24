@@ -413,7 +413,9 @@ actual fun AdicionarDescargaScreen(
         topBar = {
             GradientTopBar(
                 title = "Adicionar Descarga",
-                onBackClick = onVoltar
+                onBackClick = onVoltar,
+                // Destino da viagem: antes era um card grande em cima do formulário.
+                subtitle = listOfNotNull(placaVeiculo.ifBlank { null }, viagemAtual?.destino).joinToString(" • ")
             )
         }
     ) { padding ->
@@ -425,45 +427,8 @@ actual fun AdicionarDescargaScreen(
                 .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
                 .verticalScroll(scrollState)
         ) {
-            // Info da viagem
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = primaryColor.copy(alpha = 0.1f))
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(primaryColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.LocalShipping,
-                            null,
-                            tint = primaryColor,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            "Descarga na viagem",
-                            fontSize = 12.sp,
-                            color = primaryColor.copy(alpha = 0.7f)
-                        )
-                        Text(
-                            listOfNotNull(placaVeiculo.ifBlank { null }, viagemAtual?.destino).joinToString(" • "),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = primaryColor
-                        )
-                    }
-                }
-            }
+            Spacer(Modifier.height(16.dp))
+
 
             // Card do formulário
             Card(

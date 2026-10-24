@@ -227,7 +227,9 @@ actual fun AdicionarFreteScreen(
         topBar = {
             GradientTopBar(
                 title = "Adicionar Frete",
-                onBackClick = onVoltar
+                onBackClick = onVoltar,
+                // Destino da viagem: antes era um card grande em cima do formulário.
+                subtitle = viagemEmAndamento?.destino
             )
         }
     ) { padding ->
@@ -280,22 +282,6 @@ actual fun AdicionarFreteScreen(
                         }
                     }
                 } else {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF273159).copy(alpha = 0.1f))
-                    ) {
-                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.LocalShipping, null, tint = CorFrete, modifier = Modifier.size(32.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text("Viagem em andamento", fontSize = 12.sp, color = AppColors.TextSecondary)
-                                Text(viagemEmAndamento?.destino ?: "", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppColors.TextPrimary)
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(16.dp))
-
                     // Fretes já cadastrados nesta viagem — pra confirmar o que já foi lançado.
                     if (fretesJaCadastrados.isNotEmpty()) {
                         Text(

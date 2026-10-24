@@ -258,7 +258,9 @@ actual fun AdicionarDescargaScreen(
         topBar = {
             GradientTopBar(
                 title = "Adicionar Descarga",
-                onBackClick = onVoltar
+                onBackClick = onVoltar,
+                // Destino da viagem: antes era um card grande em cima do formulário.
+                subtitle = listOfNotNull(placaVeiculo.ifBlank { null }, viagemEmAndamento?.destino).joinToString(" • ")
             )
         }
     ) { padding ->
@@ -313,27 +315,6 @@ actual fun AdicionarDescargaScreen(
                         }
                     }
                 } else {
-                    // Card da viagem em andamento
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF273159).copy(alpha = 0.1f))
-                    ) {
-                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.LocalShipping, null, tint = Color(0xFF1E88E5), modifier = Modifier.size(32.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text("Descarga na viagem", fontSize = 12.sp, color = AppColors.TextSecondary)
-                                Text(
-                                    listOfNotNull(placaVeiculo.ifBlank { null }, viagemEmAndamento?.destino).joinToString(" • "),
-                                    fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppColors.TextPrimary
-                                )
-                                Text("Iniciada em: ${formatarDataBR(viagemEmAndamento?.data ?: "")}", fontSize = 12.sp, color = AppColors.TextSecondary)
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(16.dp))
-
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = AppColors.CardBackground),

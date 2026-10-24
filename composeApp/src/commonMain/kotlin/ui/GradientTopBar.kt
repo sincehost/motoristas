@@ -10,23 +10,37 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GradientTopBar(
     title: String,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    /** Linha pequena embaixo do título (ex.: destino da viagem em andamento). */
+    subtitle: String? = null
 ) {
     val dark = isDark()
     TopAppBar(
         title = {
-            Text(
-                title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White
-            )
+            Column {
+                Text(
+                    title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        subtitle,
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.85f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         },
         navigationIcon = {
             IconButton(onClick = onBackClick) {
